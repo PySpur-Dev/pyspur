@@ -2,8 +2,6 @@ export const nodeTypes = {
   "primitives": [
     {
       "name": "ConstantValueNode",
-      "acronym": "CVN",
-      "color": "#FFDDC1",
       "input": {
         "properties": {},
         "title": "ConstantValueNodeInput",
@@ -32,14 +30,11 @@ export const nodeTypes = {
   "llm": [
     {
       "name": "StringOutputLLMNode",
-      "acronym": "SOLN",
-      "color": "#C1E1FF",
       "input": {
         "properties": {
           "user_message": {
             "title": "User Message",
-            "type": "string",
-            "value": ""
+            "type": "string"
           }
         },
         "required": [
@@ -52,8 +47,7 @@ export const nodeTypes = {
         "properties": {
           "assistant_message": {
             "title": "Assistant Message",
-            "type": "string",
-            "value": ""
+            "type": "string"
           }
         },
         "required": [
@@ -64,42 +58,63 @@ export const nodeTypes = {
       },
       "config": {
         "$defs": {
-          "ModelName": {
-            "enum": [
-              "gpt-4o-mini",
-              "gpt-4o",
-              "o1-preview",
-              "o1-mini",
-              "gpt-4-turbo"
+          "ModelInfo": {
+            "properties": {
+              "name": {
+                "title": "Name",
+                "type": "string"
+              },
+              "max_tokens": {
+                "description": "Maximum number of tokens the model can generate",
+                "minimum": 1,
+                "title": "Max Tokens",
+                "type": "integer"
+              },
+              "temperature": {
+                "default": 0.7,
+                "description": "Temperature for randomness, between 0.0 and 1.0",
+                "maximum": 1,
+                "minimum": 0,
+                "title": "Temperature",
+                "type": "number"
+              },
+              "top_p": {
+                "default": 1,
+                "description": "Top-p sampling value, between 0.0 and 1.0",
+                "maximum": 1,
+                "minimum": 0,
+                "title": "Top P",
+                "type": "number"
+              }
+            },
+            "required": [
+              "name",
+              "max_tokens"
             ],
-            "title": "ModelName",
-            "type": "string"
+            "title": "ModelInfo",
+            "type": "object"
           }
         },
         "properties": {
-          "llm_name": {
-            "$ref": "#/$defs/ModelName",
-            "value": "gpt-4o"
-          },
-          "max_tokens": {
-            "title": "Max Tokens",
-            "type": "integer",
-            "value": 1024
-          },
-          "temperature": {
-            "title": "Temperature",
-            "type": "number",
-            "minimum": 0.0,
-            "maximum": 2.0,
-            "value": 1.0
+          "llm_info": {
+            "$ref": "#/$defs/ModelInfo",
+            "default": {
+              "name": "gpt-4o-mini",
+              "max_tokens": 16384,
+              "temperature": 0.7,
+              "top_p": 1
+            },
+            "description": "The default LLM model to use"
           },
           "system_prompt": {
+            "default": "You are a helpful assistant.",
+            "description": "The system prompt for the LLM",
             "title": "System Prompt",
-            "type": "string",
-            "value": "You are a helpful assistant."
+            "type": "string"
           },
           "json_mode": {
             "default": false,
+            "description": "Whether to use JSON mode for the LLM",
             "title": "Json Mode",
             "type": "boolean"
           },
@@ -118,30 +133,21 @@ export const nodeTypes = {
                 "type": "null"
               }
             ],
-            "value": null,
+            "default": null,
             "title": "Few Shot Examples"
           }
         },
-        "required": [
-          "llm_name",
-          "max_tokens",
-          "temperature",
-          "system_prompt"
-        ],
         "title": "StringOutputLLMNodeConfig",
         "type": "object"
       }
     },
     {
       "name": "StructuredOutputNode",
-      "acronym": "SON",
-      "color": "#D1FFC1",
       "input": {
         "properties": {
           "user_message": {
             "title": "User Message",
-            "type": "string",
-            "value": ""
+            "type": "string"
           }
         },
         "required": [
@@ -157,39 +163,59 @@ export const nodeTypes = {
       },
       "config": {
         "$defs": {
-          "ModelName": {
-            "enum": [
-              "gpt-4o-mini",
-              "gpt-4o",
-              "o1-preview",
-              "o1-mini",
-              "gpt-4-turbo"
+          "ModelInfo": {
+            "properties": {
+              "name": {
+                "title": "Name",
+                "type": "string"
+              },
+              "max_tokens": {
+                "description": "Maximum number of tokens the model can generate",
+                "minimum": 1,
+                "title": "Max Tokens",
+                "type": "integer"
+              },
+              "temperature": {
+                "default": 0.7,
+                "description": "Temperature for randomness, between 0.0 and 1.0",
+                "maximum": 1,
+                "minimum": 0,
+                "title": "Temperature",
+                "type": "number"
+              },
+              "top_p": {
+                "default": 1,
+                "description": "Top-p sampling value, between 0.0 and 1.0",
+                "maximum": 1,
+                "minimum": 0,
+                "title": "Top P",
+                "type": "number"
+              }
+            },
+            "required": [
+              "name",
+              "max_tokens"
             ],
-            "title": "ModelName",
-            "type": "string"
+            "title": "ModelInfo",
+            "type": "object"
           }
         },
         "properties": {
-          "llm_name": {
-            "$ref": "#/$defs/ModelName",
-            "value": "gpt-4o"
-          },
-          "max_tokens": {
-            "title": "Max Tokens",
-            "type": "integer",
-            "value": 1024
-          },
-          "temperature": {
-            "title": "Temperature",
-            "type": "number",
-            "minimum": 0.0,
-            "maximum": 2.0,
-            "value": 1.0
+          "llm_info": {
+            "$ref": "#/$defs/ModelInfo",
+            "default": {
+              "name": "gpt-4o",
+              "max_tokens": 16384,
+              "temperature": 0.7,
+              "top_p": 1
+            },
+            "description": "The default LLM model to use"
           },
           "system_prompt": {
+            "default": "You are a helpful assistant.",
+            "description": "The system prompt for the LLM",
             "title": "System Prompt",
-            "type": "string",
-            "value": "You are a helpful assistant."
+            "type": "string"
           },
           "output_schema": {
             "additionalProperties": {
@@ -213,15 +239,11 @@ export const nodeTypes = {
                 "type": "null"
               }
             ],
-            "value": null,
+            "default": null,
             "title": "Few Shot Examples"
           }
         },
         "required": [
-          "llm_name",
-          "max_tokens",
-          "temperature",
-          "system_prompt",
           "output_schema"
         ],
         "title": "StructuredOutputNodeConfig",
@@ -230,8 +252,6 @@ export const nodeTypes = {
     },
     {
       "name": "AdvancedLLMNode",
-      "acronym": "ALN",
-      "color": "#FFC1C1",
       "input": {
         "properties": {},
         "title": "AdvancedNodeInput",
@@ -244,39 +264,59 @@ export const nodeTypes = {
       },
       "config": {
         "$defs": {
-          "ModelName": {
-            "enum": [
-              "gpt-4o-mini",
-              "gpt-4o",
-              "o1-preview",
-              "o1-mini",
-              "gpt-4-turbo"
+          "ModelInfo": {
+            "properties": {
+              "name": {
+                "title": "Name",
+                "type": "string"
+              },
+              "max_tokens": {
+                "description": "Maximum number of tokens the model can generate",
+                "minimum": 1,
+                "title": "Max Tokens",
+                "type": "integer"
+              },
+              "temperature": {
+                "default": 0.7,
+                "description": "Temperature for randomness, between 0.0 and 1.0",
+                "maximum": 1,
+                "minimum": 0,
+                "title": "Temperature",
+                "type": "number"
+              },
+              "top_p": {
+                "default": 1,
+                "description": "Top-p sampling value, between 0.0 and 1.0",
+                "maximum": 1,
+                "minimum": 0,
+                "title": "Top P",
+                "type": "number"
+              }
+            },
+            "required": [
+              "name",
+              "max_tokens"
             ],
-            "title": "ModelName",
-            "type": "string"
+            "title": "ModelInfo",
+            "type": "object"
           }
         },
         "properties": {
-          "llm_name": {
-            "$ref": "#/$defs/ModelName",
-            "value": "gpt-4o"
-          },
-          "max_tokens": {
-            "title": "Max Tokens",
-            "type": "integer",
-            "value": 1024
-          },
-          "temperature": {
-            "title": "Temperature",
-            "type": "number",
-            "minimum": 0.0,
-            "maximum": 2.0,
-            "value": 1.0
+          "llm_info": {
+            "$ref": "#/$defs/ModelInfo",
+            "default": {
+              "name": "gpt-4o",
+              "max_tokens": 16384,
+              "temperature": 0.7,
+              "top_p": 1
+            },
+            "description": "The default LLM model to use"
           },
           "system_prompt": {
+            "default": "You are a helpful assistant.",
+            "description": "The system prompt for the LLM",
             "title": "System Prompt",
-            "type": "string",
-            "value": "You are a helpful assistant."
+            "type": "string"
           },
           "output_schema": {
             "additionalProperties": {
@@ -310,15 +350,11 @@ export const nodeTypes = {
                 "type": "null"
               }
             ],
-            "value": null,
+            "default": null,
             "title": "Few Shot Examples"
           }
         },
         "required": [
-          "llm_name",
-          "max_tokens",
-          "temperature",
-          "system_prompt",
           "output_schema"
         ],
         "title": "AdvancedNodeConfig",
@@ -327,14 +363,11 @@ export const nodeTypes = {
     },
     {
       "name": "MCTSNode",
-      "acronym": "MCTS",
-      "color": "#C1C1FF",
       "input": {
         "properties": {
           "user_message": {
             "title": "User Message",
-            "type": "string",
-            "value": ""
+            "type": "string"
           }
         },
         "required": [
@@ -347,8 +380,7 @@ export const nodeTypes = {
         "properties": {
           "assistant_message": {
             "title": "Assistant Message",
-            "type": "string",
-            "value": ""
+            "type": "string"
           }
         },
         "required": [
@@ -359,54 +391,81 @@ export const nodeTypes = {
       },
       "config": {
         "$defs": {
-          "ModelName": {
-            "enum": [
-              "gpt-4o-mini",
-              "gpt-4o",
-              "o1-preview",
-              "o1-mini",
-              "gpt-4-turbo"
+          "ModelInfo": {
+            "properties": {
+              "name": {
+                "title": "Name",
+                "type": "string"
+              },
+              "max_tokens": {
+                "description": "Maximum number of tokens the model can generate",
+                "minimum": 1,
+                "title": "Max Tokens",
+                "type": "integer"
+              },
+              "temperature": {
+                "default": 0.7,
+                "description": "Temperature for randomness, between 0.0 and 1.0",
+                "maximum": 1,
+                "minimum": 0,
+                "title": "Temperature",
+                "type": "number"
+              },
+              "top_p": {
+                "default": 1,
+                "description": "Top-p sampling value, between 0.0 and 1.0",
+                "maximum": 1,
+                "minimum": 0,
+                "title": "Top P",
+                "type": "number"
+              }
+            },
+            "required": [
+              "name",
+              "max_tokens"
             ],
-            "title": "ModelName",
-            "type": "string"
+            "title": "ModelInfo",
+            "type": "object"
           }
         },
         "properties": {
-          "llm_name": {
-            "$ref": "#/$defs/ModelName",
-            "value": "gpt-4o"
-          },
-          "max_tokens": {
-            "title": "Max Tokens",
-            "type": "integer",
-            "value": 1024
-          },
-          "temperature": {
-            "title": "Temperature",
-            "type": "number",
-            "minimum": 0.0,
-            "maximum": 2.0,
-            "value": 1.0
+          "llm_info": {
+            "$ref": "#/$defs/ModelInfo",
+            "default": {
+              "name": "gpt-4o",
+              "max_tokens": 16384,
+              "temperature": 0.7,
+              "top_p": 1
+            },
+            "description": "The default LLM model to use"
           },
           "system_prompt": {
             "title": "System Prompt",
-            "type": "string",
-            "value": "You are a helpful assistant."
+            "type": "string"
           },
           "num_simulations": {
+            "default": 10,
+            "description": "Number of simulations to run",
+            "maximum": 100,
+            "minimum": 1,
             "title": "Num Simulations",
-            "type": "integer",
-            "value": 10
+            "type": "integer"
           },
           "simulation_depth": {
+            "default": 5,
+            "description": "Simulation depth",
+            "maximum": 10,
+            "minimum": 1,
             "title": "Simulation Depth",
-            "type": "integer",
-            "value": 5
+            "type": "integer"
           },
           "exploration_weight": {
+            "default": 1.4,
+            "description": "Exploration weight",
+            "maximum": 2,
+            "minimum": 0,
             "title": "Exploration Weight",
-            "type": "number",
-            "value": 1.4
+            "type": "number"
           },
           "few_shot_examples": {
             "anyOf": [
@@ -423,12 +482,11 @@ export const nodeTypes = {
                 "type": "null"
               }
             ],
-            "value": null,
+            "default": null,
             "title": "Few Shot Examples"
           }
         },
         "required": [
-          "llm_name",
           "system_prompt"
         ],
         "title": "MCTSNodeConfig",
@@ -437,45 +495,63 @@ export const nodeTypes = {
     },
     {
       "name": "BestOfNNode",
-      "acronym": "BoN",
-      "color": "#FFD1C1",
       "input": {},
       "output": {},
       "config": {
         "$defs": {
-          "ModelName": {
-            "enum": [
-              "gpt-4o-mini",
-              "gpt-4o",
-              "o1-preview",
-              "o1-mini",
-              "gpt-4-turbo"
+          "ModelInfo": {
+            "properties": {
+              "name": {
+                "title": "Name",
+                "type": "string"
+              },
+              "max_tokens": {
+                "description": "Maximum number of tokens the model can generate",
+                "minimum": 1,
+                "title": "Max Tokens",
+                "type": "integer"
+              },
+              "temperature": {
+                "default": 0.7,
+                "description": "Temperature for randomness, between 0.0 and 1.0",
+                "maximum": 1,
+                "minimum": 0,
+                "title": "Temperature",
+                "type": "number"
+              },
+              "top_p": {
+                "default": 1,
+                "description": "Top-p sampling value, between 0.0 and 1.0",
+                "maximum": 1,
+                "minimum": 0,
+                "title": "Top P",
+                "type": "number"
+              }
+            },
+            "required": [
+              "name",
+              "max_tokens"
             ],
-            "title": "ModelName",
-            "type": "string"
+            "title": "ModelInfo",
+            "type": "object"
           }
         },
         "properties": {
-          "llm_name": {
-            "$ref": "#/$defs/ModelName",
-            "value": "gpt-4o"
-          },
-          "max_tokens": {
-            "title": "Max Tokens",
-            "type": "integer",
-            "value": 1024
-          },
-          "temperature": {
-            "title": "Temperature",
-            "type": "number",
-            "minimum": 0.0,
-            "maximum": 2.0,
-            "value": 1.0
+          "llm_info": {
+            "$ref": "#/$defs/ModelInfo",
+            "default": {
+              "name": "gpt-4o",
+              "max_tokens": 16384,
+              "temperature": 0.7,
+              "top_p": 1
+            },
+            "description": "The default LLM model to use"
           },
           "system_prompt": {
+            "default": "You are a helpful assistant.",
+            "description": "The system prompt for the LLM",
             "title": "System Prompt",
-            "type": "string",
-            "value": "You are a helpful assistant."
+            "type": "string"
           },
           "output_schema": {
             "additionalProperties": {
@@ -509,35 +585,41 @@ export const nodeTypes = {
                 "type": "null"
               }
             ],
-            "value": null,
+            "default": null,
             "title": "Few Shot Examples"
           },
           "samples": {
+            "default": 3,
+            "description": "Number of samples to generate",
+            "maximum": 10,
+            "minimum": 1,
             "title": "Samples",
-            "type": "integer",
-            "value": 3
+            "type": "integer"
           },
           "rating_prompt": {
+            "default": "Rate the following response on a scale from 0 to 10, where 0 is poor and 10 is excellent. Consider factors such as relevance, coherence, and helpfulness. Respond with only a number.",
+            "description": "The prompt for the rating LLM",
             "title": "Rating Prompt",
-            "type": "string",
-            "value": "Rate the following response on a scale from 0 to 10, where 0 is poor and 10 is excellent. Consider factors such as relevance, coherence, and helpfulness. Respond with only a number."
+            "type": "string"
           },
           "rating_temperature": {
+            "default": 0.1,
+            "description": "Temperature for randomness, between 0.0 and 1.0",
+            "maximum": 2,
+            "minimum": 0,
             "title": "Rating Temperature",
-            "type": "number",
-            "value": 0.1
+            "type": "number"
           },
           "rating_max_tokens": {
+            "default": 16,
+            "description": "Number of tokens, between 1 and 4096",
+            "maximum": 4096,
+            "minimum": 1,
             "title": "Rating Max Tokens",
-            "type": "integer",
-            "value": 16
+            "type": "integer"
           }
         },
         "required": [
-          "llm_name",
-          "max_tokens",
-          "temperature",
-          "system_prompt",
           "output_schema"
         ],
         "title": "BestOfNNodeConfig",
@@ -546,45 +628,63 @@ export const nodeTypes = {
     },
     {
       "name": "BranchSolveMergeNode",
-      "acronym": "BSM",
-      "color": "#C1FFD1",
       "input": {},
       "output": {},
       "config": {
         "$defs": {
-          "ModelName": {
-            "enum": [
-              "gpt-4o-mini",
-              "gpt-4o",
-              "o1-preview",
-              "o1-mini",
-              "gpt-4-turbo"
+          "ModelInfo": {
+            "properties": {
+              "name": {
+                "title": "Name",
+                "type": "string"
+              },
+              "max_tokens": {
+                "description": "Maximum number of tokens the model can generate",
+                "minimum": 1,
+                "title": "Max Tokens",
+                "type": "integer"
+              },
+              "temperature": {
+                "default": 0.7,
+                "description": "Temperature for randomness, between 0.0 and 1.0",
+                "maximum": 1,
+                "minimum": 0,
+                "title": "Temperature",
+                "type": "number"
+              },
+              "top_p": {
+                "default": 1,
+                "description": "Top-p sampling value, between 0.0 and 1.0",
+                "maximum": 1,
+                "minimum": 0,
+                "title": "Top P",
+                "type": "number"
+              }
+            },
+            "required": [
+              "name",
+              "max_tokens"
             ],
-            "title": "ModelName",
-            "type": "string"
+            "title": "ModelInfo",
+            "type": "object"
           }
         },
         "properties": {
-          "llm_name": {
-            "$ref": "#/$defs/ModelName",
-            "value": "gpt-4o"
-          },
-          "max_tokens": {
-            "title": "Max Tokens",
-            "type": "integer",
-            "value": 1024
-          },
-          "temperature": {
-            "title": "Temperature",
-            "type": "number",
-            "minimum": 0.0,
-            "maximum": 2.0,
-            "value": 1.0
+          "llm_info": {
+            "$ref": "#/$defs/ModelInfo",
+            "default": {
+              "name": "gpt-4o",
+              "max_tokens": 16384,
+              "temperature": 0.7,
+              "top_p": 1
+            },
+            "description": "The default LLM model to use"
           },
           "system_prompt": {
+            "default": "You are a helpful assistant.",
+            "description": "The system prompt for the LLM",
             "title": "System Prompt",
-            "type": "string",
-            "value": "You are a helpful assistant."
+            "type": "string"
           },
           "output_schema": {
             "additionalProperties": {
@@ -618,29 +718,28 @@ export const nodeTypes = {
                 "type": "null"
               }
             ],
-            "value": null,
+            "default": null,
             "title": "Few Shot Examples"
           },
           "branch_prompt": {
+            "default": "Please decompose the following task into multiple subtasks.",
+            "description": "The prompt for the branch LLM",
             "title": "Branch Prompt",
-            "type": "string",
-            "value": "Please decompose the following task into multiple subtasks."
+            "type": "string"
           },
           "solve_prompt": {
+            "default": "Please provide a detailed solution for the following subtask:",
+            "description": "The prompt for the solve LLM",
             "title": "Solve Prompt",
-            "type": "string",
-            "value": "Please provide a detailed solution for the following subtask:"
+            "type": "string"
           },
           "merge_prompt": {
+            "default": "Please combine the following solutions into a coherent and comprehensive final answer.",
             "title": "Merge Prompt",
-            "type": "string",
-            "value": "Please combine the following solutions into a coherent and comprehensive final answer."
+            "type": "string"
           }
         },
         "required": [
-          "llm_name",
-          "max_tokens",
-          "temperature",
           "output_schema"
         ],
         "title": "BranchSolveMergeNodeConfig",
@@ -649,14 +748,11 @@ export const nodeTypes = {
     },
     {
       "name": "MixtureOfAgentsNode",
-      "acronym": "MoA",
-      "color": "#E4D4F4",
       "input": {
         "properties": {
           "user_message": {
             "title": "User Message",
-            "type": "string",
-            "value": ""
+            "type": "string"
           }
         },
         "required": [
@@ -669,8 +765,7 @@ export const nodeTypes = {
         "properties": {
           "assistant_message": {
             "title": "Assistant Message",
-            "type": "string",
-            "value": ""
+            "type": "string"
           }
         },
         "required": [
@@ -681,42 +776,63 @@ export const nodeTypes = {
       },
       "config": {
         "$defs": {
-          "ModelName": {
-            "enum": [
-              "gpt-4o-mini",
-              "gpt-4o",
-              "o1-preview",
-              "o1-mini",
-              "gpt-4-turbo"
+          "ModelInfo": {
+            "properties": {
+              "name": {
+                "title": "Name",
+                "type": "string"
+              },
+              "max_tokens": {
+                "description": "Maximum number of tokens the model can generate",
+                "minimum": 1,
+                "title": "Max Tokens",
+                "type": "integer"
+              },
+              "temperature": {
+                "default": 0.7,
+                "description": "Temperature for randomness, between 0.0 and 1.0",
+                "maximum": 1,
+                "minimum": 0,
+                "title": "Temperature",
+                "type": "number"
+              },
+              "top_p": {
+                "default": 1,
+                "description": "Top-p sampling value, between 0.0 and 1.0",
+                "maximum": 1,
+                "minimum": 0,
+                "title": "Top P",
+                "type": "number"
+              }
+            },
+            "required": [
+              "name",
+              "max_tokens"
             ],
-            "title": "ModelName",
-            "type": "string"
+            "title": "ModelInfo",
+            "type": "object"
           }
         },
         "properties": {
-          "llm_name": {
-            "$ref": "#/$defs/ModelName",
-            "value": "gpt-4o"
-          },
-          "max_tokens": {
-            "title": "Max Tokens",
-            "type": "integer",
-            "value": 1024
-          },
-          "temperature": {
-            "title": "Temperature",
-            "type": "number",
-            "minimum": 0.0,
-            "maximum": 2.0,
-            "value": 1.0
+          "llm_info": {
+            "$ref": "#/$defs/ModelInfo",
+            "default": {
+              "name": "gpt-4o",
+              "max_tokens": 16384,
+              "temperature": 0.7,
+              "top_p": 1
+            },
+            "description": "The default LLM model to use"
           },
           "system_prompt": {
+            "default": "You are a helpful assistant.",
+            "description": "The system prompt for the LLM",
             "title": "System Prompt",
-            "type": "string",
-            "value": "You are a helpful assistant."
+            "type": "string"
           },
           "json_mode": {
             "default": false,
+            "description": "Whether to use JSON mode for the LLM",
             "title": "Json Mode",
             "type": "boolean"
           },
@@ -735,76 +851,88 @@ export const nodeTypes = {
                 "type": "null"
               }
             ],
-            "value": null,
+            "default": null,
             "title": "Few Shot Examples"
           },
           "samples": {
+            "default": 3,
             "title": "Samples",
-            "type": "integer",
-            "value": 3
+            "type": "integer"
           },
           "critique_prompt_template": {
+            "default": "Original query: {initial_query}\n\nI will present you with {num_candidates} candidate responses to the original query. Please analyze and critique each response, discussing their strengths and weaknesses. Provide your analysis for each candidate separately.\n\n{candidates_section}Please provide your critique for each candidate:",
             "title": "Critique Prompt Template",
-            "type": "string",
-            "value": "Original query: {initial_query}\n\nI will present you with {num_candidates} candidate responses to the original query. Please analyze and critique each response, discussing their strengths and weaknesses. Provide your analysis for each candidate separately.\n\n{candidates_section}Please provide your critique for each candidate:"
+            "type": "string"
           },
           "final_prompt_template": {
+            "default": "Original query: {initial_query}\n\nBased on the following candidate responses and their critiques, generate a final response to the original query.\n\n{candidates_section}Critiques of all candidates:\n{critiques}\n\nPlease provide a final, optimized response to the original query:",
             "title": "Final Prompt Template",
-            "type": "string",
-            "value": "Original query: {initial_query}\n\nBased on the following candidate responses and their critiques, generate a final response to the original query.\n\n{candidates_section}Critiques of all candidates:\n{critiques}\n\nPlease provide a final, optimized response to the original query:"
+            "type": "string"
           }
         },
-        "required": [
-          "llm_name",
-          "max_tokens",
-          "temperature",
-          "system_prompt"
-        ],
         "title": "MixtureOfAgentsNodeConfig",
         "type": "object"
       }
     },
     {
       "name": "SampleLLMNode",
-      "acronym": "SLN",
-      "color": "#F4E4D4",
       "input": {},
       "output": {},
       "config": {
         "$defs": {
-          "ModelName": {
-            "enum": [
-              "gpt-4o-mini",
-              "gpt-4o",
-              "o1-preview",
-              "o1-mini",
-              "gpt-4-turbo"
+          "ModelInfo": {
+            "properties": {
+              "name": {
+                "title": "Name",
+                "type": "string"
+              },
+              "max_tokens": {
+                "description": "Maximum number of tokens the model can generate",
+                "minimum": 1,
+                "title": "Max Tokens",
+                "type": "integer"
+              },
+              "temperature": {
+                "default": 0.7,
+                "description": "Temperature for randomness, between 0.0 and 1.0",
+                "maximum": 1,
+                "minimum": 0,
+                "title": "Temperature",
+                "type": "number"
+              },
+              "top_p": {
+                "default": 1,
+                "description": "Top-p sampling value, between 0.0 and 1.0",
+                "maximum": 1,
+                "minimum": 0,
+                "title": "Top P",
+                "type": "number"
+              }
+            },
+            "required": [
+              "name",
+              "max_tokens"
             ],
-            "title": "ModelName",
-            "type": "string"
+            "title": "ModelInfo",
+            "type": "object"
           }
         },
         "properties": {
-          "llm_name": {
-            "$ref": "#/$defs/ModelName",
-            "value": "gpt-4o"
-          },
-          "max_tokens": {
-            "title": "Max Tokens",
-            "type": "integer",
-            "value": 1024
-          },
-          "temperature": {
-            "title": "Temperature",
-            "type": "number",
-            "minimum": 0.0,
-            "maximum": 2.0,
-            "value": 1.0
+          "llm_info": {
+            "$ref": "#/$defs/ModelInfo",
+            "default": {
+              "name": "gpt-4o",
+              "max_tokens": 16384,
+              "temperature": 0.7,
+              "top_p": 1
+            },
+            "description": "The default LLM model to use"
           },
           "system_prompt": {
+            "default": "You are a helpful assistant.",
+            "description": "The system prompt for the LLM",
             "title": "System Prompt",
-            "type": "string",
-            "value": "You are a helpful assistant."
+            "type": "string"
           },
           "output_schema": {
             "additionalProperties": {
@@ -838,20 +966,19 @@ export const nodeTypes = {
                 "type": "null"
               }
             ],
-            "value": null,
+            "default": null,
             "title": "Few Shot Examples"
           },
           "samples": {
+            "default": 1,
+            "description": "Number of samples to generate",
+            "maximum": 10,
+            "minimum": 1,
             "title": "Samples",
-            "type": "integer",
-            "value": 1
+            "type": "integer"
           }
         },
         "required": [
-          "llm_name",
-          "max_tokens",
-          "temperature",
-          "system_prompt",
           "output_schema"
         ],
         "title": "SampleLLMNodeConfig",
@@ -860,14 +987,11 @@ export const nodeTypes = {
     },
     {
       "name": "SelfConsistencyNode",
-      "acronym": "SCN",
-      "color": "#D4F4E4",
       "input": {
         "properties": {
           "user_message": {
             "title": "User Message",
-            "type": "string",
-            "value": ""
+            "type": "string"
           }
         },
         "required": [
@@ -880,8 +1004,7 @@ export const nodeTypes = {
         "properties": {
           "assistant_message": {
             "title": "Assistant Message",
-            "type": "string",
-            "value": ""
+            "type": "string"
           }
         },
         "required": [
@@ -892,42 +1015,63 @@ export const nodeTypes = {
       },
       "config": {
         "$defs": {
-          "ModelName": {
-            "enum": [
-              "gpt-4o-mini",
-              "gpt-4o",
-              "o1-preview",
-              "o1-mini",
-              "gpt-4-turbo"
+          "ModelInfo": {
+            "properties": {
+              "name": {
+                "title": "Name",
+                "type": "string"
+              },
+              "max_tokens": {
+                "description": "Maximum number of tokens the model can generate",
+                "minimum": 1,
+                "title": "Max Tokens",
+                "type": "integer"
+              },
+              "temperature": {
+                "default": 0.7,
+                "description": "Temperature for randomness, between 0.0 and 1.0",
+                "maximum": 1,
+                "minimum": 0,
+                "title": "Temperature",
+                "type": "number"
+              },
+              "top_p": {
+                "default": 1,
+                "description": "Top-p sampling value, between 0.0 and 1.0",
+                "maximum": 1,
+                "minimum": 0,
+                "title": "Top P",
+                "type": "number"
+              }
+            },
+            "required": [
+              "name",
+              "max_tokens"
             ],
-            "title": "ModelName",
-            "type": "string"
+            "title": "ModelInfo",
+            "type": "object"
           }
         },
         "properties": {
-          "llm_name": {
-            "$ref": "#/$defs/ModelName",
-            "value": "gpt-4o"
-          },
-          "max_tokens": {
-            "title": "Max Tokens",
-            "type": "integer",
-            "value": 1024
-          },
-          "temperature": {
-            "title": "Temperature",
-            "type": "number",
-            "minimum": 0.0,
-            "maximum": 2.0,
-            "value": 1.0
+          "llm_info": {
+            "$ref": "#/$defs/ModelInfo",
+            "default": {
+              "name": "gpt-4o",
+              "max_tokens": 16384,
+              "temperature": 0.7,
+              "top_p": 1
+            },
+            "description": "The default LLM model to use"
           },
           "system_prompt": {
+            "default": "You are a helpful assistant.",
+            "description": "The system prompt for the LLM",
             "title": "System Prompt",
-            "type": "string",
-            "value": "You are a helpful assistant."
+            "type": "string"
           },
           "json_mode": {
             "default": false,
+            "description": "Whether to use JSON mode for the LLM",
             "title": "Json Mode",
             "type": "boolean"
           },
@@ -946,40 +1090,37 @@ export const nodeTypes = {
                 "type": "null"
               }
             ],
-            "value": null,
+            "default": null,
             "title": "Few Shot Examples"
           },
           "samples": {
+            "default": 5,
+            "description": "Number of samples to generate",
+            "maximum": 10,
+            "minimum": 1,
             "title": "Samples",
-            "type": "integer",
-            "value": 5
+            "type": "integer"
           },
           "similarity_threshold": {
+            "default": 0.8,
+            "description": "Similarity threshold",
+            "maximum": 1,
+            "minimum": 0,
             "title": "Similarity Threshold",
-            "type": "number",
-            "value": 0.8
+            "type": "number"
           }
         },
-        "required": [
-          "llm_name",
-          "max_tokens",
-          "temperature",
-          "system_prompt"
-        ],
         "title": "SelfConsistencyNodeConfig",
         "type": "object"
       }
     },
     {
       "name": "TreeOfThoughtsNode",
-      "acronym": "ToT",
-      "color": "#F4D4E4",
       "input": {
         "properties": {
           "user_message": {
             "title": "User Message",
-            "type": "string",
-            "value": ""
+            "type": "string"
           }
         },
         "required": [
@@ -992,8 +1133,7 @@ export const nodeTypes = {
         "properties": {
           "assistant_message": {
             "title": "Assistant Message",
-            "type": "string",
-            "value": ""
+            "type": "string"
           }
         },
         "required": [
@@ -1004,42 +1144,63 @@ export const nodeTypes = {
       },
       "config": {
         "$defs": {
-          "ModelName": {
-            "enum": [
-              "gpt-4o-mini",
-              "gpt-4o",
-              "o1-preview",
-              "o1-mini",
-              "gpt-4-turbo"
+          "ModelInfo": {
+            "properties": {
+              "name": {
+                "title": "Name",
+                "type": "string"
+              },
+              "max_tokens": {
+                "description": "Maximum number of tokens the model can generate",
+                "minimum": 1,
+                "title": "Max Tokens",
+                "type": "integer"
+              },
+              "temperature": {
+                "default": 0.7,
+                "description": "Temperature for randomness, between 0.0 and 1.0",
+                "maximum": 1,
+                "minimum": 0,
+                "title": "Temperature",
+                "type": "number"
+              },
+              "top_p": {
+                "default": 1,
+                "description": "Top-p sampling value, between 0.0 and 1.0",
+                "maximum": 1,
+                "minimum": 0,
+                "title": "Top P",
+                "type": "number"
+              }
+            },
+            "required": [
+              "name",
+              "max_tokens"
             ],
-            "title": "ModelName",
-            "type": "string"
+            "title": "ModelInfo",
+            "type": "object"
           }
         },
         "properties": {
-          "llm_name": {
-            "$ref": "#/$defs/ModelName",
-            "value": "gpt-4o"
-          },
-          "max_tokens": {
-            "title": "Max Tokens",
-            "type": "integer",
-            "value": 1024
-          },
-          "temperature": {
-            "title": "Temperature",
-            "type": "number",
-            "minimum": 0.0,
-            "maximum": 2.0,
-            "value": 0.7
+          "llm_info": {
+            "$ref": "#/$defs/ModelInfo",
+            "default": {
+              "name": "gpt-4o",
+              "max_tokens": 16384,
+              "temperature": 0.7,
+              "top_p": 1
+            },
+            "description": "The default LLM model to use"
           },
           "system_prompt": {
+            "default": "You are a helpful assistant.",
+            "description": "The system prompt for the LLM",
             "title": "System Prompt",
-            "type": "string",
-            "value": "You are a helpful assistant."
+            "type": "string"
           },
           "json_mode": {
             "default": false,
+            "description": "Whether to use JSON mode for the LLM",
             "title": "Json Mode",
             "type": "boolean"
           },
@@ -1058,67 +1219,80 @@ export const nodeTypes = {
                 "type": "null"
               }
             ],
-            "value": null,
+            "default": null,
             "title": "Few Shot Examples"
           },
           "steps": {
+            "default": 3,
+            "description": "Number of steps to run",
+            "maximum": 10,
+            "minimum": 1,
             "title": "Steps",
-            "type": "integer",
-            "value": 3
+            "type": "integer"
           },
           "n_generate_sample": {
+            "default": 1,
+            "description": "Number of samples to generate",
+            "maximum": 10,
+            "minimum": 1,
             "title": "N Generate Sample",
-            "type": "integer",
-            "value": 1
+            "type": "integer"
           },
           "n_evaluate_sample": {
+            "default": 1,
+            "description": "Number of samples to evaluate",
+            "maximum": 10,
+            "minimum": 1,
             "title": "N Evaluate Sample",
-            "type": "integer",
-            "value": 1
+            "type": "integer"
           },
           "n_select_sample": {
+            "default": 1,
+            "description": "Number of samples to select",
+            "maximum": 10,
+            "minimum": 1,
             "title": "N Select Sample",
-            "type": "integer",
-            "value": 1
+            "type": "integer"
           },
           "method_generate": {
+            "default": "sample",
+            "description": "Generation method",
             "title": "Method Generate",
-            "type": "string",
-            "value": "sample"
+            "type": "string"
           },
           "method_evaluate": {
+            "default": "value",
+            "description": "Evaluation method",
             "title": "Method Evaluate",
-            "type": "string",
-            "value": "value"
+            "type": "string"
           },
           "method_select": {
+            "default": "greedy",
+            "description": "Selection method",
             "title": "Method Select",
-            "type": "string",
-            "value": "greedy"
+            "type": "string"
           },
           "prompt_sample": {
+            "default": "standard",
+            "description": "Prompt sample",
             "title": "Prompt Sample",
-            "type": "string",
-            "value": "standard"
+            "type": "string"
           },
           "stops": {
-            "title": "Stops",
-            "type": "array",
+            "default": [],
             "items": {
               "type": "string"
-            }
+            },
+            "title": "Stops",
+            "type": "array"
           },
           "search_method": {
+            "default": "bfs",
+            "description": "Search method",
             "title": "Search Method",
-            "type": "string",
-            "value": "bfs"
+            "type": "string"
           }
         },
-        "required": [
-          "llm_name",
-          "max_tokens",
-          "system_prompt"
-        ],
         "title": "TreeOfThoughtsNodeConfig",
         "type": "object"
       }
@@ -1127,8 +1301,6 @@ export const nodeTypes = {
   "python": [
     {
       "name": "PythonFuncNode",
-      "acronym": "PFN",
-      "color": "#D4E4F4",
       "input": {
         "properties": {},
         "title": "PythonFuncNodeInput",
@@ -1173,8 +1345,6 @@ export const nodeTypes = {
   "subworkflow": [
     {
       "name": "SubworkflowNode",
-      "acronym": "SWN",
-      "color": "#F4D4C1",
       "input": {},
       "output": {},
       "config": {
