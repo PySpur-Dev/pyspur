@@ -1,5 +1,23 @@
 import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
-import { ReactFlow, Background, ReactFlowProvider, useViewport } from '@xyflow/react';
+// import { ReactFlow, Background, ReactFlowProvider, useViewport } from '@xyflow/react';
+import {
+  ReactFlow,
+  Node,
+  ReactFlowProvider,
+  useReactFlow,
+  Background,
+  BackgroundVariant,
+  MarkerType,
+  useNodesState,
+  useEdgesState,
+  addEdge,
+  Edge,
+  Connection,
+  SelectionMode,
+  useViewport,
+} from '@xyflow/react';
+
+
 import '@xyflow/react/dist/style.css';
 import { useSelector, useDispatch } from 'react-redux';
 import Operator from './footer/operator/Operator';
@@ -27,9 +45,12 @@ import { useModeStore } from '../../store/modeStore';
 import { initializeFlow } from '../../store/flowSlice'; // Import the new action
 // Import the new API function
 import InputNode from '../nodes/InputNode';
+import GroupNode from '../nodes/groupNode/GroupNode';
 import { useSaveWorkflow } from '../../hooks/useSaveWorkflow';
 import LoadingSpinner from '../LoadingSpinner'; // Updated import
 import ConditionalNode from '../nodes/ConditionalNode';
+import { sortNodes, getId, getNodePositionInsideParent } from '../../utils/groupUtils';
+import SelectedNodesToolbar from '../nodes/groupNode/SelectedNodesToolbar';
 
 const useNodeTypes = ({ nodeTypesConfig }) => {
   const nodeTypes = useMemo(() => {
@@ -90,6 +111,7 @@ const FlowCanvasContent = (props) => {
   }, [dispatch, workflowData, workflowID]);
 
   const { nodeTypes, isLoading } = useNodeTypes({ nodeTypesConfig });
+  console.log('nodeTypes', nodeTypes);
 
   const nodes = useSelector((state) => state.flow.nodes);
   const edges = useSelector((state) => state.flow.edges);
@@ -295,6 +317,10 @@ const FlowCanvasContent = (props) => {
     hideAttribution: true
   };
 
+  const onDragOver = (event) => {
+    event.preventDefault();
+    event.dataTransfer.dropEffect = 'move';
+  };
 
   const mode = useModeStore((state) => state.mode);
 

@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
-import { Handle, useHandleConnections } from '@xyflow/react';
+// import { Handle, useHandleConnections, NodeToolbar } from '@xyflow/react';
 import { useSelector, useDispatch } from 'react-redux';
 import BaseNode from './BaseNode';
 import styles from './DynamicNode.module.css';
@@ -8,6 +8,17 @@ import {
   updateNodeData,
   updateEdgesOnHandleRename,
 } from '../../store/flowSlice';
+import useDetachNodes from '../../hooks/useDetachNodes';
+import {
+  Handle,
+  Position,
+  NodeToolbar,
+  NodeProps,
+  useStore,
+  useReactFlow,
+  BuiltInNode,
+  useHandleConnections
+} from '@xyflow/react';
 
 const DynamicNode = ({ id, type, data, position, ...props }) => {
   const nodeRef = useRef(null);
@@ -229,8 +240,19 @@ const DynamicNode = ({ id, type, data, position, ...props }) => {
 
   const isConditionalNode = type === 'ConditionalNode';
 
+  const hasParent = useStore((store) => !!store.nodeLookup.get(id)?.parentId);
+  const { deleteElements } = useReactFlow();
+  const detachNodes = useDetachNodes();
+
+  const onDelete = () => deleteElements({ nodes: [{ id }] });
+  const onDetach = () => detachNodes([id]); 
+
   return (
     <div className={styles.dynamicNodeWrapper} style={{ zIndex: props.parentNode ? 1 : 0 }}>
+      <NodeToolbar className="nodrag">
+        <button onClick={onDelete}>Delete</button>
+        {hasParent && <button onClick={onDetach}>Detach</button>}
+      </NodeToolbar>
       <BaseNode
         id={id}
         data={nodeData}
