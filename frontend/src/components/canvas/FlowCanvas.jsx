@@ -52,6 +52,11 @@ import ConditionalNode from '../nodes/ConditionalNode';
 import { sortNodes, getId, getNodePositionInsideParent } from '../../utils/groupUtils';
 import SelectedNodesToolbar from '../nodes/groupNode/SelectedNodesToolbar';
 
+const onDragOver = (event) => {
+  event.preventDefault();
+  event.dataTransfer.dropEffect = 'move';
+};
+
 const useNodeTypes = ({ nodeTypesConfig }) => {
   const nodeTypes = useMemo(() => {
     if (!nodeTypesConfig) return {};
@@ -61,6 +66,8 @@ const useNodeTypes = ({ nodeTypesConfig }) => {
           acc[node.name] = InputNode;
         } else if (node.name === 'ConditionalNode') {
           acc[node.name] = ConditionalNode;
+        } else if (node.name === 'GroupNode') {
+          acc[node.name] = GroupNode;
         } else {
           acc[node.name] = (props) => {
             return <DynamicNode {...props} type={node.name} />;
@@ -161,6 +168,15 @@ const FlowCanvasContent = (props) => {
     (changes) => dispatch(edgesChange({ changes })),
     [dispatch]
   );
+
+  const setNodes = useCallback(
+    (nodes) => {
+      const nodesArray = Array.isArray(nodes) ? nodes : []; // Ensure nodes is an array
+      dispatch(nodesChange({ changes: nodesArray.map((node) => ({ node })) }));
+    },
+    [dispatch]
+  );
+
   const onConnect = useCallback(
     (connection) => {
       const newEdge = {
@@ -317,10 +333,135 @@ const FlowCanvasContent = (props) => {
     hideAttribution: true
   };
 
-  const onDragOver = (event) => {
+  
+
+  const { screenToFlowPosition, getIntersectingNodes, getNodes } =
+    useReactFlow();
+
+  const onDrop = (event) => {
     event.preventDefault();
-    event.dataTransfer.dropEffect = 'move';
+
+    const type = event.dataTransfer.getData('application/reactflow');
+    const position = screenToFlowPosition({
+      x: event.clientX - 20,
+      y: event.clientY - 20,
+    });
+    const nodeDimensions = type === 'group' ? { width: 400, height: 200 } : {};
+
+    const intersections = getIntersectingNodes({
+      x: position.x,
+      y: position.y,
+      width: 40,
+      height: 40,
+    }).filter((n) => n.type === 'group');
+    const groupNode = intersections[0];
+
+    const newNode = {
+      id: getId(),
+      type,
+      position,
+      data: { label: `${type}` },
+      ...nodeDimensions,
+    };
+
+    if (groupNode) {
+      // if we drop a node on a group node, we want to position the node inside the group
+      newNode.position = getNodePositionInsideParent(
+        {
+          position,
+          width: 40,
+          height: 40,
+        },
+        groupNode
+      ) ?? { x: 0, y: 0 };
+      newNode.parentId = groupNode?.id;
+      newNode.expandParent = true;
+    }
+
+    // we need to make sure that the parents are sorted before the children
+    // to make sure that the children are rendered on top of the parents
+    const sortedNodes = getNodes().concat(newNode).sort(sortNodes);
+    setNodes(sortedNodes);
   };
+
+  const onNodeDragStop = useCallback(
+    (_, node) => {
+      if (node.type !== 'node' && !node.parentId) {
+        return;
+      }
+
+      const intersections = getIntersectingNodes(node).filter(
+        (n) => n.type === 'group'
+      );
+      const groupNode = intersections[0];
+
+      // when there is an intersection on drag stop, we want to attach the node to its new parent
+      if (intersections.length && node.parentId !== groupNode?.id) {
+        const nextNodes = getNodes()
+          .map((n) => {
+            if (n.id === groupNode.id) {
+              return {
+                ...n,
+                className: '',
+              };
+            } else if (n.id === node.id) {
+              const position = getNodePositionInsideParent(n, groupNode) ?? {
+                x: 0,
+                y: 0,
+              };
+
+              return {
+                ...n,
+                position,
+                parentId: groupNode.id,
+                extent: 'parent',
+              };
+            }
+
+            return n;
+          })
+          .sort(sortNodes);
+
+        setNodes(nextNodes);
+      }
+    },
+    [getIntersectingNodes, getNodes, setNodes]
+  );
+
+  const onNodeDrag = useCallback(
+    (_, node) => {
+      if (node.type !== 'node' && !node.parentId) {
+        return;
+      }
+
+      const intersections = getIntersectingNodes(node).filter(
+        (n) => n.type === 'group'
+      );
+      const groupClassName =
+        intersections.length && node.parentId !== intersections[0]?.id
+          ? 'active'
+          : '';
+
+      setNodes((nds) => {
+        return nds.map((n) => {
+          if (n.type === 'group') {
+            return {
+              ...n,
+              className: groupClassName,
+            };
+          } else if (n.id === node.id) {
+            return {
+              ...n,
+              position: node.position,
+            };
+          }
+
+          return { ...n };
+        });
+      });
+    },
+    [getIntersectingNodes, setNodes]
+  );
 
   const mode = useModeStore((state) => state.mode);
 
@@ -431,6 +572,9 @@ const FlowCanvasContent = (props) => {
             deleteKeyCode="Delete"
             nodesConnectable={true}
             connectionMode="loose"
+            onNodeDrag={onNodeDrag}
+            onNodeDragStop={onNodeDragStop}
+            onDrop={onDrop}
           >
             <Background />
 
@@ -445,6 +589,7 @@ const FlowCanvasContent = (props) => {
 
 
             <Operator />
+            <SelectedNodesToolbar />
           </ReactFlow>
         </div>
         {selectedNodeID && (

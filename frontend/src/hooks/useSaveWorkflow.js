@@ -54,7 +54,7 @@ export const useSaveWorkflow = (trigger, delay = 2000) => {
         }),
       };
       console.log('send to b/e workflow:', updatedWorkflow);
-      await updateWorkflow(workflowID, updatedWorkflow);
+      // await updateWorkflow(workflowID, updatedWorkflow);
     } catch (error) {
       console.error('Error saving workflow:', error);
     }
