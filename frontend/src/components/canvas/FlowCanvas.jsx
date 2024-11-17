@@ -58,16 +58,14 @@ const onDragOver = (event) => {
 };
 
 const useNodeTypes = ({ nodeTypesConfig }) => {
+  console.log('nodeTypesConfig', nodeTypesConfig);
   const nodeTypes = useMemo(() => {
-    if (!nodeTypesConfig) return {};
-    return Object.keys(nodeTypesConfig).reduce((acc, category) => {
+    const types = Object.keys(nodeTypesConfig || {}).reduce((acc, category) => {
       nodeTypesConfig[category].forEach(node => {
         if (node.name === 'InputNode') {
           acc[node.name] = InputNode;
         } else if (node.name === 'ConditionalNode') {
           acc[node.name] = ConditionalNode;
-        } else if (node.name === 'GroupNode') {
-          acc[node.name] = GroupNode;
         } else {
           acc[node.name] = (props) => {
             return <DynamicNode {...props} type={node.name} />;
@@ -76,6 +74,11 @@ const useNodeTypes = ({ nodeTypesConfig }) => {
       });
       return acc;
     }, {});
+
+    // Ensure GroupNode is always included
+    types['GroupNode'] = GroupNode;
+
+    return types;
   }, [nodeTypesConfig]);
 
   const isLoading = !nodeTypesConfig;
@@ -386,16 +389,15 @@ const FlowCanvasContent = (props) => {
 
   const onNodeDragStop = useCallback(
     (_, node) => {
-      if (node.type !== 'node' && !node.parentId) {
+      if (node.type === 'group' || !node.parentId) {
         return;
       }
-
+  
       const intersections = getIntersectingNodes(node).filter(
         (n) => n.type === 'group'
       );
       const groupNode = intersections[0];
-
-      // when there is an intersection on drag stop, we want to attach the node to its new parent
+  
       if (intersections.length && node.parentId !== groupNode?.id) {
         const nextNodes = getNodes()
           .map((n) => {
@@ -409,19 +411,30 @@ const FlowCanvasContent = (props) => {
                 x: 0,
                 y: 0,
               };
-
-              return {
-                ...n,
-                position,
-                parentId: groupNode.id,
-                extent: 'parent',
-              };
+  
+              // Ensure the node is only given a parent extent if it has a valid parentId
+              if (groupNode) {
+                return {
+                  ...n,
+                  position,
+                  parentId: groupNode.id,
+                  extent: 'parent', // Set extent only if groupNode is valid
+                };
+              } else {
+                console.warn(`Node ${n.id} does not have a valid parent group.`);
+                return {
+                  ...n,
+                  position,
+                  parentId: null,
+                  extent: undefined, // Remove extent if no valid parent
+                };
+              }
             }
-
+  
             return n;
           })
           .sort(sortNodes);
-
+  
         setNodes(nextNodes);
       }
     },
@@ -430,7 +443,7 @@ const FlowCanvasContent = (props) => {
 
   const onNodeDrag = useCallback(
     (_, node) => {
-      if (node.type !== 'node' && !node.parentId) {
+      if (node.type === 'GroupNode' || !node.parentId) {
         return;
       }
 
@@ -444,7 +457,7 @@ const FlowCanvasContent = (props) => {
 
       setNodes((nds) => {
         return nds.map((n) => {
-          if (n.type === 'group') {
+          if (n.type === 'GroupNode') {
             return {
               ...n,
               className: groupClassName,
