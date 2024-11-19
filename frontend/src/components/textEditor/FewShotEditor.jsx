@@ -3,6 +3,7 @@ import { useSelector, useDispatch } from 'react-redux';
 import TextEditor from './TextEditor';
 import { updateNodeData } from '../../store/flowSlice';
 import { Button, Tabs, Tab } from "@nextui-org/react";
+import _ from 'lodash';
 
 const InputOutputTabs = ({ activeTab, setActiveTab }) => {
     return (
@@ -28,19 +29,24 @@ const FewShotEditor = ({ nodeID, exampleIndex, onSave, onDiscard }) => {
 
     const handleContentChange = (content) => {
         const fieldName = `few_shot_examples[${exampleIndex}].${activeTab}`;
-        const updatedExamples = [...(node?.data?.userconfig?.few_shot_examples || [])];
+
+        // Use lodash's cloneDeep to deep clone the few_shot_examples array
+        const updatedExamples = _.cloneDeep(node?.data?.config?.few_shot_examples || []);
 
         if (!updatedExamples[exampleIndex]) {
             updatedExamples[exampleIndex] = {};
         }
+
+        // Update the content for the active tab (input/output)
         updatedExamples[exampleIndex][activeTab] = content;
 
+        // Dispatch the updated data to Redux
         dispatch(updateNodeData({
             id: nodeID,
             data: {
                 ...node?.data,
-                userconfig: {
-                    ...node?.data?.userconfig,
+                config: {
+                    ...node?.data?.config,
                     few_shot_examples: updatedExamples
                 }
             }
@@ -53,21 +59,13 @@ const FewShotEditor = ({ nodeID, exampleIndex, onSave, onDiscard }) => {
 
             <TextEditor
                 key={`${activeTab}-${exampleIndex}`}
-                content={node?.data?.userconfig?.few_shot_examples?.[exampleIndex]?.[activeTab] || ''}
+                content={node?.data?.config?.few_shot_examples?.[exampleIndex]?.[activeTab] || ''}
                 setContent={handleContentChange}
                 isEditable={true}
                 fieldTitle={`Example ${exampleIndex + 1} ${activeTab}`}
             />
 
             <div className="mt-4">
-                <Button
-                    onPress={onSave}
-                    color="primary"
-                    variant="solid"
-                    auto
-                >
-                    Save
-                </Button>
                 <Button
                     onPress={onDiscard}
                     color="primary"
@@ -76,6 +74,15 @@ const FewShotEditor = ({ nodeID, exampleIndex, onSave, onDiscard }) => {
                 >
                     Discard
                 </Button>
+                <Button
+                    onPress={onSave}
+                    color="primary"
+                    variant="solid"
+                    auto
+                >
+                    Save
+                </Button>
+
             </div>
         </div>
     );

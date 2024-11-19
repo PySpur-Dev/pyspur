@@ -13,6 +13,7 @@ import {
   TableBody,
   TableRow,
   TableCell,
+  Input
 } from "@nextui-org/react";
 import { Icon } from "@iconify/react";
 import TextEditor from './textEditor/TextEditor';
@@ -84,7 +85,7 @@ const RunModal = ({ isOpen, onOpenChange, onRun, onSave }) => {
 
     return (
       <div onDoubleClick={() => handleDoubleClick(row.id, field)}>
-        {row[field]}
+        <div dangerouslySetInnerHTML={{ __html: row[field] }} />
       </div>
     );
   };

@@ -8,12 +8,14 @@ import {
   NavbarItem,
   Link,
   Button,
+  Spinner,
 } from "@nextui-org/react";
 import { Icon } from "@iconify/react";
 import SettingsCard from './settings/Settings';
-import { setProjectName, updateNodeData } from '../store/flowSlice'; // Ensure updateNodeData is imported
+import { setProjectName, updateNodeData, resetRun } from '../store/flowSlice'; // Ensure updateNodeData is imported
 import RunModal from './RunModal';
 import { getRunStatus, startRun, getWorkflow } from '../utils/api';
+import { Toaster, toast } from 'sonner'
 
 const Header = ({ activePage }) => {
   const dispatch = useDispatch();
@@ -22,16 +24,22 @@ const Header = ({ activePage }) => {
   const [isRunning, setIsRunning] = useState(false);
   const [isDebugModalOpen, setIsDebugModalOpen] = useState(false);
 
+  let currentStatusInterval = null;
+
   const updateWorkflowStatus = async (runID) => {
     let pollCount = 0;
-    const checkStatusInterval = setInterval(async () => {
+    if (currentStatusInterval) {
+      clearInterval(currentStatusInterval);
+    }
+    currentStatusInterval = setInterval(async () => {
       try {
         const statusResponse = await getRunStatus(runID);
         const outputs = statusResponse.outputs;
 
         if (statusResponse.status === 'FAILED' || pollCount > 10) {
           setIsRunning(false);
-          clearInterval(checkStatusInterval);
+          clearInterval(currentStatusInterval);
+          toast.error('Workflow run failed.');
           return;
         }
 
@@ -47,15 +55,16 @@ const Header = ({ activePage }) => {
 
         if (statusResponse.status !== 'RUNNING') {
           setIsRunning(false);
-          clearInterval(checkStatusInterval);
+          clearInterval(currentStatusInterval);
+          toast.success('Workflow run completed.');
         }
 
         pollCount += 1;
       } catch (error) {
         console.error('Error fetching workflow status:', error);
-        clearInterval(checkStatusInterval);
+        clearInterval(currentStatusInterval);
       }
-    }, 10000);
+    }, 1000);
   };
 
   // get the workflow ID from the URL
@@ -63,17 +72,27 @@ const Header = ({ activePage }) => {
 
   const executeWorkflow = async (inputValues) => {
     try {
+      toast('Starting workflow run...');
       const result = await startRun(workflowID, inputValues, null, 'interactive');
       setIsRunning(true);
-      // console.log('Result:', result);
+      dispatch(resetRun());
       updateWorkflowStatus(result.id);
     } catch (error) {
       console.error('Error starting workflow run:', error);
+      toast.error('Error starting workflow run.');
     }
   };
 
   const handleRunWorkflow = async () => {
     setIsDebugModalOpen(true);
+  };
+
+  const handleStopWorkflow = () => {
+    setIsRunning(false);
+    if (currentStatusInterval) {
+      clearInterval(currentStatusInterval);
+    }
+    toast('Workflow run stopped.');
   };
 
   const handleProjectNameChange = (e) => {
@@ -112,9 +131,10 @@ const Header = ({ activePage }) => {
 
   return (
     <>
+      <Toaster richColors position="bottom-right" />
       <Navbar
         classNames={{
-          base: "lg:bg-background lg:backdrop-filter-none h-12 mt-1",
+          base: "lg:bg-background lg:backdrop-filter-none h-12 mt-1 shadow-sm",
           wrapper: "px-4 sm:px-6",
           item: [
             "flex",
@@ -148,11 +168,12 @@ const Header = ({ activePage }) => {
 
         {activePage === "workflow" && (
           <NavbarContent
-            className="h-12 rounded-full bg-content2 dark:bg-content1 hidden sm:flex gap-4"
+            className="h-12 rounded-full bg-content2 dark:bg-content1 sm:flex"
             id="workflow-title"
             justify="start"
           >
             <Input
+              className="px-4"
               type="text"
               placeholder="Project Name"
               value={projectName}
@@ -182,11 +203,24 @@ const Header = ({ activePage }) => {
             justify="end"
             id="workflow-actions-buttons"
           >
-            <NavbarItem className="hidden sm:flex">
-              <Button isIconOnly radius="full" variant="light" onClick={handleRunWorkflow}>
-                <Icon className="text-default-500" icon="solar:play-linear" width={22} />
-              </Button>
-            </NavbarItem>
+            {isRunning ? (
+              <>
+                <NavbarItem className="hidden sm:flex">
+                  <Spinner size="sm" />
+                </NavbarItem>
+                <NavbarItem className="hidden sm:flex">
+                  <Button isIconOnly radius="full" variant="light" onClick={handleStopWorkflow}>
+                    <Icon className="text-default-500" icon="solar:stop-linear" width={22} />
+                  </Button>
+                </NavbarItem>
+              </>
+            ) : (
+              <NavbarItem className="hidden sm:flex">
+                <Button isIconOnly radius="full" variant="light" onClick={handleRunWorkflow}>
+                  <Icon className="text-default-500" icon="solar:play-linear" width={22} />
+                </Button>
+              </NavbarItem>
+            )}
             <NavbarItem className="hidden sm:flex">
               <Button
                 isIconOnly

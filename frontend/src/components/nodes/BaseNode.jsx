@@ -61,7 +61,7 @@ const BaseNode = ({ isCollapsed, setIsCollapsed, id, data = {}, children, style 
   const isHovered = String(id) === String(hoveredNodeId);
   const isSelected = String(id) === String(selectedNodeId);
 
-  const status = data.run && data.run.data ? 'completed' : (data.status || 'default').toLowerCase();
+  const status = data.run && data.run ? 'completed' : (data.status || 'default').toLowerCase();
 
   const borderColor = status === 'completed' ? '#4CAF50' :
     status === 'failed' ? 'red' :
@@ -71,7 +71,7 @@ const BaseNode = ({ isCollapsed, setIsCollapsed, id, data = {}, children, style 
   const cardStyle = {
     ...style,
     borderColor: borderColor,
-    borderWidth: isSelected ? '3px' : isHovered ? '3px' : style.borderWidth || '1px',
+    borderWidth: isSelected ? '3px' : status === 'completed' ? '2px' : isHovered ? '3px' : style.borderWidth || '1px',
     borderStyle: 'solid',
     transition: 'border-color 0.1s, border-width 0.02s',
     position: 'relative',
@@ -110,7 +110,9 @@ const BaseNode = ({ isCollapsed, setIsCollapsed, id, data = {}, children, style 
               className="text-lg font-semibold text-center"
               style={{ marginBottom: isCollapsed ? '4px' : '8px' }}
             >
-              {data?.userconfig?.title || data?.title || 'Untitled'}
+              {/* {data?.title || 'Untitled'} */}
+              {data?.config?.title || data?.title || 'Untitled'}
+
             </h3>
 
             {/* Container for the collapse button and acronym tag */}

@@ -1,6 +1,8 @@
 from abc import ABC, abstractmethod
+from hashlib import md5
 from typing import Any, Dict, List, Tuple, Type, Union
 
+from jinja2 import Template
 from pydantic import BaseModel, Field, ValidationError, create_model
 
 DynamicSchemaValueType = str
@@ -210,6 +212,20 @@ class BaseNode(ABC):
             "#FA8072",  # Salmon
             "#8A2BE2",  # Violet
         ]
-        color = colors[hash(cls.name) % len(colors)]
+        color = colors[int(md5(cls.__name__.encode()).hexdigest(), 16) % len(colors)]
 
         return VisualTag(acronym=acronym, color=color)
+
+    @classmethod
+    def get_jinja2_template_for_fields(cls, fields: List[str]) -> str:
+        """
+        Create a default Jinja2 template for a list of fields in YAML format.
+        """
+        return "\n".join([f"{field}: {{{{{field}}}}}" for field in fields])
+
+    @classmethod
+    def hydrate_jinja2_template(cls, template: str, data: Dict[str, Any]) -> str:
+        """
+        Hydrate a Jinja2 template with data.
+        """
+        return Template(template).render(data)

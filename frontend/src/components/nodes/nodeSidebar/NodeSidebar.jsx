@@ -10,14 +10,18 @@ import { Button, Slider, Switch, Textarea, Input, Select, SelectItem, Accordion,
 import { Icon } from "@iconify/react";
 import NodeOutput from "../NodeOutputDisplay";
 import SchemaEditor from './SchemaEditor';
+import { selectPropertyMetadata } from '../../../store/nodeTypesSlice';
+import { cloneDeep, set, debounce } from 'lodash';
 
 const NodeSidebar = ({ nodeID }) => {
     const dispatch = useDispatch();
     const nodeTypes = useSelector((state) => state.nodeTypes.data);
-
     const node = useSelector((state) => selectNodeById(state, nodeID));
-    // Get the width from Redux store
     const storedWidth = useSelector((state) => state.flow.sidebarWidth);
+    const hasRunOutput = node?.data?.run ? true : false;
+
+    // Fetch all metadata once at the top level
+    const metadata = useSelector((state) => state.nodeTypes.metadata);
 
     // Initialize width state with the stored value
     const [width, setWidth] = useState(storedWidth);
@@ -38,6 +42,14 @@ const NodeSidebar = ({ nodeID }) => {
     const [dynamicModel, setDynamicModel] = useState(node?.data?.config || {});
     const [fewShotIndex, setFewShotIndex] = useState(null); // Track the index of the few-shot example being edited
 
+    // Create a debounced version of the dispatch update
+    const debouncedDispatch = useCallback(
+        debounce((id, updatedModel) => {
+            dispatch(updateNodeData({ id, data: { config: updatedModel } }));
+        }, 300), // Adjust the delay (in ms) as needed
+        [dispatch]
+    );
+
     // Update dynamicModel when nodeID changes
     useEffect(() => {
         if (node) {
@@ -47,35 +59,62 @@ const NodeSidebar = ({ nodeID }) => {
         }
     }, [nodeID, node, node.data.config]);
 
-    // Update the input change handler to use DynamicModel
-    const handleInputChange = (key, value) => {
-        const updatedModel = { ...dynamicModel, [key]: value };
+    // Helper function to update nested object by path
+    const updateNestedModel = (obj, path, value) => {
+        const deepClone = cloneDeep(obj); // Use lodash's cloneDeep for deep cloning
+        set(deepClone, path, value); // Use lodash's set to update the nested value
+        return deepClone;
+    };
+
+    // Update the input change handler to use local state immediately but debounce Redux updates for Slider
+    const handleInputChange = (key, value, isSlider = false) => {
+        let updatedModel;
+
+        if (key.includes('.')) {
+            updatedModel = updateNestedModel(dynamicModel, key, value);
+        } else {
+            updatedModel = { ...dynamicModel, [key]: value };
+        }
+        console.log("after making a change: ", updatedModel);
+        // Update local state immediately
         setDynamicModel(updatedModel);
-        dispatch(updateNodeData({ id: nodeID, data: { config: updatedModel } }));
+
+        // Conditionally debounce the Redux update for Slider inputs
+        if (isSlider) {
+            debouncedDispatch(nodeID, updatedModel);
+        } else {
+            dispatch(updateNodeData({ id: nodeID, data: { config: updatedModel } }));
+        }
     };
 
 
-    const renderEnumSelect = (key, label, enumValues) => (
-        <div key={key}>
-            <Select
-                label={label}
-                value={dynamicModel[key] || ''}
-                onChange={(e) => handleInputChange(key, e.target.value)}
-                fullWidth
-            >
-                {enumValues.map((option) => (
-                    <SelectItem key={option} value={option}>
-                        {option}
-                    </SelectItem>
-                ))}
-            </Select>
-        </div>
-    );
+    const renderEnumSelect = (key, label, enumValues, fullPath, defaultSelected) => {
+        const lastTwoDots = fullPath.split('.').slice(-2).join('.'); // Extract last two segments of the path
+        return (
+            <div key={key}>
+                <Select
+                    label={label}
+                    defaultSelectedKeys={[defaultSelected || dynamicModel[key] || '']}
+                    onChange={(e) => handleInputChange(lastTwoDots, e.target.value)} // Use lastTwoDots in handleInputChange
+                    fullWidth
+                >
+                    {enumValues.map((option) => (
+                        <SelectItem key={option} value={option}>
+                            {option}
+                        </SelectItem>
+                    ))}
+                </Select>
+            </div>
+        );
+    };
 
     // Handle adding a new few-shot example
     const handleAddNewExample = () => {
         const updatedExamples = [...(dynamicModel?.few_shot_examples || []), { input: '', output: '' }];
         handleInputChange('few_shot_examples', updatedExamples);
+
+        // Set the fewShotIndex to the index of the newly added example
+        setFewShotIndex(updatedExamples.length - 1);
     };
 
     // Handle deleting a few-shot example
@@ -85,33 +124,37 @@ const NodeSidebar = ({ nodeID }) => {
         handleInputChange('few_shot_examples', updatedExamples);
     };
 
-    // Helper function to get constraints for a field
-    const getFieldConstraints = (key) => {
-
-        return null;
+    // Helper function to get field metadata
+    const getFieldMetadata = (fullPath) => {
+        return selectPropertyMetadata({ nodeTypes: { metadata } }, fullPath);
     };
 
     // Helper function to render fields based on their type
-    const renderField = (key, field, value) => {
-        // Get constraints for this field
-        const fieldConstraints = getFieldConstraints(key);
-        console.log("renderField", key, field, value);
+    const renderField = (key, field, value, parentPath = '', isLast = false) => {
+        const fullPath = `${parentPath ? `${parentPath}.` : ''}${key}`;
+        const fieldMetadata = getFieldMetadata(fullPath);
+
+        // Handle enum fields
+        if (fieldMetadata?.enum) {
+            const defaultSelected = value || fieldMetadata.default;
+            return renderEnumSelect(key, fieldMetadata.title || key, fieldMetadata.enum, fullPath, defaultSelected); // Pass fullPath
+        }
+
         // Handle specific cases for input_schema, output_schema, and system_prompt
         if (key === 'input_schema') {
-
             return (
                 <div key={key} className="my-2">
-                    <hr className="my-2" />
-                    <label className="text-sm font-semibold mb-1 block">Input Schema</label>
+                    <label className="font-semibold mb-1 block">Input Schema</label>
                     <SchemaEditor
                         jsonValue={dynamicModel.input_schema || {}}
                         onChange={(newValue) => {
-                            handleInputChange('input_schema', { ...field, ...newValue });
+                            handleInputChange('input_schema', newValue);
                         }}
                         options={jsonOptions}
                         schemaType="input_schema" // Specify schema type
+                        nodeId={nodeID}
                     />
-                    <hr className="my-2" />
+                    {!isLast && <hr className="my-2" />} {/* Add hr only if not the last element */}
                 </div>
             );
         }
@@ -119,8 +162,7 @@ const NodeSidebar = ({ nodeID }) => {
         if (key === 'output_schema') {
             return (
                 <div key={key} className="my-2">
-                    <hr className="my-2" />
-                    <label className="text-sm font-semibold mb-1 block">Output Schema</label>
+                    <label className="font-semibold mb-1 block">Output Schema</label>
                     <SchemaEditor
                         jsonValue={dynamicModel.output_schema || {}}
                         onChange={(newValue) => {
@@ -128,25 +170,44 @@ const NodeSidebar = ({ nodeID }) => {
                         }}
                         options={jsonOptions}
                         schemaType="output_schema" // Specify schema type
+                        nodeId={nodeID}
                     />
-                    <hr className="my-2" />
+                    {!isLast && <hr className="my-2" />} {/* Add hr only if not the last element */}
                 </div>
             );
         }
 
-        if (key === 'system_prompt') {
+        if (key === 'system_message') {
             return (
-                <div key={key} className="my-4 p-4 bg-gray-50 rounded-lg">
+                <div key={key} >
                     <TextEditor
                         key={key}
                         nodeID={nodeID}
                         fieldName={key}
                         inputSchema={dynamicModel.input_schema || {}}
-                        fieldTitle="System Prompt"
+                        fieldTitle="System Message"
+                        content={dynamicModel[key] || ''}
+                        setContent={(value) => handleInputChange(key, value)}
+                    />
+                    {!isLast && <hr className="my-2" />} {/* Add hr only if not the last element */}
+                </div>
+            );
+        }
+        else if (key === 'user_message') {
+            return (
+                <div key={key} >
+                    <TextEditor
+                        key={key}
+                        nodeID={nodeID}
+                        fieldName={key}
+                        inputSchema={dynamicModel.input_schema || {}}
+                        fieldTitle="User Message"
+                        content={dynamicModel[key] || ''}
                         setContent={(value) => handleInputChange(key, value)}
                     />
                     {/* Render Few Shot Examples right after the System Prompt */}
                     {renderFewShotExamples()}
+                    {!isLast && <hr className="my-2" />} {/* Add hr only if not the last element */}
                 </div>
             );
         }
@@ -166,24 +227,29 @@ const NodeSidebar = ({ nodeID }) => {
                 );
             case 'number':
                 // Check if we have constraints that would make this suitable for a slider
-                if (fieldConstraints &&
-                    (fieldConstraints.minimum !== undefined || fieldConstraints.maximum !== undefined)) {
-                    const min = fieldConstraints.minimum ?? 0;
-                    const max = fieldConstraints.maximum ?? 100;
+                if (fieldMetadata &&
+                    (fieldMetadata.minimum !== undefined || fieldMetadata.maximum !== undefined)) {
+                    const min = fieldMetadata.minimum ?? 0;
+                    const max = fieldMetadata.maximum ?? 100;
+
                     return (
                         <div key={key} className="my-4">
                             <div className="flex justify-between items-center mb-2">
-                                <label className="font-semibold">{key}</label>
+                                <label className="font-semibold">{fieldMetadata.title || key}</label>
                                 <span className="text-sm">{value}</span>
                             </div>
                             <Slider
-                                aria-label={key}
+                                aria-label={fieldMetadata.title || key}
                                 value={value}
-                                min={min}
-                                max={max}
-                                step={fieldConstraints.type === 'integer' ? 1 : 0.1}
+                                minValue={min}
+                                maxValue={max}
+                                step={fieldMetadata.type === 'integer' ? 1 : 0.1}
                                 className="w-full"
-                                onChange={(newValue) => handleInputChange(key, newValue)}
+                                onChange={(newValue) => {
+                                    const path = parentPath ? `${parentPath}.${key}` : key;
+                                    const lastTwoDots = path.split('.').slice(-2).join('.');
+                                    handleInputChange(lastTwoDots, newValue, true); // Pass true for isSlider
+                                }}
                             />
                         </div>
                     );
@@ -217,10 +283,8 @@ const NodeSidebar = ({ nodeID }) => {
                 if (field && typeof field === 'object' && !Array.isArray(field)) {
                     return (
                         <div key={key} className="my-2">
-                            <hr className="my-2" />
-                            <label className="text-sm font-semibold mb-1 block">{key}</label>
-                            {Object.keys(field).map((subKey) => renderField(subKey, field[subKey], value?.[subKey]))}
-                            <hr className="my-2" />
+                            {Object.keys(field).map((subKey) => renderField(subKey, field[subKey], value?.[subKey], fullPath))}
+                            {!isLast && <hr className="my-2" />} {/* Add hr only if not the last element */}
                         </div>
                     );
                 }
@@ -242,12 +306,14 @@ const NodeSidebar = ({ nodeID }) => {
     const renderConfigFields = () => {
         if (!nodeSchema || !nodeSchema.config || !dynamicModel) return null;
         const properties = nodeSchema.config;
-        console.log(nodeSchema);
-        return Object.keys(properties).map((key) => {
+        const keys = Object.keys(properties).filter((key) => key !== 'title' && key !== 'type'); // Skip "title" and "type"
+
+        return keys.map((key, index) => {
             const field = properties[key];
             const value = dynamicModel[key]; // Access value from DynamicModel
-            return renderField(key, field, value); // Use the helper function to render each field
-        }).concat(<hr key="divider" className="my-2" />);
+            const isLast = index === keys.length - 1; // Check if this is the last element
+            return renderField(key, field, value, `${nodeType}.config`, isLast); // Pass the isLast flag
+        });
     };
 
     const renderFewShotExamples = () => {
@@ -264,21 +330,42 @@ const NodeSidebar = ({ nodeID }) => {
                     />
                 ) : (
                     <div>
-                        <h3 className="my-2 text-sm font-semibold">Few Shot Examples</h3>
-                        <ul>
+                        <h3 className="my-2 font-semibold">Few Shot Examples</h3>
+                        <div className="flex flex-wrap gap-2">
                             {fewShotExamples.map((example, index) => (
-                                <li key={`few-shot-${index}`} className="flex items-center justify-between mb-1">
-                                    <div>Example {index + 1}</div>
-                                    <div className="ml-2">
-                                        <Button onClick={() => setFewShotIndex(index)}>Edit</Button>
-                                        <Button onClick={() => handleDeleteExample(index)}>Delete</Button>
-                                    </div>
-                                </li>
+                                <div
+                                    key={`few-shot-${index}`}
+                                    className="flex items-center space-x-2 p-2 bg-gray-100 rounded-full cursor-pointer"
+                                    onClick={() => setFewShotIndex(index)} // Open editor on click
+                                >
+                                    <span>Example {index + 1}</span>
+                                    <Button
+                                        isIconOnly
+                                        radius="full"
+                                        variant="light"
+                                        onClick={(e) => {
+                                            e.stopPropagation(); // Prevent triggering the edit on delete click
+                                            handleDeleteExample(index);
+                                        }}
+                                        color="primary"
+                                        auto
+                                    >
+                                        <Icon icon="solar:trash-bin-trash-linear" width={22} />
+                                    </Button>
+                                </div>
                             ))}
-                        </ul>
 
-                        <div className="mt-2">
-                            <Button onClick={handleAddNewExample}>Add Example</Button>
+                            {/* Add new example button */}
+                            <Button
+                                isIconOnly
+                                radius="full"
+                                variant="light"
+                                onClick={handleAddNewExample}
+                                color="primary"
+                                auto
+                            >
+                                <Icon icon="solar:add-circle-linear" width={22} />
+                            </Button>
                         </div>
                     </div>
                 )}
@@ -363,8 +450,7 @@ const NodeSidebar = ({ nodeID }) => {
                     </Button>
                 </div>
 
-                <Accordion selectionMode="multiple" defaultExpandedKeys={["title", "config", "examples", "testInputs"]}>
-
+                <Accordion selectionMode="multiple" defaultExpandedKeys={hasRunOutput ? ["output"] : ["title", "config"]}>
                     {nodeType !== 'InputNode' && (
                         <AccordionItem key="output" aria-label='Output' title="Outputs">
                             <NodeOutput node={node} />

@@ -138,15 +138,14 @@ const InputNode = ({ id, data, ...props }) => {
                         </div>
                       )}
                     </td>
-                    <td className={styles.handleCell}>
+                    <td className={`${styles.handleCell} border-l border-default-300 w-0 ml-2`}>
                       <div className={styles.handleWrapper}>
                         <Handle
                           type="source"
                           position="right"
                           id={key}
-                          className={`${styles.handle} ${styles.handleRight} ${
-                            isCollapsed ? styles.collapsedHandleOutput : ''
-                          }`}
+                          className={`${styles.handle} ${styles.handleRight} ${isCollapsed ? styles.collapsedHandleOutput : ''
+                            }`}
                           isConnectable={!isCollapsed}
                         />
                       </div>
@@ -157,7 +156,7 @@ const InputNode = ({ id, data, ...props }) => {
             </table>
           )}
         </div>
-      </div>
+      </div >
     );
   };
 

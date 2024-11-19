@@ -11,6 +11,7 @@ from litellm import acompletion
 from pydantic import BaseModel, Field
 from sklearn.metrics.pairwise import cosine_similarity
 from tenacity import AsyncRetrying, stop_after_attempt, wait_random_exponential
+from enum import Enum
 
 load_dotenv()
 
@@ -19,8 +20,26 @@ EMBEDDING_MODEL = "text-embedding-3-small"
 EMBEDDING_DIMENSIONS = 1536
 
 
+class LLMModels(str, Enum):
+    GPT_4O_MINI = "gpt-4o-mini"
+    GPT_4O = "gpt-4o"
+    O1_PREVIEW = "o1-preview"
+    O1_MINI = "o1-mini"
+    GPT_4_TURBO = "gpt-4-turbo"
+    CHATGPT_4O_LATEST = "chatgpt-4o-latest"
+    CLAUDE_3_5_SONNET_LATEST = "claude-3-5-sonnet-latest"
+    CLAUDE_3_5_HAIKU_LATEST = "claude-3-5-haiku-latest"
+    CLAUDE_3_OPUS_LATEST = "claude-3-opus-latest"
+    GEMINI_1_5_PRO = "gemini-1.5-pro"
+    GEMINI_1_5_FLASH = "gemini-1.5-flash"
+    GEMINI_1_5_PRO_LATEST = "gemini-1.5-pro-latest"
+    GEMINI_1_5_FLASH_LATEST = "gemini-1.5-flash-latest"
+
+
 class ModelInfo(BaseModel):
-    name: str
+    model: LLMModels = Field(
+        LLMModels.GPT_4O, description="The LLM model to use for completion"
+    )
     max_tokens: Optional[int] = Field(
         ...,
         ge=1,
@@ -39,49 +58,6 @@ class ModelInfo(BaseModel):
         le=1.0,
         description="Top-p sampling value, between 0.0 and 1.0",
     )
-
-
-class LLMModelRegistry:
-    GPT_4O_MINI = ModelInfo(
-        name="gpt-4o-mini",
-        max_tokens=16384,
-        temperature=0.7,
-        top_p=1.0,
-    )
-    GPT_4O = ModelInfo(
-        name="gpt-4o",
-        max_tokens=16384,
-        temperature=0.7,
-        top_p=1.0,
-    )
-    O1_PREVIEW = ModelInfo(
-        name="o1-preview",
-        max_tokens=32768,
-        temperature=0.7,
-        top_p=1.0,
-    )
-    O1_MINI = ModelInfo(
-        name="o1-mini",
-        max_tokens=65536,
-        temperature=0.7,
-        top_p=1.0,
-    )
-    GPT_4_TURBO = ModelInfo(
-        name="gpt-4-turbo",
-        max_tokens=16384,
-        temperature=0.7,
-        top_p=1.0,
-    )
-    CHATGPT_4O_LATEST = ModelInfo(
-        name="chatgpt-4o-latest",
-        max_tokens=16384,
-        temperature=0.7,
-        top_p=1.0,
-    )
-
-    @classmethod
-    def get_model_info(cls, model_name: str) -> Optional[ModelInfo]:
-        return getattr(cls, model_name.upper(), None)
 
 
 def create_messages(

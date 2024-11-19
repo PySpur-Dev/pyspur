@@ -5,7 +5,7 @@ from pydantic import BaseModel, Field
 
 from ..dynamic_schema import DynamicSchemaNode
 from .single_llm_call import SingleLLMCallNode, SingleLLMCallNodeConfig
-from .llm_utils import LLMModelRegistry, ModelInfo
+from .llm_utils import LLMModels, ModelInfo
 
 
 class BestOfNNodeConfig(SingleLLMCallNodeConfig):
@@ -25,7 +25,8 @@ class BestOfNNodeConfig(SingleLLMCallNodeConfig):
         16, ge=1, le=4096, description="Number of tokens, between 1 and 4096"
     )
     llm_info: ModelInfo = Field(
-        LLMModelRegistry.GPT_4O, description="The default LLM model to use"
+        ModelInfo(model=LLMModels.GPT_4O, max_tokens=16384, temperature=0.7),
+        description="The default LLM model to use",
     )
 
 
@@ -47,7 +48,10 @@ class BestOfNNode(DynamicSchemaNode):
         # Initialize the LLM node for rating responses
         rating_llm_config = SingleLLMCallNodeConfig(
             llm_info=self.config.llm_info,
-            system_prompt=self.config.rating_prompt,
+            system_message=self.config.rating_prompt,
+            user_message=self.get_jinja2_template_for_fields(
+                list(self.config.output_schema.keys())
+            ),
             input_schema=self.config.output_schema,
             output_schema={"rating": "float"},
         )
@@ -63,8 +67,8 @@ class BestOfNNode(DynamicSchemaNode):
             response.model_dump()
         )
         rating_llm_config_dump = self._rating_llm_node.config.model_dump()
-        rating_llm_config_dump["system_prompt"] = self.config.rating_prompt.format(
-            **input_data.model_dump()
+        rating_llm_config_dump["system_message"] = self.hydrate_jinja2_template(
+            rating_llm_config_dump["system_message"], input_data.model_dump()
         )
         self._rating_llm_node = SingleLLMCallNode(
             SingleLLMCallNodeConfig.model_validate(rating_llm_config_dump)

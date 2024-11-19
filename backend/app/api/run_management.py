@@ -1,10 +1,12 @@
 from typing import Any, Dict, List, Optional
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
+from trio import TaskStatus
 
 from ..schemas.run_schemas import RunResponseSchema, RunStatusResponseSchema
 from ..database import get_db
 from ..models.run_model import RunModel, RunStatus
+from ..models.task_model import TaskStatus
 
 router = APIRouter()
 
@@ -53,6 +55,14 @@ def get_run_status(run_id: str, db: Session = Depends(get_db)):
         }
         for task in tasks
     ]
+    # fail if any task has failed
+    for task in tasks:
+        if task.status == TaskStatus.FAILED:
+            # update run status to failed
+            run.status = RunStatus.FAILED
+            db.commit()
+            break
+
     combined_task_outputs: Dict[str, Any] = {}
     for task in tasks:
         combined_task_outputs[task.node_id] = task.outputs

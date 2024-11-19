@@ -1,4 +1,5 @@
 import React from 'react';
+import Markdown from 'react-markdown';
 
 const NodeOutputDisplay = (props) => {
     const { node } = props;
@@ -13,7 +14,9 @@ const NodeOutputDisplay = (props) => {
                     {Object.entries(output).map(([key, value]) => (
                         <div key={key} className="my-2 flex flex-col items-start">
                             <label className="text-sm font-semibold mb-1 block">{key}:</label>
-                            <div className="ml-2 mt-auto">{value}</div>
+                            <div className="ml-2 mt-auto">
+                                <Markdown>{value}</Markdown>
+                            </div>
                         </div>
                     ))}
                 </div>

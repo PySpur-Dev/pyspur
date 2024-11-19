@@ -7,6 +7,7 @@ export const useSaveWorkflow = (trigger, delay = 2000) => {
   const edges = useSelector(state => state.flow.edges);
   const workflowID = useSelector(state => state.flow.workflowID);
   const workflowInputVariables = useSelector(state => state.flow.workflowInputVariables);
+  const workflowName = useSelector(state => state.flow.projectName);
 
   const saveWorkflow = useCallback(async () => {
     try {
@@ -32,33 +33,37 @@ export const useSaveWorkflow = (trigger, delay = 2000) => {
         }
       });
 
-      const updatedWorkflow = {
-        nodes: updatedNodes.map(node => ({
-          id: node.id,
-          node_type: node.type,
-          config: node.config,
-          coordinates: node.position,
-        })),
-        links: edges.map(edge => {
-          const sourceNode = nodes.find(node => node.id === edge.source);
-          const targetNode = nodes.find(node => node.id === edge.target);
+      const updatedWorkflow = 
+      {
+        name: workflowName,
+        definition: {
+          nodes: updatedNodes.map(node => ({
+            id: node.id,
+            node_type: node.type,
+            config: node.config,
+            coordinates: node.position,
+          })),
+          links: edges.map(edge => {
+            const sourceNode = nodes.find(node => node.id === edge.source);
+            const targetNode = nodes.find(node => node.id === edge.target);
 
-          return {
-            source_id: edge.source,
-            source_output_key: edge.sourceHandle,
-            source_output_type: sourceNode?.config?.data?.output_schema?.[edge.sourceHandle] || 'str',
-            target_id: edge.target,
-            target_input_key: edge.targetHandle,
-            target_input_type: targetNode?.config?.data?.input_schema?.[edge.targetHandle] || 'str',
-          };
-        }),
+            return {
+              source_id: edge.source,
+              source_output_key: edge.sourceHandle,
+              source_output_type: sourceNode?.config?.data?.output_schema?.[edge.sourceHandle] || 'str',
+              target_id: edge.target,
+              target_input_key: edge.targetHandle,
+              target_input_type: targetNode?.config?.data?.input_schema?.[edge.targetHandle] || 'str',
+            };
+          }),
+        }
       };
       console.log('send to b/e workflow:', updatedWorkflow);
       // await updateWorkflow(workflowID, updatedWorkflow);
     } catch (error) {
       console.error('Error saving workflow:', error);
     }
-  }, [workflowID, nodes, edges, workflowInputVariables]);
+  }, [workflowID, nodes, edges, workflowInputVariables, workflowName]);
 
   useEffect(() => {
     const handle = setTimeout(() => {

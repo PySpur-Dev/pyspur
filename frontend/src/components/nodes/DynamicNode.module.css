@@ -17,14 +17,18 @@
 .handleCell {
   width: 20px;
   position: relative;
+  margin-left: 0.5rem;
 }
 
 .outputHandleCell {
   vertical-align: middle;
   text-align: center;
+  width: 0;
+  margin-left: 0.5rem;
 }
 
 .handleWrapper {
+
   display: flex;
   justify-content: center;
   align-items: center;

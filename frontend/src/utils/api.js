@@ -1,19 +1,27 @@
 import axios from 'axios';
 import testInput from '../constants/test_input.js'; // Import the test input directly
-import JSPydanticModel from './JSPydanticModel'; // Import the JSPydanticModel class
+import JSPydanticModel from './JSPydanticModel.js'; // Import the JSPydanticModel class
 
 const API_BASE_URL = 'http://localhost:8000';
 
 export const getNodeTypes = async () => {
   try {
     const response = await axios.get(`${API_BASE_URL}/node/supported_types/`);
-    console.log('Node Types Response:', response.data);
+    console.log('Raw Node Types Response:', response.data);
     const model = new JSPydanticModel(response.data);
 
-    // Now just return the processed schema which includes the constraints
+    // Get both the processed schema and metadata
     const schema = model.createObjectFromSchema();
+    const metadata = model.getAllMetadata();
+
     console.log('Processed Schema:', schema);
-    return schema;
+    console.log('Schema Metadata:', metadata);
+
+    // Return both schema and metadata
+    return {
+      schema,
+      metadata
+    };
   } catch (error) {
     console.error('Error getting node types:', error);
     throw error;

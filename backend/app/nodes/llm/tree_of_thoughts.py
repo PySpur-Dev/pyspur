@@ -8,7 +8,7 @@ from pydantic import Field
 
 from ..base import BaseNode, VisualTag
 from .single_llm_call import SingleLLMCallNode, SingleLLMCallNodeConfig
-from .llm_utils import LLMModelRegistry, ModelInfo
+from .llm_utils import LLMModels, ModelInfo
 from .string_output_llm import (
     StringOutputLLMNode,
     StringOutputLLMNodeConfig,
@@ -19,7 +19,14 @@ from .string_output_llm import (
 
 class TreeOfThoughtsNodeConfig(StringOutputLLMNodeConfig):
     llm_info: ModelInfo = Field(
-        LLMModelRegistry.GPT_4O, description="The default LLM model to use"
+        ModelInfo(model=LLMModels.GPT_4O, max_tokens=16384, temperature=0.7),
+        description="The default LLM model to use",
+    )
+    system_message: str = Field(
+        "You are a helpful assistant.", description="The system message for the LLM"
+    )
+    user_message: str = Field(
+        "What would you like to ask?", description="The user message for the LLM"
     )
     steps: int = Field(3, ge=1, le=10, description="Number of steps to run")
     n_generate_sample: int = Field(
@@ -66,7 +73,8 @@ class TreeOfThoughtsNode(BaseNode):
         # evaluation node is an advanced LLM node
         evaluation_config = SingleLLMCallNodeConfig(
             llm_info=config.llm_info,
-            system_prompt=config.system_prompt,
+            system_message=config.system_message,
+            user_message=config.user_message,
             input_schema={"prompt": "str"},
             output_schema={"value": "float"},
         )

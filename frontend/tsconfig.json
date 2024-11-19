@@ -115,7 +115,7 @@
     "next-env.d.ts",
     "**/*.ts",
     "**/*.tsx"
-  ],
+, "src/utils/JSPydanticModel.js"  ],
   "exclude": [
     "node_modules"
   ]

@@ -2,7 +2,6 @@ from typing import List
 from fastapi import APIRouter, HTTPException, Depends, status
 from sqlalchemy.orm import Session
 from datetime import datetime, timezone
-import uuid
 
 from ..schemas.workflow_schemas import (
     WorkflowNodeCoordinatesSchema,
@@ -59,13 +58,20 @@ def create_workflow(
 )
 def update_workflow(
     workflow_id: str,
-    workflow_def: WorkflowDefinitionSchema,
+    workflow_request: WorkflowCreateRequestSchema,
     db: Session = Depends(get_db),
 ) -> WorkflowResponseSchema:
     workflow = db.query(WorkflowModel).filter(WorkflowModel.id == workflow_id).first()
     if not workflow:
         raise HTTPException(status_code=404, detail="Workflow not found")
-    workflow.definition = workflow_def.model_dump()
+    if not workflow_request.definition:
+        raise HTTPException(
+            status_code=400,
+            detail="Workflow definition is required to update a workflow",
+        )
+    workflow.definition = workflow_request.definition.model_dump()
+    workflow.name = workflow_request.name
+    workflow.description = workflow_request.description
     workflow.updated_at = datetime.now(timezone.utc)
     db.commit()
     db.refresh(workflow)

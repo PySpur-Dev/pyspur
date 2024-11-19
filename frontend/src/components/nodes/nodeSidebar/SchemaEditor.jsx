@@ -1,12 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { Button, Input, Select, SelectItem } from '@nextui-org/react';
 import { Icon } from '@iconify/react';
+import { useDispatch } from 'react-redux';
+import { deleteEdgeByHandle } from '../../../store/flowSlice'; // Import the deleteEdge action
 
-const SchemaEditor = ({ jsonValue = {}, onChange, options = [], disabled = false, schemaType = 'input_schema' }) => {
+const SchemaEditor = ({ jsonValue = {}, onChange, options = [], disabled = false, schemaType = 'input_schema', nodeId }) => {
   const [newKey, setNewKey] = useState('');
   const [newType, setNewType] = useState('str'); // Default to 'string'
-  const [editingKey, setEditingKey] = useState(null); // Track which key's type is being edited
   const [editingField, setEditingField] = useState(null); // Track the field being edited
+  const dispatch = useDispatch(); // Initialize dispatch
 
   const getPlaceholderExample = () => {
     return schemaType === 'input_schema'
@@ -26,17 +28,12 @@ const SchemaEditor = ({ jsonValue = {}, onChange, options = [], disabled = false
     }
   };
 
-  const handleTypeChange = (key, type) => {
-    const updatedJson = {
-      ...jsonValue,
-      [key]: type
-    };
-    onChange(updatedJson);
-  };
-
   const handleRemoveKey = (key) => {
     const { [key]: _, ...updatedJson } = jsonValue;
+    console.log("after removing a key: ", key, updatedJson);
     onChange(updatedJson);
+    // Dispatch an action to remove the corresponding edge
+    dispatch(deleteEdgeByHandle({ nodeId, handleKey: key }));
   };
 
   // Helper function to extract the type from the value
@@ -62,8 +59,6 @@ const SchemaEditor = ({ jsonValue = {}, onChange, options = [], disabled = false
     onChange(updatedJson);
     setEditingField(null);
   };
-
-
 
   return (
     <div className="json-editor">
