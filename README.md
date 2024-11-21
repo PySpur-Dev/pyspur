@@ -11,7 +11,7 @@ https://github.com/user-attachments/assets/19cf6f99-6d66-45dc-911c-74025f87b1d2
 * However, such graphs involves intricate interdependencies among nodes, where the output of one node becomes the input for another.
 * **The goal of PySpur is to enable developers to build, test, and deploy such LLM graphs by abstracting away the complexity of parallel execution and state management.**
 
-# ✨ Three Key Features
+# ✨ Core Benefits
 
 1. **Develop with Inference-Time Compute Nodes**:
     * **High-level, batteries-included planners** (MCTS, Self-Refinement, BoN, ToT, etc.)
