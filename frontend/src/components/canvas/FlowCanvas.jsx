@@ -29,6 +29,8 @@ import {
   setSelectedNode,
   deleteNode,
   setWorkflowInputVariable,
+  updateNodeData,
+  setNodes,
 } from '../../store/flowSlice';
 // import ConnectionLine from './ConnectionLine';
 import NodeSidebar from '../nodes/nodeSidebar/NodeSidebar';
@@ -49,6 +51,8 @@ import GroupNode from '../nodes/groupNode/GroupNode';
 import { useSaveWorkflow } from '../../hooks/useSaveWorkflow';
 import LoadingSpinner from '../LoadingSpinner'; // Updated import
 import ConditionalNode from '../nodes/ConditionalNode';
+import dagre from '@dagrejs/dagre'; 
+
 import { sortNodes, getId, getNodePositionInsideParent } from '../../utils/groupUtils';
 import SelectedNodesToolbar from '../nodes/groupNode/SelectedNodesToolbar';
 
@@ -182,6 +186,48 @@ const FlowCanvasContent = (props) => {
 
   const onConnect = useCallback(
     (connection) => {
+      if (!connection.targetHandle || connection.targetHandle === 'node-body') {
+        // The user dropped the connection on the body of the node
+        const sourceNode = nodes.find((n) => n.id === connection.source);
+        const targetNode = nodes.find((n) => n.id === connection.target);
+
+        if (sourceNode && targetNode) {
+          const outputHandleName = connection.sourceHandle;
+
+          // Ensure the source handle (output variable) is specified
+          if (!outputHandleName) {
+            console.error('Source handle is not specified.');
+            return;
+          }
+
+          // Add a new input variable to the target node's input_schema
+          const updatedInputSchema = {
+            ...targetNode.data.config.input_schema,
+            [outputHandleName]: 'str', // Assuming the type is 'str'
+          };
+
+          // Dispatch an action to update the target node's data
+          dispatch(
+            updateNodeData({
+              id: targetNode.id,
+              data: {
+                config: {
+                  ...targetNode.data.config,
+                  input_schema: updatedInputSchema,
+                },
+              },
+            })
+          );
+
+          // Update the connection to include the new targetHandle
+          connection = {
+            ...connection,
+            targetHandle: outputHandleName,
+          };
+        }
+      }
+
+      // Create the new edge with the updated connection
       const newEdge = {
         ...connection,
         id: uuidv4(),
@@ -189,7 +235,7 @@ const FlowCanvasContent = (props) => {
       };
       dispatch(connect({ connection: newEdge }));
     },
-    [dispatch] // Add nodes to the dependency array
+    [dispatch, nodes]
   );
 
 
@@ -311,6 +357,109 @@ const FlowCanvasContent = (props) => {
     },
     [nodes, onNodesDelete]
   );
+
+  const getLayoutedNodes = (nodes, edges, direction = 'LR') => {
+    const dagreGraph = new dagre.graphlib.Graph();
+    dagreGraph.setGraph({ 
+      rankdir: direction, 
+      align: 'UL',
+      edgesep: 32, 
+      ranksep: 32, 
+      nodesep: 32,
+      // ranker: 'longest-path'
+    });
+    dagreGraph.setDefaultEdgeLabel(() => ({}));
+
+    nodes.forEach((node) => {
+      dagreGraph.setNode(node.id, { width: node.measured.width, height: node.measured.height });
+    });
+
+    const nodeWeights = {};
+    const edgeWeights = {};
+
+    // Initialize root nodes with weight 1024
+    nodes.forEach(node => {
+      const incomingEdges = edges.filter(edge => edge.target === node.id);
+      if (incomingEdges.length === 0) {
+        nodeWeights[node.id] = 1024;
+        // set weight for all outgoing edges to half of the node weight
+        const outgoingEdges = edges.filter(edge => edge.source === node.id);
+        outgoingEdges.forEach(edge => {
+          edgeWeights[edge.id] = 512;
+        });
+      }
+
+    });
+
+    // Perform a topological sort to determine the order of processing nodes
+    const sortedNodes = [];
+    const visited = new Set();
+
+    const visit = (node) => {
+      if (!visited.has(node.id)) {
+        visited.add(node.id);
+        const outgoingEdges = edges.filter(edge => edge.source === node.id);
+        outgoingEdges.forEach(edge => {
+          const targetNode = nodes.find(n => n.id === edge.target);
+          visit(targetNode);
+        });
+        sortedNodes.push(node);
+      }
+    };
+
+    nodes.forEach(node => {
+      if (!visited.has(node.id)) {
+        visit(node);
+      }
+    });
+
+    // Calculate weights for nodes and edges
+    sortedNodes.forEach(node => {
+      const incomingEdges = edges.filter(edge => edge.target === node.id);
+      const maxIncomingWeight = incomingEdges.reduce((maxWeight, edge) => {
+        return Math.max(maxWeight, edgeWeights[edge.id] || 0);
+      }, 0);
+
+      if (!nodeWeights[node.id]) {
+        nodeWeights[node.id] = maxIncomingWeight;
+      }
+
+      const outgoingEdges = edges.filter(edge => edge.source === node.id);
+      outgoingEdges.forEach(edge => {
+        edgeWeights[edge.id] = nodeWeights[node.id] / 2;
+      });
+    });
+
+
+    edges.forEach((edge) => {
+      const weight = edgeWeights[edge.id] || 1; // Use edgeWeights if available, default to 1
+      dagreGraph.setEdge(edge.source, edge.target, { weight: weight, height: 10, width: 10, labelpos: 'c', minlen: 1 });
+    });
+
+    dagre.layout(dagreGraph);
+
+    const isHorizontal = direction === 'LR';
+
+    const layoutedNodes = nodes.map((node) => {
+      const nodeWithPosition = dagreGraph.node(node.id);
+
+      return {
+        ...node,
+        position: {
+          x: nodeWithPosition.x - node.measured.width / 2,
+          y: nodeWithPosition.y - node.measured.height / 2,
+        },
+      };
+    });
+
+    return layoutedNodes;
+  };
+
+  const handleLayout = useCallback(() => {
+    const layoutedNodes = getLayoutedNodes(nodes, edges);
+    dispatch(setNodes({ nodes: layoutedNodes }));
+  }, [nodes, edges, dispatch]);
+
 
   // Add effect to handle keyboard events
   useEffect(() => {
@@ -601,7 +750,7 @@ const FlowCanvasContent = (props) => {
 
 
 
-            <Operator />
+            <Operator handleLayout={handleLayout}/>
             <SelectedNodesToolbar />
           </ReactFlow>
         </div>

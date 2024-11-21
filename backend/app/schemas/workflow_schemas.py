@@ -53,6 +53,7 @@ class WorkflowDefinitionSchema(BaseModel):
 
     nodes: List[WorkflowNodeSchema]
     links: List[WorkflowLinkSchema]
+    test_inputs: List[Dict[str, Any]] = []
 
     @field_validator("nodes")
     def nodes_must_have_unique_ids(cls, v: List[WorkflowNodeSchema]):

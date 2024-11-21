@@ -8,6 +8,7 @@ import { getWorkflow } from '../../utils/api';
 import { useDispatch } from 'react-redux'; // Import useDispatch from react-redux
 import LoadingSpinner from '../../components/LoadingSpinner';
 import { fetchNodeTypes } from '../../store/nodeTypesSlice';
+import { setTestInputs } from '../../store/flowSlice'; // Import setTestInputs action
 
 const WorkflowPage = () => {
 
@@ -22,6 +23,11 @@ const WorkflowPage = () => {
             try {
                 const data = await getWorkflow(id);
                 setWorkflowData(data);
+
+                // Dispatch the test inputs to the Redux store
+                if (data.definition && data.definition.test_inputs) {
+                    dispatch(setTestInputs(data.definition.test_inputs));
+                }
             } catch (error) {
                 console.error('Error fetching workflow:', error);
             }

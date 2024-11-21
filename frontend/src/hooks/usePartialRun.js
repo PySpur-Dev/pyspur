@@ -22,6 +22,7 @@ const usePartialRun = () => {
       const data = await runPartialWorkflow(workflowId, nodeId, initialInputs, partialOutputs, rerunPredecessors);
       console.log('Partial run successful, result:', data);
       setResult(data);
+      return data;
     } catch (err) {
       console.error('Error during partial run:', err);
       setError(err);

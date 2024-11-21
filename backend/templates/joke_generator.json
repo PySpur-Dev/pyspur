@@ -1,0 +1,161 @@
+{
+  "name": "Joke Generator using BoN Sampling",
+  "metadata": {
+    "name": "Joke Generator",
+    "description": "Generate and refine jokes using Best-of-N sampling.",
+    "features": ["Dark humor", "Audience-specific jokes", "Refinement options"]
+  },
+  "definition": {
+    "nodes": [
+      {
+        "id": "input_node",
+        "title": "",
+        "node_type": "InputNode",
+        "config": {
+          "input_schema": {
+            "topic": "str",
+            "audience": "str"
+          }
+        },
+        "coordinates": {
+          "x": 0,
+          "y": 0
+        }
+      },
+      {
+        "id": "node_1732123362957",
+        "title": "",
+        "node_type": "BestOfNNode",
+        "config": {
+          "title": "Joke Drafter (BoN)",
+          "type": "object",
+          "input_schema": {
+            "topic": "str",
+            "audience": "str"
+          },
+          "output_schema": {
+            "initial_joke": "str"
+          },
+          "llm_info": {
+            "model": "gpt-4o",
+            "max_tokens": 16384,
+            "temperature": 0.7,
+            "top_p": 1
+          },
+          "system_message": "<p>You are a stand-up comedian who uses dark humor like Ricky Gervais or Jimmy Carr.</p><p></p><p>The user will provide you with a topic and audience, and you have to devise a short joke for that.</p><p></p><p>You can roast the person if a person is mentioned, it's only among friends.</p>",
+          "user_message": "<p>Your audience is: {{ audience }}</p><p>The topic should be about {{ topic }} </p>",
+          "few_shot_examples": null,
+          "samples": 10,
+          "rating_prompt": "Rate the following joke on a scale from 0 to 10, where 0 is poor and 10 is excellent. \nConsider factors such as surprise, relatability, and punchiness. Respond with only a number.",
+          "rating_temperature": 0.1,
+          "rating_max_tokens": 16
+        },
+        "coordinates": {
+          "x": 374,
+          "y": 29.5
+        }
+      },
+      {
+        "id": "node_1732123792310",
+        "title": "",
+        "node_type": "BestOfNNode",
+        "config": {
+          "title": "Joke Refiner",
+          "type": "object",
+          "input_schema": {
+            "initial_joke": "str"
+          },
+          "output_schema": {
+            "final_joke": "str"
+          },
+          "llm_info": {
+            "model": "gpt-4o",
+            "max_tokens": 16384,
+            "temperature": 0.7,
+            "top_p": 1
+          },
+          "system_message": "<p>Your goal is to refine a joke to make it more vulgar and concise. It's just among friends, so you can get roasty.</p><ul><li><p>Be mean</p></li><li><p>Have dark humour</p></li><li><p>Be very punchy</p></li></ul>",
+          "user_message": "<p>{{ initial_joke }}</p>",
+          "few_shot_examples": null,
+          "samples": 3,
+          "rating_prompt": "Rate the following response on a scale from 0 to 10, where 0 is poor and 10 is excellent. Consider factors such as relevance, coherence, and helpfulness. Respond with only a number.",
+          "rating_temperature": 0.1,
+          "rating_max_tokens": 16
+        },
+        "coordinates": {
+          "x": 750,
+          "y": 30
+        }
+      },
+      {
+        "id": "node_1732123863911",
+        "title": "",
+        "node_type": "SingleLLMCallNode",
+        "config": {
+          "title": "Joke Drafter (Single-Shot)",
+          "type": "object",
+          "input_schema": {
+            "topic": "str",
+            "audience": "str"
+          },
+          "output_schema": {
+            "final_joke": "str"
+          },
+          "llm_info": {
+            "model": "gpt-4o",
+            "max_tokens": 16384,
+            "temperature": 0.7,
+            "top_p": 1
+          },
+          "system_message": "<p>You are a stand-up comedian who uses dark humor like Ricky Gervais or Jimmy Carr.</p><p></p><p>The user will provide you with a topic and audience, and you have to devise a short joke for that.</p><p></p><p>You can roast the person if a person is mentioned, it's only among friends.</p>",
+          "user_message": "<p>Your audience is: {{ audience }}</p><p>The topic should be about {{ topic }} </p>",
+          "few_shot_examples": null
+        },
+        "coordinates": {
+          "x": 374,
+          "y": 204.5
+        }
+      }
+    ],
+    "links": [
+      {
+        "source_id": "input_node",
+        "source_output_key": "topic",
+        "target_id": "node_1732123362957",
+        "target_input_key": "topic"
+      },
+      {
+        "source_id": "input_node",
+        "source_output_key": "audience",
+        "target_id": "node_1732123362957",
+        "target_input_key": "audience"
+      },
+      {
+        "source_id": "node_1732123362957",
+        "source_output_key": "initial_joke",
+        "target_id": "node_1732123792310",
+        "target_input_key": "initial_joke"
+      },
+      {
+        "source_id": "input_node",
+        "source_output_key": "topic",
+        "target_id": "node_1732123863911",
+        "target_input_key": "topic"
+      },
+      {
+        "source_id": "input_node",
+        "source_output_key": "audience",
+        "target_id": "node_1732123863911",
+        "target_input_key": "audience"
+      }
+    ],
+    "test_inputs": [
+      {
+        "id": 1732123761259,
+        "topic": "<p>A bald guy called Jean in his twenties</p>",
+        "audience": "<p>Young and Educated</p>"
+      }
+    ]
+  },
+  "description": ""
+}

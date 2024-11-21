@@ -75,7 +75,7 @@ const NodeSidebar = ({ nodeID }) => {
         } else {
             updatedModel = { ...dynamicModel, [key]: value };
         }
-        console.log("after making a change: ", updatedModel);
+
         // Update local state immediately
         setDynamicModel(updatedModel);
 
@@ -247,8 +247,12 @@ const NodeSidebar = ({ nodeID }) => {
                                 className="w-full"
                                 onChange={(newValue) => {
                                     const path = parentPath ? `${parentPath}.${key}` : key;
-                                    const lastTwoDots = path.split('.').slice(-2).join('.');
-                                    handleInputChange(lastTwoDots, newValue, true); // Pass true for isSlider
+                                    const lastTwoDots = path.split('.').slice(-2);
+
+                                    // If the first part is "config", only pass the second part
+                                    const finalPath = lastTwoDots[0] === 'config' ? lastTwoDots[1] : lastTwoDots.join('.');
+
+                                    handleInputChange(finalPath, newValue, true); // Pass true for isSlider
                                 }}
                             />
                         </div>
@@ -433,8 +437,8 @@ const NodeSidebar = ({ nodeID }) => {
             <div className="flex-1 px-4 py-1 overflow-auto max-h-screen" id="node-details">
                 <div className="flex justify-between items-center mb-2">
                     <div>
-                        <h1 className="text-lg font-semibold">{node?.id || 'Node Details'}</h1>
-                        <h2 className="text-sm font-semibold">{nodeType}</h2>
+                        <h1 className="text-lg font-semibold">{node?.data?.config?.title || node?.id || 'Node Details'}</h1>
+                        <h2 className="text-xs font-semibold">{nodeType}</h2>
                     </div>
                     <Button
                         isIconOnly

@@ -20,6 +20,13 @@ import {
   useHandleConnections
 } from '@xyflow/react';
 
+const updateMessageVariables = (message, oldKey, newKey) => {
+  if (!message) return message;
+
+  const regex = new RegExp(`{{\\s*${oldKey}\\s*}}`, 'g');
+  return message.replace(regex, `{{${newKey}}}`);
+};
+
 const DynamicNode = ({ id, type, data, position, ...props }) => {
   const nodeRef = useRef(null);
   const [nodeWidth, setNodeWidth] = useState('auto');
@@ -34,6 +41,7 @@ const DynamicNode = ({ id, type, data, position, ...props }) => {
 
   const handleSchemaKeyEdit = useCallback(
     (oldKey, newKey, schemaType) => {
+      newKey = newKey.replace(/\s+/g, '_');
       if (oldKey === newKey || !newKey.trim()) {
         setEditingField(null);
         return;
@@ -45,14 +53,33 @@ const DynamicNode = ({ id, type, data, position, ...props }) => {
       };
       delete updatedSchema[oldKey];
 
+      let updatedConfig = {
+        ...nodeData?.config,
+        [schemaType]: updatedSchema,
+      };
+
+      if (schemaType === 'input_schema') {
+        if (nodeData?.config?.system_message) {
+          updatedConfig.system_message = updateMessageVariables(
+            nodeData.config.system_message,
+            oldKey,
+            newKey
+          );
+        }
+        if (nodeData?.config?.user_message) {
+          updatedConfig.user_message = updateMessageVariables(
+            nodeData.config.user_message,
+            oldKey,
+            newKey
+          );
+        }
+      }
+
       dispatch(
         updateNodeData({
           id,
           data: {
-            config: {
-              ...nodeData?.config,
-              [schemaType]: updatedSchema,
-            },
+            config: updatedConfig,
           },
         })
       );
@@ -144,7 +171,6 @@ const DynamicNode = ({ id, type, data, position, ...props }) => {
   };
 
   const OutputHandleRow = ({ keyName }) => {
-    const connections = useHandleConnections({ type: 'source', id: keyName });
 
     return (
       <tr key={`output-${keyName}`} className="align-middle">
@@ -246,7 +272,10 @@ const DynamicNode = ({ id, type, data, position, ...props }) => {
   const onDetach = () => detachNodes([id]); 
 
   return (
-    <div className={styles.dynamicNodeWrapper} style={{ zIndex: props.parentNode ? 1 : 0 }}>
+    <div
+      className={styles.dynamicNodeWrapper}
+      style={{ zIndex: props.parentNode ? 1 : 0 }}
+    >
       <NodeToolbar className="nodrag">
         <button onClick={onDelete}>Delete</button>
         {hasParent && <button onClick={onDetach}>Detach</button>}
@@ -254,7 +283,10 @@ const DynamicNode = ({ id, type, data, position, ...props }) => {
       <BaseNode
         id={id}
         data={nodeData}
-        style={{ width: nodeWidth, backgroundColor: isConditionalNode ? '#e0f7fa' : undefined }}
+        style={{
+          width: nodeWidth,
+          backgroundColor: isConditionalNode ? '#e0f7fa' : undefined,
+        }}
         isCollapsed={isCollapsed}
         setIsCollapsed={setIsCollapsed}
         selected={props.selected}

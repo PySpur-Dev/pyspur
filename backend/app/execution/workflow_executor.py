@@ -205,13 +205,14 @@ class WorkflowExecutor:
                 for node_id in partial_outputs.keys()
             }
 
+        nodes_to_be_run: Set[str] = set()
         if rerun_predecessors:
             predecessor_ids = self._dependencies.get(node_id, set())
             for predecessor_id in predecessor_ids:
-                self._outputs.pop(predecessor_id, None)
-                self._node_tasks.pop(predecessor_id, None)
-
-            nodes_to_be_run = predecessor_ids | {node_id}
+                if predecessor_id not in partial_outputs or predecessor_id == node_id:
+                    self._outputs.pop(predecessor_id, None)
+                    self._node_tasks.pop(predecessor_id, None)
+                    nodes_to_be_run.add(predecessor_id)
         else:
             nodes_to_be_run = {node_id}
 

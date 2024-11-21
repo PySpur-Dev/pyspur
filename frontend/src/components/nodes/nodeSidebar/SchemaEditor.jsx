@@ -45,6 +45,8 @@ const SchemaEditor = ({ jsonValue = {}, onChange, options = [], disabled = false
   };
 
   const handleKeyEdit = (oldKey, newKey) => {
+    // replace spaces with underscores
+    newKey = newKey.replace(/\s+/g, '_');
     if (oldKey === newKey || !newKey.trim()) {
       setEditingField(null);
       return;
@@ -66,7 +68,7 @@ const SchemaEditor = ({ jsonValue = {}, onChange, options = [], disabled = false
         <Input
           type="text"
           value={newKey}
-          onChange={(e) => setNewKey(e.target.value)}
+          onChange={(e) => setNewKey(e.target.value.replace(/\s+/g, '_'))}
           placeholder={getPlaceholderExample()}
           label="Name"
           disabled={disabled}

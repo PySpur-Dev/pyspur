@@ -14,6 +14,7 @@ const initialState = {
   sidebarWidth: 400,
   projectName: 'Untitled Project',
   workflowInputVariables: {},
+  testInputs: [],
 };
 
 const flowSlice = createSlice({
@@ -215,7 +216,27 @@ const flowSlice = createSlice({
           }
         };
       });
-    }
+    },
+
+    setTestInputs: (state, action) => {
+      state.testInputs = action.payload;
+    },
+    addTestInput: (state, action) => {
+      state.testInputs = [
+        ...state.testInputs,
+        action.payload,
+      ];
+    },
+    updateTestInput: (state, action) => {
+      const updatedInput = action.payload;
+      state.testInputs = state.testInputs.map((input) =>
+        input.id === updatedInput.id ? updatedInput : input
+      );
+    },
+    deleteTestInput: (state, action) => {
+      const { id } = action.payload;
+      state.testInputs = state.testInputs.filter((input) => input.id !== id);
+    },
   },
 });
 
@@ -240,7 +261,11 @@ export const {
   updateWorkflowInputVariableKey,
   resetFlow,
   updateEdgesOnHandleRename,
-  resetRun
+  resetRun,
+  setTestInputs,
+  addTestInput,
+  updateTestInput,
+  deleteTestInput,
 } = flowSlice.actions;
 
 export default flowSlice.reducer;

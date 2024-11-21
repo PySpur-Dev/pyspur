@@ -30,6 +30,14 @@ def create_a_new_workflow_definition() -> WorkflowDefinitionSchema:
     )
 
 
+def generate_unique_workflow_name(db: Session, base_name: str) -> str:
+    existing_workflow = db.query(WorkflowModel).filter(WorkflowModel.name == base_name).first()
+    if existing_workflow:
+        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        return f"{base_name} {timestamp}"
+    return base_name
+
+
 @router.post(
     "/", response_model=WorkflowResponseSchema, description="Create a new workflow"
 )
@@ -38,8 +46,9 @@ def create_workflow(
 ) -> WorkflowResponseSchema:
     if not workflow_request.definition:
         workflow_request.definition = create_a_new_workflow_definition()
+    workflow_name = generate_unique_workflow_name(db, workflow_request.name or "Untitled Workflow")
     new_workflow = WorkflowModel(
-        name=workflow_request.name or "Untitled Workflow",
+        name=workflow_name,
         description=workflow_request.description,
         definition=(workflow_request.definition.model_dump()),
         created_at=datetime.now(timezone.utc),
@@ -171,8 +180,9 @@ def duplicate_workflow(
         raise HTTPException(status_code=404, detail="Workflow not found")
 
     # Create a new WorkflowModel instance by copying fields
+    new_workflow_name = generate_unique_workflow_name(db, f"{workflow.name} (Copy)")
     new_workflow = WorkflowModel(
-        name=f"{workflow.name} (Copy)",
+        name=new_workflow_name,
         description=workflow.description,
         definition=workflow.definition,
         created_at=datetime.now(timezone.utc),

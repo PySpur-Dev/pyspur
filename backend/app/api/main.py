@@ -29,7 +29,7 @@ async def lifespan(app: FastAPI):
     DaskClusterManager.shutdown()
 
 
-app = FastAPI(lifespan=lifespan)
+app = FastAPI(lifespan=lifespan, root_path="/api")
 
 # Add CORS middleware
 app.add_middleware(

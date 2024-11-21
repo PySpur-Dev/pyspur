@@ -8,33 +8,33 @@ export const useSaveWorkflow = (trigger, delay = 2000) => {
   const workflowID = useSelector(state => state.flow.workflowID);
   const workflowInputVariables = useSelector(state => state.flow.workflowInputVariables);
   const workflowName = useSelector(state => state.flow.projectName);
+  const testInputs = useSelector(state => state.flow.testInputs);
 
   const saveWorkflow = useCallback(async () => {
     try {
-
-      const updatedNodes = nodes.map(node => {
-        if (node.type === 'InputNode') {
-          return {
-            ...node,
-            config: {
-              ...node.data.config,
-              input_schema: Object.fromEntries(
-                Object.keys(workflowInputVariables).map(key => [key, "str"])
-              )
-            }
-          };
-        }
-        else {
-          return {
-            ...node,
-            config: node.data?.config,
-            title: node.data?.title
+      const updatedNodes = nodes
+        .filter(node => node !== null && node !== undefined)
+        .map(node => {
+          if (node.type === 'InputNode') {
+            return {
+              ...node,
+              config: {
+                ...node.data.config,
+                input_schema: Object.fromEntries(
+                  Object.keys(workflowInputVariables).map(key => [key, "str"])
+                )
+              }
+            };
+          } else {
+            return {
+              ...node,
+              config: node.data?.config,
+              title: node.data?.title
+            };
           }
-        }
-      });
+        });
 
-      const updatedWorkflow = 
-      {
+      const updatedWorkflow = {
         name: workflowName,
         definition: {
           nodes: updatedNodes.map(node => ({
@@ -56,14 +56,16 @@ export const useSaveWorkflow = (trigger, delay = 2000) => {
               target_input_type: targetNode?.config?.data?.input_schema?.[edge.targetHandle] || 'str',
             };
           }),
+          test_inputs: testInputs,
         }
       };
+
       console.log('send to b/e workflow:', updatedWorkflow);
       // await updateWorkflow(workflowID, updatedWorkflow);
     } catch (error) {
       console.error('Error saving workflow:', error);
     }
-  }, [workflowID, nodes, edges, workflowInputVariables, workflowName]);
+  }, [workflowID, nodes, edges, workflowInputVariables, workflowName, testInputs]);
 
   useEffect(() => {
     const handle = setTimeout(() => {

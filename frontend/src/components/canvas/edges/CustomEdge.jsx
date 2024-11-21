@@ -3,6 +3,7 @@ import {
   BaseEdge,
   EdgeLabelRenderer,
   getBezierPath,
+  getSmoothStepPath,
   useReactFlow,
 } from '@xyflow/react';
 import { Button } from '@nextui-org/react';
@@ -52,14 +53,16 @@ const CustomEdge = ({
       edgeId: id
     });
   };
+  const borderRadius = 16;
 
-  const [edgePath, labelX, labelY] = getBezierPath({
+  const [edgePath, labelX, labelY] = getSmoothStepPath({
     sourceX,
     sourceY,
     sourcePosition,
     targetX,
     targetY,
     targetPosition,
+    borderRadius,
   });
 
   const handleDeleteEdge = (event) => {

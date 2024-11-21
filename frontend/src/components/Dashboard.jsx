@@ -49,21 +49,16 @@ const Dashboard = () => {
   }, []);
 
   useEffect(() => {
-    // Fetch workflows and templates
-    const fetchData = async () => {
+    const fetchTemplates = async () => {
       try {
-        const [workflowsData, templatesData] = await Promise.all([
-          getWorkflows(),
-          getTemplates(),
-        ]);
-        setWorkflows(workflowsData);
-        setTemplates(templatesData);
+        const workflows = await getTemplates();
+        setTemplates(workflows);
       } catch (error) {
-        console.error('Error fetching data:', error);
+        console.error('Error fetching templates:', error);
       }
     };
 
-    fetchData();
+    fetchTemplates();
   }, []);
 
   const columns = [
@@ -180,7 +175,7 @@ const Dashboard = () => {
         const reader = new FileReader();
         reader.onload = async (e) => {
           try {
-            const jsonContent = JSON.parse(e.target.result);
+            let jsonContent = JSON.parse(e.target.result);
 
             // Generate a unique name for the new workflow
             const uniqueName = `Imported Spur ${new Date().toLocaleString()}`;
@@ -190,12 +185,21 @@ const Dashboard = () => {
               name: uniqueName,
               description: '',
             };
-
+            // to support old style downloaded workflows
+            if (jsonContent.name) {
+              newWorkflow.name = jsonContent.name;
+            }
+            if (jsonContent.description) {
+              newWorkflow.description = jsonContent.description;
+            }
+            if (jsonContent.nodes) {
+              newWorkflow.definition = jsonContent;
+            }
+            if (jsonContent.definition) {
+              newWorkflow.definition = jsonContent.definition;
+            }
             // Call the API to create the workflow
             const createdWorkflow = await createWorkflow(newWorkflow);
-
-            // Update the newly created workflow with the JSON content
-            await updateWorkflow(createdWorkflow.id, jsonContent);
 
             // Navigate to the new workflow's page using its ID
             router.push(`/workflows/${createdWorkflow.id}`);
@@ -212,9 +216,9 @@ const Dashboard = () => {
     }
   };
 
-  const handleUseTemplate = async (templateFileName) => {
+  const handleUseTemplate = async (template) => {
     try {
-      const newWorkflow = await instantiateTemplate(templateFileName);
+      const newWorkflow = await instantiateTemplate(template);
       router.push(`/workflows/${newWorkflow.id}`);
     } catch (error) {
       console.error('Error using template:', error);
@@ -301,7 +305,7 @@ const Dashboard = () => {
                   title={template.name}
                   description={template.description}
                   features={template.features}
-                  onUse={() => handleUseTemplate(template.file_name)}
+                  onUse={() => handleUseTemplate(template)}
                 />
               ))}
             </div>

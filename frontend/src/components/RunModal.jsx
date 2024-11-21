@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useSelector } from 'react-redux';
+import { useSelector, useDispatch } from 'react-redux';
 import {
   Modal,
   ModalContent,
@@ -17,6 +17,7 @@ import {
 } from "@nextui-org/react";
 import { Icon } from "@iconify/react";
 import TextEditor from './textEditor/TextEditor';
+import { addTestInput, deleteTestInput, setTestInputs } from '../store/flowSlice';
 
 const RunModal = ({ isOpen, onOpenChange, onRun, onSave }) => {
   const workflowInputVariables = useSelector(state => state.flow.workflowInputVariables);
@@ -32,26 +33,31 @@ const RunModal = ({ isOpen, onOpenChange, onRun, onSave }) => {
   // Add this new state to track editor contents
   const [editorContents, setEditorContents] = useState({});
 
-  const handleAddRow = () => {
+  const dispatch = useDispatch();
+  const testInputs = useSelector((state) => state.flow.testInputs);
 
-    setTestData([
-      ...testData,
-      {
-        id: testData.length + 1,
-        ...editorContents
-      }
-    ]);
+  useEffect(() => {
+    // Load test inputs from Redux store
+    setTestData(testInputs);
+  }, [testInputs]);
+
+  const handleAddRow = () => {
+    const newTestInput = {
+      id: Date.now(),  // Use a timestamp or UUID for unique IDs
+      ...editorContents,
+    };
+    setTestData([...testData, newTestInput]);
     setEditorContents({});
-    setNewRow(workflowInputVariableNames.reduce((acc, field) => ({ ...acc, [field]: "" }), {}));
+
+    // Dispatch action to add test input to Redux
+    dispatch(addTestInput(newTestInput));
   };
 
-  // Add this useEffect to log editorContents whenever it changes
-  useEffect(() => {
-
-  }, [editorContents]);
-
   const handleDeleteRow = (id) => {
-    setTestData(testData.filter(row => row.id !== id));
+    setTestData(testData.filter((row) => row.id !== id));
+
+    // Dispatch action to remove test input from Redux
+    dispatch(deleteTestInput({ id }));
   };
 
   const handleDoubleClick = (rowId, field) => {
@@ -126,21 +132,9 @@ const RunModal = ({ isOpen, onOpenChange, onRun, onSave }) => {
   };
 
   const handleSave = () => {
-    if (!selectedRow) return;
-
-    // Find the selected test data
-    const selectedTestCase = testData.find(row => row.id == selectedRow);
-    if (!selectedTestCase) return;
-
-    // Remove the id field from the test case
-    const { id, ...inputValues } = selectedTestCase;
-
     if (typeof onSave === 'function') {
-      onSave(inputValues);  // Call the onSave function
-    } else {
-      console.error('onSave is not a function');
+      onSave();
     }
-
     onOpenChange(false);
   };
 

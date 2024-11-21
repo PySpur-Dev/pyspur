@@ -11,7 +11,7 @@ import TipPopup from '../../../TipPopUp';
 import { resetWorkflow } from '../../../../utils/api';
 import { resetFlow } from '../../../../store/flowSlice';
 
-function Operator() {
+function Operator({handleLayout}) {
   const dispatch = useDispatch();
   const nodes = useSelector(state => state.flow.nodes);
   const mode = useModeStore((state) => state.mode);
@@ -80,6 +80,20 @@ function Operator() {
               <Icon
                 className="text-default-500"
                 icon="solar:trash-bin-trash-linear"
+                width={16}
+              />
+            </Button>
+          </TipPopup>
+          <TipPopup title='Layout Nodes'>
+            <Button
+              size="sm"
+              isIconOnly
+              onClick={handleLayout}
+              className='bg-white'
+            >
+              <Icon
+                className="text-default-500"
+                icon="solar:ruler-angular-linear"
                 width={16}
               />
             </Button>

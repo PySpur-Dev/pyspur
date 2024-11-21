@@ -1,11 +1,21 @@
 version: '3.8'
 
 services:
-  api:
-    build: ./backend
-    command: bash /app/entrypoint.sh
+  nginx:
+    image: nginx:latest
+    ports:
+      - "6080:80"
     volumes:
-      - ./backend:/app
+      - ./nginx/conf.d:/etc/nginx/conf.d
+      - ./nginx/.htpasswd:/etc/nginx/.htpasswd
+    depends_on:
+      - backend
+      - frontend
+  backend:
+    build: ./backend
+    command: bash /pyspur/entrypoint.sh
+    volumes:
+      - ./backend:/pyspur
     ports:
       - "8000:8000"
       - "8787:8787"
@@ -18,6 +28,6 @@ services:
     ports:
       - "3000:3000"
     depends_on:
-      - api
+      - backend
 volumes:
   node_modules:
