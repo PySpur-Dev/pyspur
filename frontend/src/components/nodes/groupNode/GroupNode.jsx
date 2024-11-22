@@ -33,9 +33,9 @@ function GroupNode({ id }) {
     };
   }, isEqual);
 
-  const onDelete = () => {
-    deleteElements({ nodes: [{ id }] });
-  };
+  // const onDelete = () => {
+  //   deleteElements({ nodes: [{ id }] });
+  // };
 
   const onDetach = () => {
     const childNodeIds = Array.from(store.getState().nodeLookup.values())
@@ -51,11 +51,10 @@ function GroupNode({ id }) {
         lineStyle={lineStyle}
         minHeight={minHeight}
         minWidth={minWidth}
-        shouldResize={true} // Ensure this is set to true if resizing is needed
       />
       <NodeToolbar className="nodrag">
-        <button onClick={onDelete}>Delete</button>
-        {hasChildNodes && <button onClick={onDetach}>Ungroup</button>} // Ensure hasChildNodes is correctly calculated
+        {/* <button onClick={onDelete}>Delete</button> */}
+        {hasChildNodes && <button onClick={onDetach}>Ungroup</button>}
       </NodeToolbar>
     </div>
   );

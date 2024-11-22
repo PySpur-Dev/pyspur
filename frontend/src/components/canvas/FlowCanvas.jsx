@@ -79,8 +79,12 @@ const useNodeTypes = ({ nodeTypesConfig }) => {
       return acc;
     }, {});
 
+    console.log('types', types);
+
     // Ensure GroupNode is always included
-    types['GroupNode'] = GroupNode;
+    types['group'] = GroupNode;
+
+    // console.log('types', types);
 
     return types;
   }, [nodeTypesConfig]);
@@ -125,6 +129,7 @@ const FlowCanvasContent = (props) => {
   }, [dispatch, workflowData, workflowID]);
 
   const { nodeTypes, isLoading } = useNodeTypes({ nodeTypesConfig });
+  // nodeTypes['group'] = GroupNode;
   // console.log('nodeTypes', nodeTypes);
 
   const nodes = useSelector((state) => state.flow.nodes);

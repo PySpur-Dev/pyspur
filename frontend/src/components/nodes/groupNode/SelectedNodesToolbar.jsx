@@ -5,13 +5,19 @@ import {
     useReactFlow,
 } from '@xyflow/react';
 
+import { useDispatch, useSelector } from 'react-redux';
+
+import { setNodes } from '../../../store/flowSlice';
+
 import { getId } from '../../../utils/groupUtils';
 
 const padding = 25;
 
 export default function SelectedNodesToolbar() {
+    const dispatch = useDispatch();
     const nodes = useNodes();
-    const { setNodes, getNodesBounds } = useReactFlow();
+    console.log('nodes', nodes);
+    const { getNodesBounds } = useReactFlow();
     const store = useStoreApi();
     const selectedNodes = nodes.filter((node) => node.selected && !node.parentId);
     const selectedNodeIds = selectedNodes.map((node) => node.id);
@@ -52,7 +58,7 @@ export default function SelectedNodesToolbar() {
 
         store.getState().resetSelectedElements();
         store.setState({ nodesSelectionActive: false });
-        setNodes([groupNode, ...nextNodes]);
+        dispatch(setNodes({nodes: [groupNode, ...nextNodes]}));
     };
 
     return (

@@ -57,7 +57,7 @@ const NodeSidebar = ({ nodeID }) => {
             setNodeSchema(findNodeSchema(node.type));
             setDynamicModel(node.data.config || {});
         }
-    }, [nodeID, node, node.data.config]);
+    }, [nodeID, node, node?.data?.config]);
 
     // Helper function to update nested object by path
     const updateNestedModel = (obj, path, value) => {
