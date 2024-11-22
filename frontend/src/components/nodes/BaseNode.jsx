@@ -30,10 +30,11 @@ const BaseNode = ({ isCollapsed, setIsCollapsed, id, data = {}, children, style 
   const initialInputs = useSelector((state) => {
     const inputNodeId = state.flow?.nodes.find((node) => node.type === 'InputNode')?.id;
     let testInputs = state.flow?.testInputs;
-    if (testInputs && Array.isArray(testInputs)) {
+    if (testInputs && Array.isArray(testInputs) && testInputs.length > 0) {
       const { id, ...rest } = testInputs[0];
       return {[inputNodeId]: rest};
     }
+    return {}; // Return an empty object if testInputs is not valid
   });
   const availableOutputs = useSelector((state) => {
     const nodes = state.flow.nodes;

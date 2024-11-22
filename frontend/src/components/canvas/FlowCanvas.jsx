@@ -62,7 +62,7 @@ const onDragOver = (event) => {
 };
 
 const useNodeTypes = ({ nodeTypesConfig }) => {
-  console.log('nodeTypesConfig', nodeTypesConfig);
+  // console.log('nodeTypesConfig', nodeTypesConfig);
   const nodeTypes = useMemo(() => {
     const types = Object.keys(nodeTypesConfig || {}).reduce((acc, category) => {
       nodeTypesConfig[category].forEach(node => {
@@ -125,7 +125,7 @@ const FlowCanvasContent = (props) => {
   }, [dispatch, workflowData, workflowID]);
 
   const { nodeTypes, isLoading } = useNodeTypes({ nodeTypesConfig });
-  console.log('nodeTypes', nodeTypes);
+  // console.log('nodeTypes', nodeTypes);
 
   const nodes = useSelector((state) => state.flow.nodes);
   const edges = useSelector((state) => state.flow.edges);
@@ -173,14 +173,6 @@ const FlowCanvasContent = (props) => {
 
   const onEdgesChange = useCallback(
     (changes) => dispatch(edgesChange({ changes })),
-    [dispatch]
-  );
-
-  const setNodes = useCallback(
-    (nodes) => {
-      const nodesArray = Array.isArray(nodes) ? nodes : []; // Ensure nodes is an array
-      dispatch(nodesChange({ changes: nodesArray.map((node) => ({ node })) }));
-    },
     [dispatch]
   );
 
@@ -538,15 +530,19 @@ const FlowCanvasContent = (props) => {
 
   const onNodeDragStop = useCallback(
     (_, node) => {
-      if (node.type === 'group' || !node.parentId) {
+      if (node.type == 'group') {
         return;
       }
   
       const intersections = getIntersectingNodes(node).filter(
-        (n) => n.type === 'group'
+        (n) => n.type == 'group'
       );
       const groupNode = intersections[0];
-  
+      console.log('groupNode', groupNode);
+
+      const nodes = getNodes();
+      console.log('nodes', nodes);
+
       if (intersections.length && node.parentId !== groupNode?.id) {
         const nextNodes = getNodes()
           .map((n) => {
@@ -583,8 +579,10 @@ const FlowCanvasContent = (props) => {
             return n;
           })
           .sort(sortNodes);
+
+        console.log('nextNodes', nextNodes);
   
-        setNodes(nextNodes);
+        dispatch(setNodes({ nodes: nextNodes }));
       }
     },
     [getIntersectingNodes, getNodes, setNodes]

@@ -24,6 +24,7 @@ function GroupNode({ id }) {
       (n) => n.parentId === id
     );
     const rect = getRelativeNodesBounds(childNodes);
+    console.log('rect', rect);
 
     return {
       minWidth: rect.x + rect.width,
@@ -50,10 +51,11 @@ function GroupNode({ id }) {
         lineStyle={lineStyle}
         minHeight={minHeight}
         minWidth={minWidth}
+        shouldResize={true} // Ensure this is set to true if resizing is needed
       />
       <NodeToolbar className="nodrag">
         <button onClick={onDelete}>Delete</button>
-        {hasChildNodes && <button onClick={onDetach}>Ungroup</button>}
+        {hasChildNodes && <button onClick={onDetach}>Ungroup</button>} // Ensure hasChildNodes is correctly calculated
       </NodeToolbar>
     </div>
   );

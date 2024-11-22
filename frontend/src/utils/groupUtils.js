@@ -23,23 +23,26 @@ export const getNodePositionInsideParent = (node, groupNode) => {
   const groupWidth = groupNode.measured?.width ?? 0;
   const groupHeight = groupNode.measured?.height ?? 0;
 
-  if (position.x < groupNode.position.x) {
-    position.x = 0;
-  } else if (position.x + nodeWidth > groupNode.position.x + groupWidth) {
-    position.x = groupWidth - nodeWidth;
+  let newPositionX = position.x;
+  let newPositionY = position.y;
+
+  if (newPositionX < groupNode.position.x) {
+    newPositionX = 0;
+  } else if (newPositionX + nodeWidth > groupNode.position.x + groupWidth) {
+    newPositionX = groupWidth - nodeWidth;
   } else {
-    position.x = position.x - groupNode.position.x;
+    newPositionX = newPositionX - groupNode.position.x;
   }
 
-  if (position.y < groupNode.position.y) {
-    position.y = 0;
-  } else if (position.y + nodeHeight > groupNode.position.y + groupHeight) {
-    position.y = groupHeight - nodeHeight;
+  if (newPositionY < groupNode.position.y) {
+    newPositionY = 0;
+  } else if (newPositionY + nodeHeight > groupNode.position.y + groupHeight) {
+    newPositionY = groupHeight - nodeHeight;
   } else {
-    position.y = position.y - groupNode.position.y;
+    newPositionY = newPositionY - groupNode.position.y;
   }
 
-  return position;
+  return { x: newPositionX, y: newPositionY };
 };
 
 export const getBoundsOfBoxes = (box1, box2) => ({

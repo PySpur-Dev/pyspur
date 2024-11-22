@@ -5,8 +5,8 @@ import { useDispatch } from 'react-redux';
 import { setTestInputs } from '../store/flowSlice';
 
 const API_BASE_URL = typeof window !== 'undefined'
-  ? `http://${window.location.host}/api`
-  : 'http://localhost:6080/api';
+  ? 'http://localhost:8000/api'
+  : 'http://localhost:8000/api';
 
 export const getNodeTypes = async () => {
   try {
