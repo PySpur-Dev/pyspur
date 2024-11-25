@@ -1,0 +1,41 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+main {
+  @apply font-sans;
+}
+
+form.rjsf {
+  @apply flex flex-col gap-6;
+
+  fieldset {
+    @apply relative flex flex-col gap-4;
+  }
+
+  #root__title {
+    @apply sticky top-0 left-0 right-0 bg-blue-500 w-full z-20;
+  }
+
+  .form-group {
+    @apply flex flex-col gap-2;
+  }
+
+  .control-label {
+    @apply text-xs font-medium;
+  }
+
+  .field-description {
+    @apply text-xs text-gray-500;
+  }
+
+  .hidden {
+    @apply sr-only;
+  }
+
+  .custom-form-field {
+    .control-label {
+      @apply sr-only;
+    }
+  }
+}
