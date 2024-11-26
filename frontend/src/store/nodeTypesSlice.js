@@ -2,19 +2,17 @@ import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import { getNodeTypes } from '../utils/api';
 
 const initialState = {
-  data: null,      // This will store the schema object
-  metadata: null,  // This will store the metadata
+  raw: null,
+  data: null, // This will store the schema object
+  metadata: null, // This will store the metadata
   status: 'idle',
   error: null,
 };
 
-export const fetchNodeTypes = createAsyncThunk(
-  'nodeTypes/fetchNodeTypes',
-  async () => {
-    const response = await getNodeTypes();
-    return response;  // Now returns { schema, metadata }
-  }
-);
+export const fetchNodeTypes = createAsyncThunk('nodeTypes/fetchNodeTypes', async () => {
+  const response = await getNodeTypes();
+  return response; // Now returns { raw,schema, metadata }
+});
 
 const nodeTypesSlice = createSlice({
   name: 'nodeTypes',
@@ -27,6 +25,7 @@ const nodeTypesSlice = createSlice({
       })
       .addCase(fetchNodeTypes.fulfilled, (state, action) => {
         state.status = 'succeeded';
+        state.raw = action.payload.raw;
         state.data = action.payload.schema;
         state.metadata = action.payload.metadata;
       })
@@ -48,7 +47,7 @@ const findMetadataInCategory = (metadata, nodeType, path) => {
     if (!nodes) continue;
 
     // Find the node in the category
-    const node = nodes.find(node => node.name === nodeType);
+    const node = nodes.find((node) => node.name === nodeType);
     if (!node) continue;
     // Navigate the remaining path
     const remainingPath = path.split('.');
@@ -58,14 +57,14 @@ const findMetadataInCategory = (metadata, nodeType, path) => {
       if (current && typeof current === 'object' && part in current) {
         current = current[part];
       } else {
-        return null;  // Path not found
+        return null; // Path not found
       }
     }
 
-    return current;  // Return the found metadata
+    return current; // Return the found metadata
   }
 
-  return null;  // Node type not found in any category
+  return null; // Node type not found in any category
 };
 
 export const selectPropertyMetadata = (state, propertyPath) => {

@@ -1,35 +1,34 @@
 import { useCallback, useEffect } from 'react';
 import { useSelector } from 'react-redux';
 import { updateWorkflow } from '../utils/api';
+import { debounce } from 'lodash';
 
 export const useSaveWorkflow = (trigger, delay = 2000) => {
-  const nodes = useSelector(state => state.flow.nodes);
-  const edges = useSelector(state => state.flow.edges);
-  const workflowID = useSelector(state => state.flow.workflowID);
-  const workflowInputVariables = useSelector(state => state.flow.workflowInputVariables);
-  const workflowName = useSelector(state => state.flow.projectName);
-  const testInputs = useSelector(state => state.flow.testInputs);
+  const nodes = useSelector((state) => state.flow.nodes);
+  const edges = useSelector((state) => state.flow.edges);
+  const workflowID = useSelector((state) => state.flow.workflowID);
+  const workflowInputVariables = useSelector((state) => state.flow.workflowInputVariables);
+  const workflowName = useSelector((state) => state.flow.projectName);
+  const testInputs = useSelector((state) => state.flow.testInputs);
 
   const saveWorkflow = useCallback(async () => {
     try {
       const updatedNodes = nodes
-        .filter(node => node !== null && node !== undefined)
-        .map(node => {
+        .filter((node) => node !== null && node !== undefined)
+        .map((node) => {
           if (node.type === 'InputNode') {
             return {
               ...node,
               config: {
                 ...node.data.config,
-                input_schema: Object.fromEntries(
-                  Object.keys(workflowInputVariables).map(key => [key, "str"])
-                )
-              }
+                input_schema: Object.fromEntries(Object.keys(workflowInputVariables).map((key) => [key, 'str'])),
+              },
             };
           } else {
             return {
               ...node,
               config: node.data?.config,
-              title: node.data?.title
+              title: node.data?.title,
             };
           }
         });
@@ -37,15 +36,15 @@ export const useSaveWorkflow = (trigger, delay = 2000) => {
       const updatedWorkflow = {
         name: workflowName,
         definition: {
-          nodes: updatedNodes.map(node => ({
+          nodes: updatedNodes.map((node) => ({
             id: node.id,
             node_type: node.type,
             config: node.config,
             coordinates: node.position,
           })),
-          links: edges.map(edge => {
-            const sourceNode = nodes.find(node => node.id === edge.source);
-            const targetNode = nodes.find(node => node.id === edge.target);
+          links: edges.map((edge) => {
+            const sourceNode = nodes.find((node) => node.id === edge.source);
+            const targetNode = nodes.find((node) => node.id === edge.target);
 
             return {
               source_id: edge.source,
@@ -57,7 +56,7 @@ export const useSaveWorkflow = (trigger, delay = 2000) => {
             };
           }),
           test_inputs: testInputs,
-        }
+        },
       };
 
       console.log('send to b/e workflow:', updatedWorkflow);
@@ -67,15 +66,19 @@ export const useSaveWorkflow = (trigger, delay = 2000) => {
     }
   }, [workflowID, nodes, edges, workflowInputVariables, workflowName, testInputs]);
 
-  useEffect(() => {
-    const handle = setTimeout(() => {
+  const debouncedSave = useCallback(
+    debounce(() => {
       if (nodes.length > 0 || edges.length > 0) {
         saveWorkflow();
       }
-    }, delay);
+    }, delay),
+    [nodes, edges, saveWorkflow, delay],
+  );
+  useEffect(() => {
+    debouncedSave();
 
-    return () => clearTimeout(handle);
-  }, [nodes, edges, saveWorkflow, trigger, delay]);
+    return () => debouncedSave.cancel();
+  }, [debouncedSave]);
 
   return saveWorkflow;
 };

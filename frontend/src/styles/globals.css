@@ -28,7 +28,7 @@
     --chart-3: 197 37% 24%;
     --chart-4: 43 74% 66%;
     --chart-5: 27 87% 67%;
-    --radius: 0.5rem
+    --radius: 0.5rem;
   }
 
   .dark {
@@ -55,7 +55,7 @@
     --chart-2: 160 60% 45%;
     --chart-3: 30 80% 55%;
     --chart-4: 280 65% 60%;
-    --chart-5: 340 75% 55%
+    --chart-5: 340 75% 55%;
   }
 }
 
@@ -66,5 +66,39 @@
 
   body {
     @apply bg-background text-foreground;
+  }
+}
+
+form.rjsf {
+  @apply flex flex-col gap-6;
+
+  fieldset {
+    @apply relative flex flex-col gap-4;
+  }
+
+  #root__title {
+    @apply sticky top-0 left-0 right-0 bg-blue-500 w-full z-20;
+  }
+
+  .form-group {
+    @apply flex flex-col gap-2;
+  }
+
+  .control-label {
+    @apply text-xs font-medium;
+  }
+
+  .field-description {
+    @apply text-xs text-gray-500;
+  }
+
+  .hidden {
+    @apply sr-only;
+  }
+
+  .custom-form-field {
+    .control-label {
+      @apply sr-only;
+    }
   }
 }

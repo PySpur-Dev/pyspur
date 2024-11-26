@@ -1,12 +1,8 @@
 import axios from 'axios';
 import testInput from '../constants/test_input.js'; // Import the test input directly
 import JSPydanticModel from './JSPydanticModel.js'; // Import the JSPydanticModel class
-import { useDispatch } from 'react-redux';
-import { setTestInputs } from '../store/flowSlice';
 
-const API_BASE_URL = typeof window !== 'undefined'
-  ? `http://${window.location.host}/api`
-  : 'http://localhost:6080/api';
+const API_BASE_URL = typeof window !== 'undefined' ? `http://${window.location.host}/api` : 'http://localhost:6080/api';
 
 export const getNodeTypes = async () => {
   try {
@@ -23,8 +19,9 @@ export const getNodeTypes = async () => {
 
     // Return both schema and metadata
     return {
+      raw: response.data,
       schema,
-      metadata
+      metadata,
     };
   } catch (error) {
     console.error('Error getting node types:', error);
@@ -32,12 +29,13 @@ export const getNodeTypes = async () => {
   }
 };
 
-
 export const runWorkflow = async (workflowData) => {
   try {
     // save the work flow Data to a file
     // Create a blob from the workflowData
-    const blob = new Blob([JSON.stringify(workflowData, null, 2)], { type: 'application/json' });
+    const blob = new Blob([JSON.stringify(workflowData, null, 2)], {
+      type: 'application/json',
+    });
     const url = URL.createObjectURL(blob);
 
     // Create a link element and trigger a download
@@ -76,7 +74,7 @@ export const getWorkflows = async () => {
     console.error('Error getting workflows:', error);
     throw error;
   }
-}
+};
 
 export const createWorkflow = async (workflowData) => {
   try {
@@ -86,7 +84,7 @@ export const createWorkflow = async (workflowData) => {
     console.error('Error creating workflow:', error);
     throw error;
   }
-}
+};
 
 export const updateWorkflow = async (workflowId, workflowData) => {
   try {
@@ -96,7 +94,7 @@ export const updateWorkflow = async (workflowId, workflowData) => {
     console.error('Error updating workflow:', error);
     throw error;
   }
-}
+};
 
 export const resetWorkflow = async (workflowId) => {
   try {
@@ -106,14 +104,14 @@ export const resetWorkflow = async (workflowId) => {
     console.error('Error resetting workflow:', error);
     throw error;
   }
-}
+};
 
 export const startRun = async (workflowID, initialInputs = {}, parentRunId = null, runType = 'interactive') => {
   console.log('workflowID', workflowID, 'runType', runType, 'initialInputs', initialInputs, 'parentRunId', parentRunId);
   try {
     const requestBody = {
       initial_inputs: initialInputs,
-      parent_run_id: parentRunId
+      parent_run_id: parentRunId,
     };
     const response = await axios.post(`${API_BASE_URL}/wf/${workflowID}/start_run/?run_type=${runType}`, requestBody);
     return response.data;
@@ -121,13 +119,13 @@ export const startRun = async (workflowID, initialInputs = {}, parentRunId = nul
     console.error('Error starting run:', error);
     throw error;
   }
-}
+};
 
 export const startBatchRun = async (workflowID, datasetID, miniBatchSize = 10) => {
   try {
     const requestBody = {
       dataset_id: datasetID,
-      mini_batch_size: miniBatchSize
+      mini_batch_size: miniBatchSize,
     };
     const response = await axios.post(`${API_BASE_URL}/wf/${workflowID}/start_batch_run/`, requestBody);
     return response.data;
@@ -135,8 +133,7 @@ export const startBatchRun = async (workflowID, datasetID, miniBatchSize = 10) =
     console.error('Error starting batch run:', error);
     throw error;
   }
-}
-
+};
 
 export const getWorkflow = async (workflowID) => {
   try {
@@ -146,14 +143,14 @@ export const getWorkflow = async (workflowID) => {
     console.error('Error getting workflow:', error);
     throw error;
   }
-}
+};
 
-export const getAllRuns = async (lastK = 10, parentOnly = true, runType = "batch") => {
+export const getAllRuns = async (lastK = 10, parentOnly = true, runType = 'batch') => {
   try {
     const params = {
       last_k: lastK,
       parent_only: parentOnly,
-      run_type: runType
+      run_type: runType,
     };
     const response = await axios.get(`${API_BASE_URL}/run/`, { params });
     return response.data;
@@ -161,7 +158,7 @@ export const getAllRuns = async (lastK = 10, parentOnly = true, runType = "batch
     console.error('Error fetching runs:', error);
     throw error;
   }
-}
+};
 
 export const downloadOutputFile = async (outputFileID) => {
   try {
@@ -189,8 +186,7 @@ export const downloadOutputFile = async (outputFileID) => {
     console.error('Error downloading output file:', error);
     throw error;
   }
-}
-
+};
 
 export const listApiKeys = async () => {
   try {
@@ -200,7 +196,7 @@ export const listApiKeys = async () => {
     console.error('Error listing API keys:', error);
     throw error;
   }
-}
+};
 
 export const getApiKey = async (name) => {
   try {
@@ -210,17 +206,20 @@ export const getApiKey = async (name) => {
     console.error(`Error getting API key for ${name}:`, error);
     throw error;
   }
-}
+};
 
 export const setApiKey = async (name, value) => {
   try {
-    const response = await axios.post(`${API_BASE_URL}/env-mgmt/`, { name, value });
+    const response = await axios.post(`${API_BASE_URL}/env-mgmt/`, {
+      name,
+      value,
+    });
     return response.data;
   } catch (error) {
     console.error(`Error setting API key for ${name}:`, error);
     throw error;
   }
-}
+};
 
 export const deleteApiKey = async (name) => {
   try {
@@ -230,25 +229,28 @@ export const deleteApiKey = async (name) => {
     console.error(`Error deleting API key for ${name}:`, error);
     throw error;
   }
-}
-
+};
 
 export const uploadDataset = async (name, description, file) => {
   try {
     const formData = new FormData();
     formData.append('file', file);
 
-    const response = await axios.post(`${API_BASE_URL}/ds/?name=${encodeURIComponent(name)}&description=${encodeURIComponent(description)}`, formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data',
+    const response = await axios.post(
+      `${API_BASE_URL}/ds/?name=${encodeURIComponent(name)}&description=${encodeURIComponent(description)}`,
+      formData,
+      {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
       },
-    });
+    );
     return response.data;
   } catch (error) {
     console.error('Error uploading dataset:', error);
     throw error;
   }
-}
+};
 
 export const listDatasets = async () => {
   try {
@@ -258,7 +260,7 @@ export const listDatasets = async () => {
     console.error('Error listing datasets:', error);
     throw error;
   }
-}
+};
 
 export const getDataset = async (datasetId) => {
   try {
@@ -268,7 +270,7 @@ export const getDataset = async (datasetId) => {
     console.error(`Error getting dataset with ID ${datasetId}:`, error);
     throw error;
   }
-}
+};
 
 export const deleteDataset = async (datasetId) => {
   try {
@@ -278,7 +280,7 @@ export const deleteDataset = async (datasetId) => {
     console.error(`Error deleting dataset with ID ${datasetId}:`, error);
     throw error;
   }
-}
+};
 
 export const listDatasetRuns = async (datasetId) => {
   try {
@@ -288,7 +290,7 @@ export const listDatasetRuns = async (datasetId) => {
     console.error(`Error listing runs for dataset with ID ${datasetId}:`, error);
     throw error;
   }
-}
+};
 
 export const deleteWorkflow = async (workflowId) => {
   try {
@@ -337,7 +339,7 @@ export const runPartialWorkflow = async (workflowId, nodeId, initialInputs, part
       node_id: nodeId,
       initial_inputs: initialInputs,
       partial_outputs: partialOutputs,
-      rerun_predecessors: rerunPredecessors
+      rerun_predecessors: rerunPredecessors,
     };
     const response = await axios.post(`${API_BASE_URL}/wf/${workflowId}/run_partial/`, requestBody);
     return response.data;
