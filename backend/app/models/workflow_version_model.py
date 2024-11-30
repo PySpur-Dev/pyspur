@@ -1,4 +1,4 @@
-from sqlalchemy import Integer, String, DateTime, JSON, ForeignKey
+from sqlalchemy import Integer, String, DateTime, JSON, ForeignKey, Computed
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from datetime import datetime, timezone
 from typing import List, Optional, Any
@@ -10,6 +10,9 @@ class WorkflowVersionModel(BaseModel):
     __tablename__ = "workflow_versions"
 
     _intid: Mapped[int] = mapped_column(Integer, primary_key=True)
+    id: Mapped[str] = mapped_column(
+        String, Computed("'WV' || _intid"), nullable=False, index=True
+    )
     version: Mapped[int] = mapped_column(Integer, nullable=False)
     workflow_id: Mapped[str] = mapped_column(
         ForeignKey("workflows.id"), nullable=False, index=True

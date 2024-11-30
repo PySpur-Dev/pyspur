@@ -15,7 +15,7 @@ class SpurModel(BaseModel):
     name = Column(String, nullable=False)
     description = Column(String)
     workflow_id = Column(String, ForeignKey("workflows.id"), nullable=False)
-    workflow_version_id = Column(String, ForeignKey("workflow_versions.id"))
+    workflow_version_id = Column(Integer, ForeignKey("workflow_versions._intid"))
     api_key = Column(String, nullable=False)  # For API authentication
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime(timezone=True))
