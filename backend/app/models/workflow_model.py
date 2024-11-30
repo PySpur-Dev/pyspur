@@ -33,3 +33,4 @@ class WorkflowModel(BaseModel):
     )
 
     versions = relationship("WorkflowVersionModel", back_populates="workflow")
+    spurs = relationship("SpurModel", back_populates="workflow")

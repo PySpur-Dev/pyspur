@@ -1,35 +1,27 @@
-from sqlalchemy import Integer, String, DateTime, JSON, ForeignKey
-from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy import Column, String, JSON, ForeignKey, DateTime, Integer, Computed
+from sqlalchemy.orm import relationship, Mapped, mapped_column
 from datetime import datetime, timezone
-from typing import List, Optional, Any
+from typing import Optional, Any
 from .base_model import BaseModel
-from .run_model import RunModel
 
 
 class WorkflowVersionModel(BaseModel):
+    """
+    Represents a specific version of a workflow.
+    Created when a workflow is run or when explicitly versioned.
+    """
+
     __tablename__ = "workflow_versions"
 
     _intid: Mapped[int] = mapped_column(Integer, primary_key=True)
-    version: Mapped[int] = mapped_column(Integer, nullable=False)
-    workflow_id: Mapped[int] = mapped_column(
-        ForeignKey("workflows.id"), nullable=False, index=True
+    id: Mapped[str] = mapped_column(
+        String, Computed("'V' || _intid"), nullable=False, index=True
     )
-    name: Mapped[str] = mapped_column(String, nullable=False)
-    description: Mapped[Optional[str]] = mapped_column(String)
-    definition: Mapped[Any] = mapped_column(JSON, nullable=False)
-    definition_hash: Mapped[str] = mapped_column(String, nullable=False)
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime, default=datetime.now(timezone.utc)
-    )
-    updated_at: Mapped[datetime] = mapped_column(
-        DateTime,
-        default=datetime.now(timezone.utc),
-        onupdate=datetime.now(timezone.utc),
-    )
+    workflow_id = Column(String, ForeignKey("workflows.id"), nullable=False)
+    version_number = Column(Integer, nullable=False)
+    definition = Column(JSON, nullable=False)
+    created_at = Column(DateTime(timezone=True), default=datetime.now(timezone.utc))
 
     # Relationships
     workflow = relationship("WorkflowModel", back_populates="versions")
-
-    runs: Mapped[Optional[List["RunModel"]]] = relationship(
-        "RunModel", backref="workflow_version"
-    )
+    spurs = relationship("SpurModel", back_populates="workflow_version")
