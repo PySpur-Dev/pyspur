@@ -14,7 +14,7 @@ import { Icon } from "@iconify/react";
 import SettingsCard from './settings/Settings';
 import { setProjectName, updateNodeData, resetRun } from '../store/flowSlice'; // Ensure updateNodeData is imported
 import RunModal from './RunModal';
-import { getRunStatus, startRun, getWorkflow, createSpur } from '../utils/api';
+import { getRunStatus, startRun, getWorkflow } from '../utils/api';
 import { Toaster, toast } from 'sonner'
 
 const Header = ({ activePage }) => {
@@ -23,7 +23,6 @@ const Header = ({ activePage }) => {
   const projectName = useSelector((state) => state.flow.projectName);
   const [isRunning, setIsRunning] = useState(false);
   const [isDebugModalOpen, setIsDebugModalOpen] = useState(false);
-  const [isDeploying, setIsDeploying] = useState(false);
 
   let currentStatusInterval = null;
 
@@ -135,46 +134,6 @@ const Header = ({ activePage }) => {
     }
   };
 
-  const handleDeploy = async () => {
-    try {
-      setIsDeploying(true);
-      const workflow = await getWorkflow(workflowID);
-      console.log('Workflow data:', workflow);
-
-      // Extract input and output schemas from workflow definition
-      const definition = workflow.definition;
-      const inputNode = definition.nodes.find(node => node.id === 'input_node');
-      const outputNodes = definition.nodes.filter(node => node.node_type === 'OutputNode');
-
-      const inputSchema = inputNode?.config?.schema || {};
-      const outputSchema = outputNodes.reduce((schema, node) => {
-        if (node.config?.schema) {
-          schema[node.id] = node.config.schema;
-        }
-        return schema;
-      }, {});
-
-      const spurName = `${projectName}-api`;
-
-      // For now, we'll create a spur without a specific version
-      // The backend will use the latest version by default
-      const result = await createSpur(
-        workflowID,
-        null, // Let the backend use the latest version
-        spurName,
-        workflow.description,
-        inputSchema,
-        outputSchema
-      );
-      toast.success('API deployed successfully! API Key: ' + result.api_key);
-    } catch (error) {
-      console.error('Error deploying API:', error);
-      toast.error('Failed to deploy API: ' + (error.response?.data?.detail || error.message));
-    } finally {
-      setIsDeploying(false);
-    }
-  };
-
   return (
     <>
       <Toaster richColors position="bottom-right" />
@@ -195,7 +154,7 @@ const Header = ({ activePage }) => {
             "data-[active=true]:after:h-[2px]",
             "data-[active=true]:after:rounded-[2px]",
             "data-[active=true]:after:bg-primary",
-            "data-[active=true]:after:text-primary",
+            "data-[active=true]:text-primary",
           ],
         }}
       >
@@ -282,21 +241,6 @@ const Header = ({ activePage }) => {
                 <Icon
                   className="text-default-500"
                   icon="solar:download-linear"
-                  width={24}
-                />
-              </Button>
-            </NavbarItem>
-            <NavbarItem className="hidden sm:flex">
-              <Button
-                isIconOnly
-                radius="full"
-                variant="light"
-                onClick={handleDeploy}
-                isLoading={isDeploying}
-              >
-                <Icon
-                  className="text-default-500"
-                  icon="solar:cloud-upload-linear"
                   width={24}
                 />
               </Button>

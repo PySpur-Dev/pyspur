@@ -400,28 +400,3 @@ export const getWorkflowOutputVariables = async (workflowId) => {
     throw error;
   }
 };
-
-export const createSpur = async (workflowId, workflowVersionId, name, description = '', inputSchema = {}, outputSchema = {}) => {
-  try {
-    const requestBody = {
-      workflow_id: workflowId,
-      workflow_version_id: workflowVersionId ? String(workflowVersionId) : null,
-      name,
-      description,
-      input_schema: inputSchema,
-      output_schema: outputSchema
-    };
-    console.log('Creating spur with URL:', `${API_BASE_URL}/spur/`);
-    console.log('Request body:', JSON.stringify(requestBody, null, 2));
-    const response = await axios.post(`${API_BASE_URL}/spur/`, requestBody);
-    return response.data;
-  } catch (error) {
-    console.error('Error creating spur:', error);
-    if (error.response) {
-      console.error('Response data:', error.response.data);
-      console.error('Response status:', error.response.status);
-      console.error('Response headers:', error.response.headers);
-    }
-    throw error;
-  }
-}

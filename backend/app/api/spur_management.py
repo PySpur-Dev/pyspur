@@ -8,17 +8,18 @@ from fastapi.openapi.models import Example
 
 from ..database import get_db
 from ..models.spur_model import SpurModel
-from ..schemas.spur_schemas import SpurCreateSchema, SpurResponseSchema, RateLimitConfig
+from ..schemas.spur_schemas import SpurCreateSchema, SpurResponseSchema
 from ..utils.workflow_version_utils import fetch_workflow_version
 from ..utils.rate_limiter import RateLimiter
 from .workflow_run import run_workflow_non_blocking
 
 router = APIRouter(
+    prefix="/spur",
     tags=["Spur API Management"],
     responses={
         404: {"description": "Not found"},
         429: {"description": "Rate limit exceeded"},
-    }
+    },
 )
 
 # Create rate limiter instance - 100 requests per minute per API key
@@ -27,29 +28,27 @@ rate_limiter = RateLimiter(calls=100, period=60)
 # API key header for spur authentication
 API_KEY_HEADER = APIKeyHeader(name="X-API-Key")
 
+
 async def verify_api_key(
-    api_key: str = Depends(API_KEY_HEADER),
-    db: Session = Depends(get_db)
+    api_key: str = Depends(API_KEY_HEADER), db: Session = Depends(get_db)
 ) -> SpurModel:
     """Verify API key and return associated Spur"""
-    spur = db.query(SpurModel).filter(
-        SpurModel.api_key == api_key,
-        SpurModel.is_active == True
-    ).first()
+    spur = (
+        db.query(SpurModel)
+        .filter(SpurModel.api_key == api_key, SpurModel.is_active == True)
+        .first()
+    )
     if not spur:
-        raise HTTPException(
-            status_code=401,
-            detail="Invalid or inactive API key"
-        )
+        raise HTTPException(status_code=401, detail="Invalid or inactive API key")
 
     # Check rate limit
     if not await rate_limiter.is_allowed(api_key):
         raise HTTPException(
-            status_code=429,
-            detail="Rate limit exceeded. Please try again later."
+            status_code=429, detail="Rate limit exceeded. Please try again later."
         )
 
     return spur
+
 
 @router.post(
     "/",
@@ -68,21 +67,15 @@ async def verify_api_key(
                         "id": "spur_123",
                         "name": "My API",
                         "api_key": "sk_test_123...",
-                        "status": "active"
+                        "status": "active",
                     }
                 }
-            }
+            },
         }
-    }
+    },
 )
-async def create_spur(
-    spur: SpurCreateSchema,
-    db: Session = Depends(get_db)
-):
+async def create_spur(spur: SpurCreateSchema, db: Session = Depends(get_db)):
     """Create a new Spur API deployment"""
-    # Get rate limit configuration from request or use defaults
-    rate_limit = spur.rate_limit or RateLimitConfig()
-
     new_spur = SpurModel(
         name=spur.name,
         description=spur.description,
@@ -93,30 +86,12 @@ async def create_spur(
         input_schema=spur.input_schema,
         output_schema=spur.output_schema,
         is_active=True,
-        rate_limit_calls=rate_limit.calls,
-        rate_limit_period=rate_limit.period
     )
     db.add(new_spur)
     db.commit()
     db.refresh(new_spur)
+    return new_spur
 
-    # Convert to response schema with proper type conversions
-    return SpurResponseSchema(
-        id=str(new_spur.id),
-        name=str(new_spur.name),
-        description=str(new_spur.description) if new_spur.description else None,
-        workflow_id=str(new_spur.workflow_id),
-        workflow_version_id=str(new_spur.workflow_version_id) if new_spur.workflow_version_id else None,
-        is_active=bool(new_spur.is_active),
-        created_at=new_spur.created_at,
-        api_key=str(new_spur.api_key),
-        input_schema=dict(new_spur.input_schema) if new_spur.input_schema else {},
-        output_schema=dict(new_spur.output_schema) if new_spur.output_schema else {},
-        rate_limit=RateLimitConfig(
-            calls=int(new_spur.rate_limit_calls),
-            period=int(new_spur.rate_limit_period)
-        )
-    )
 
 @router.post(
     "/{spur_id}/invoke",
@@ -131,12 +106,9 @@ async def create_spur(
             "description": "Successfully started workflow execution",
             "content": {
                 "application/json": {
-                    "example": {
-                        "run_id": "run_123",
-                        "status": "pending"
-                    }
+                    "example": {"run_id": "run_123", "status": "pending"}
                 }
-            }
+            },
         },
         429: {
             "description": "Rate limit exceeded",
@@ -146,16 +118,16 @@ async def create_spur(
                         "detail": "Rate limit exceeded. Please try again later."
                     }
                 }
-            }
-        }
-    }
+            },
+        },
+    },
 )
 async def invoke_spur(
     spur_id: str,
     inputs: Dict[str, Any],
     background_tasks: BackgroundTasks,
     spur: SpurModel = Depends(verify_api_key),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """Invoke a Spur API endpoint"""
     # Validate inputs against schema
@@ -167,13 +139,11 @@ async def invoke_spur(
         start_run_request={"initial_inputs": inputs},
         background_tasks=background_tasks,
         run_type="spur",
-        db=db
+        db=db,
     )
 
-    return {
-        "run_id": run.id,
-        "status": "pending"
-    }
+    return {"run_id": run.id, "status": "pending"}
+
 
 @router.get(
     "/{spur_id}/status",
@@ -187,15 +157,12 @@ async def invoke_spur(
                     "example": {
                         "id": "spur_123",
                         "status": "active",
-                        "rate_limit": {
-                            "calls": 100,
-                            "period": 60
-                        }
+                        "rate_limit": {"calls": 100, "period": 60},
                     }
                 }
-            }
+            },
         }
-    }
+    },
 )
 async def get_spur_status(
     spur_id: str,
@@ -205,11 +172,9 @@ async def get_spur_status(
     return {
         "id": spur.id,
         "status": "active" if spur.is_active else "inactive",
-        "rate_limit": {
-            "calls": rate_limiter.calls,
-            "period": rate_limiter.period
-        }
+        "rate_limit": {"calls": rate_limiter.calls, "period": rate_limiter.period},
     }
+
 
 @router.delete("/{spur_id}")
 async def deactivate_spur(spur_id: str, db: Session = Depends(get_db)):
