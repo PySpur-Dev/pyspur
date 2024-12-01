@@ -8,13 +8,12 @@ from fastapi.openapi.models import Example
 
 from ..database import get_db
 from ..models.spur_model import SpurModel
-from ..schemas.spur_schemas import SpurCreateSchema, SpurResponseSchema
+from ..schemas.spur_schemas import SpurCreateSchema, SpurResponseSchema, RateLimitConfig
 from ..utils.workflow_version_utils import fetch_workflow_version
 from ..utils.rate_limiter import RateLimiter
 from .workflow_run import run_workflow_non_blocking
 
 router = APIRouter(
-    prefix="/spur",
     tags=["Spur API Management"],
     responses={
         404: {"description": "Not found"},
@@ -81,6 +80,9 @@ async def create_spur(
     db: Session = Depends(get_db)
 ):
     """Create a new Spur API deployment"""
+    # Get rate limit configuration from request or use defaults
+    rate_limit = spur.rate_limit or RateLimitConfig()
+
     new_spur = SpurModel(
         name=spur.name,
         description=spur.description,
@@ -90,12 +92,31 @@ async def create_spur(
         created_at=datetime.now(timezone.utc),
         input_schema=spur.input_schema,
         output_schema=spur.output_schema,
-        is_active=True
+        is_active=True,
+        rate_limit_calls=rate_limit.calls,
+        rate_limit_period=rate_limit.period
     )
     db.add(new_spur)
     db.commit()
     db.refresh(new_spur)
-    return new_spur
+
+    # Convert to response schema with proper type conversions
+    return SpurResponseSchema(
+        id=str(new_spur.id),
+        name=str(new_spur.name),
+        description=str(new_spur.description) if new_spur.description else None,
+        workflow_id=str(new_spur.workflow_id),
+        workflow_version_id=str(new_spur.workflow_version_id) if new_spur.workflow_version_id else None,
+        is_active=bool(new_spur.is_active),
+        created_at=new_spur.created_at,
+        api_key=str(new_spur.api_key),
+        input_schema=dict(new_spur.input_schema) if new_spur.input_schema else {},
+        output_schema=dict(new_spur.output_schema) if new_spur.output_schema else {},
+        rate_limit=RateLimitConfig(
+            calls=int(new_spur.rate_limit_calls),
+            period=int(new_spur.rate_limit_period)
+        )
+    )
 
 @router.post(
     "/{spur_id}/invoke",
