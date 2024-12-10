@@ -1,7 +1,8 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
-import { applyNodeChanges, applyEdgeChanges, addEdge, Node, Edge, NodeChange, EdgeChange, Connection } from '@xyflow/react';
+import { applyNodeChanges, applyEdgeChanges, addEdge, Edge, NodeChange, EdgeChange, Connection } from '@xyflow/react';
 import { v4 as uuidv4 } from 'uuid';
 import { createNode } from '../utils/nodeFactory';
+import { FlowNode } from '../utils/nodeTitleUtils';
 
 interface Coordinates {
   x: number;
@@ -35,8 +36,21 @@ interface TestInput {
 }
 
 interface FlowState {
-  nodeTypes: string[];
-  nodes: Node[];
+  nodeTypes: Record<string, Array<{
+    name: string;
+    visual_tag: {
+      acronym: string;
+      color: string;
+    };
+    config: Record<string, any>;
+    input?: {
+      properties: Record<string, any>;
+    };
+    output?: {
+      properties: Record<string, any>;
+    };
+  }>>;
+  nodes: FlowNode[];
   edges: Edge[];
   workflowID: string | null;
   selectedNode: string | null;
@@ -46,13 +60,13 @@ interface FlowState {
   testInputs: TestInput[];
   inputNodeValues: Record<string, any>;
   history: {
-    past: Array<{nodes: Node[], edges: Edge[]}>;
-    future: Array<{nodes: Node[], edges: Edge[]}>;
+    past: Array<{nodes: FlowNode[], edges: Edge[]}>;
+    future: Array<{nodes: FlowNode[], edges: Edge[]}>;
   };
 }
 
 const initialState: FlowState = {
-  nodeTypes: [],
+  nodeTypes: {},
   nodes: [],
   edges: [],
   workflowID: null,
@@ -89,11 +103,35 @@ const flowSlice = createSlice({
       const { workflowID, definition, name } = action.payload;
       state.workflowID = workflowID;
       state.projectName = name;
-      state.nodeTypes = action.payload.nodeTypes;
+
+      // Convert string[] to NodeTypes format
+      const nodeTypesMap: Record<string, Array<{
+        name: string;
+        visual_tag: { acronym: string; color: string };
+        config: Record<string, any>;
+        input?: { properties: Record<string, any> };
+        output?: { properties: Record<string, any> };
+      }>> = {};
+
+      action.payload.nodeTypes.forEach(type => {
+        nodeTypesMap[type] = [{
+          name: type,
+          visual_tag: { acronym: type.substring(0, 2).toUpperCase(), color: '#666666' },
+          config: {},
+          input: { properties: {} },
+          output: { properties: {} }
+        }];
+      });
+
+      state.nodeTypes = nodeTypesMap;
       const { nodes, links } = definition;
 
       state.nodes = nodes.map(node =>
-        createNode(state.nodeTypes, node.node_type, node.id, { x: node.coordinates.x, y: node.coordinates.y }, { config: node.config })
+        createNode(nodeTypesMap, node.node_type, node.id,
+          { x: node.coordinates.x, y: node.coordinates.y },
+          { config: node.config },
+          state.nodes as FlowNode[]
+        )
       );
 
       state.edges = links.map(link => ({
@@ -112,7 +150,7 @@ const flowSlice = createSlice({
     },
 
     nodesChange: (state, action: PayloadAction<{ changes: NodeChange[] }>) => {
-      state.nodes = applyNodeChanges(action.payload.changes, state.nodes);
+      state.nodes = applyNodeChanges(action.payload.changes, state.nodes) as FlowNode[];
     },
 
     edgesChange: (state, action: PayloadAction<{ changes: EdgeChange[] }>) => {
@@ -124,14 +162,14 @@ const flowSlice = createSlice({
       state.edges = addEdge(action.payload.connection, state.edges);
     },
 
-    addNode: (state, action: PayloadAction<{ node: Node }>) => {
+    addNode: (state, action: PayloadAction<{ node: FlowNode }>) => {
       if (action.payload.node) {
         saveToHistory(state);
         state.nodes = [...state.nodes, action.payload.node];
       }
     },
 
-    setNodes: (state, action: PayloadAction<{ nodes: Node[] }>) => {
+    setNodes: (state, action: PayloadAction<{ nodes: FlowNode[] }>) => {
       state.nodes = action.payload.nodes;
     },
 
@@ -222,7 +260,9 @@ const flowSlice = createSlice({
       state.nodes = nodes.map(node =>
         createNode(state.nodeTypes, node.node_type, node.id,
           { x: node.coordinates.x, y: node.coordinates.y },
-          { config: node.config })
+          { config: node.config },
+          state.nodes as FlowNode[]
+        )
       );
 
       state.edges = links.map(link => ({
@@ -372,6 +412,6 @@ export const {
 
 export default flowSlice.reducer;
 
-export const selectNodeById = (state: { flow: FlowState }, nodeId: string): Node | undefined => {
+export const selectNodeById = (state: { flow: FlowState }, nodeId: string): FlowNode | undefined => {
   return state.flow.nodes.find((node) => node.id === nodeId);
 };

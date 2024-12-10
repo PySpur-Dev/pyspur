@@ -12,8 +12,8 @@ import {
 } from '../types/workflow';
 
 const API_BASE_URL = typeof window !== 'undefined'
-  ? `http://${window.location.host}/api`
-  : 'http://localhost:6080/api';
+  ? 'http://localhost:8000/api'  // Backend is running on port 8000
+  : 'http://localhost:8000/api';  // Use same URL for SSR
 
 // Define types for API responses and request payloads
 export interface NodeTypesResponse {

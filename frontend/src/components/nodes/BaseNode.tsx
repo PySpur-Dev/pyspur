@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { deleteNode, setSelectedNode, updateNodeData, addNode, setEdges } from '../../store/flowSlice';
-import { Handle, getConnectedEdges, Node, Edge, Position } from '@xyflow/react';
+import { Handle, getConnectedEdges, Node as XYNode, Edge, Position } from '@xyflow/react';
 import { v4 as uuidv4 } from 'uuid';
+import { getUniqueNodeTitle, FlowNode } from '../../utils/nodeTitleUtils';
 import {
   Card,
   CardHeader,
@@ -24,8 +25,18 @@ interface NodeData {
     title?: string;
     [key: string]: any;
   };
+  input?: {
+    properties: Record<string, any>;
+    [key: string]: any;
+  };
+  output?: {
+    properties: Record<string, any>;
+    [key: string]: any;
+  };
   [key: string]: any;
 }
+
+type Node = XYNode<NodeData>;
 
 interface RootState {
   flow: {
@@ -45,6 +56,7 @@ interface BaseNodeProps {
   style?: React.CSSProperties;
   isInputNode?: boolean;
   className?: string;
+  handleOpenModal?: () => void;
 }
 
 const BaseNode: React.FC<BaseNodeProps> = ({
@@ -65,7 +77,8 @@ const BaseNode: React.FC<BaseNodeProps> = ({
   const dispatch = useDispatch();
 
   // Retrieve the node's position and edges from the Redux store
-  const node = useSelector((state: RootState) => state.flow.nodes.find((n) => n.id === id));
+  const nodes = useSelector((state: RootState) => state.flow.nodes);
+  const node = nodes.find((n) => n.id === id);
   const edges = useSelector((state: RootState) => state.flow.edges);
   const selectedNodeId = useSelector((state: RootState) => state.flow.selectedNode);
 
@@ -163,13 +176,25 @@ const BaseNode: React.FC<BaseNodeProps> = ({
     // Generate a new unique ID for the duplicated node
     const newNodeId = `node_${Date.now()}`;
 
-    // Create the new node with an offset position
+    // Get unique title for the duplicated node
+    const baseTitle = node.data?.config?.title || node.data?.title || 'Untitled';
+    const uniqueTitle = getUniqueNodeTitle(baseTitle, nodes as FlowNode[]);
+
+    // Create the new node with an offset position and unique title
     const newNode = {
       ...node,
       id: newNodeId,
-      position: { x: node.position.x + 20, y: node.position.y + 20 }, // Offset the position slightly
-      selected: false, // Ensure the new node is not selected by default
-    };
+      position: { x: node.position.x + 20, y: node.position.y + 20 },
+      selected: false,
+      data: {
+        ...(node.data || {}),
+        title: uniqueTitle,
+        config: {
+          ...(node.data?.config || {}),
+          title: uniqueTitle,
+        },
+      },
+    } as Node;
 
     // Duplicate the edges connected to the node
     const newEdges = connectedEdges.map((edge) => {
@@ -177,8 +202,8 @@ const BaseNode: React.FC<BaseNodeProps> = ({
       return {
         ...edge,
         id: newEdgeId,
-        source: edge.source === id ? newNodeId : edge.source, // Update source if the current node is the source
-        target: edge.target === id ? newNodeId : edge.target, // Update target if the current node is the target
+        source: edge.source === id ? newNodeId : edge.source,
+        target: edge.target === id ? newNodeId : edge.target,
       };
     });
 
