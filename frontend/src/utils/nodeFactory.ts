@@ -1,6 +1,6 @@
 import { Node as FlowNode } from '@xyflow/react';
 import cloneDeep from 'lodash/cloneDeep';
-import { NodeTypes, NodeType, BaseNodeData } from '../types/nodes/base';
+import { NodeTypes, NodeType, BaseNodeData, WorkflowNode } from '../types/nodes/base';
 
 interface Position {
   x: number;
@@ -8,12 +8,12 @@ interface Position {
 }
 
 interface AdditionalData {
-  config?: Record<string, any>;
+  config?: Record<string, unknown>;
   input?: {
-    properties: Record<string, any>;
+    properties: Record<string, unknown>;
   };
   output?: {
-    properties: Record<string, any>;
+    properties: Record<string, unknown>;
   };
 }
 
@@ -23,7 +23,7 @@ export function createNode(
   id: string,
   position: Position,
   additionalData: AdditionalData = {}
-): FlowNode<BaseNodeData> | null {
+): WorkflowNode | null {
   const category = Object.keys(nodeTypes).find(cat =>
     nodeTypes[cat].some(type => type.name === nodeType)
   );
@@ -53,7 +53,7 @@ export function createNode(
     };
   }
 
-  const node: FlowNode<BaseNodeData> = {
+  const node: WorkflowNode = {
     id,
     type: nodeType,
     position,

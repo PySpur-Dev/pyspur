@@ -1,5 +1,6 @@
 import { v4 as uuidv4 } from 'uuid';
 import { createNode } from './nodeFactory';
+import { NodeType, BaseNodeData } from '../types/nodes/base';
 
 // Define types for the function parameters and return values
 interface NodeDefinition {
@@ -23,14 +24,14 @@ interface Definition {
 }
 
 interface NodeTypes {
-  [key: string]: any; // Adjust this type based on the actual structure of nodeTypes
+  [key: string]: NodeType[];
 }
 
 interface MappedNode {
   id: string;
   type: string;
   position: { x: number; y: number };
-  data: Record<string, any>;
+  data: BaseNodeData;
 }
 
 interface MappedEdge {
@@ -51,15 +52,16 @@ export const mapNodesAndEdges = (
   console.log('nodes', nodes);
 
   // Map nodes to the expected format
-  const mappedNodes: MappedNode[] = nodes.map((node) =>
-    createNode(
+  const mappedNodes = nodes.map((node) => {
+    const createdNode = createNode(
       nodeTypes,
       node.node_type,
       node.id,
       { x: node.coordinates.x, y: node.coordinates.y },
       node.additionalData || {}
-    )
-  );
+    );
+    return createdNode as MappedNode;
+  }).filter((node): node is MappedNode => node !== null);
 
   // Map links to the expected edge format
   const mappedEdges: MappedEdge[] = links.map((link) => ({

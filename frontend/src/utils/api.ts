@@ -10,6 +10,7 @@ import {
   Template,
   Dataset
 } from '../types/workflow';
+import { NodeType } from '../types/nodes/base';
 
 const API_BASE_URL = typeof window !== 'undefined'
   ? `http://${window.location.host}/api`
@@ -17,8 +18,8 @@ const API_BASE_URL = typeof window !== 'undefined'
 
 // Define types for API responses and request payloads
 export interface NodeTypesResponse {
-  schema: Record<string, any>;
-  metadata: Record<string, any>;
+  schema: Record<string, unknown>;
+  metadata: Record<string, NodeType[]>;
 }
 
 export interface WorkflowVersion {
@@ -103,7 +104,7 @@ export const getRunStatus = async (runID: string): Promise<RunStatusResponse> =>
   }
 };
 
-export const getRun = async (runID) => {
+export const getRun = async (runID: string) => {
   try {
     const response = await axios.get(`${API_BASE_URL}/run/${runID}/`);
     console.log('Run Data:', response.data);
@@ -205,7 +206,7 @@ export const getWorkflow = async (workflowID: string): Promise<Workflow> => {
 };
 
 
-export const getWorkflowRuns = async (workflowID) => {
+export const getWorkflowRuns = async (workflowID: string) => {
   try {
     const response = await axios.get(`${API_BASE_URL}/wf/${workflowID}/runs/`);
     return response.data;
@@ -216,25 +217,28 @@ export const getWorkflowRuns = async (workflowID) => {
   }
 }
 
-export const downloadOutputFile = async (outputFileID) => {
+export const downloadOutputFile = async (outputFileID: string) => {
   try {
     // First, get the output file details to find the original filename
     const fileInfoResponse = await axios.get(`${API_BASE_URL}/of/${outputFileID}/`);
-    const fileName = fileInfoResponse.data.file_name;
+    const originalFilename = fileInfoResponse.data.filename;
 
+    // Then download the actual file
     const response = await axios.get(`${API_BASE_URL}/of/${outputFileID}/download/`, {
       responseType: 'blob',
     });
 
+    // Create a URL for the blob
     const url = window.URL.createObjectURL(new Blob([response.data]));
     const link = document.createElement('a');
     link.href = url;
-    link.setAttribute('download', fileName);
-
+    link.setAttribute('download', originalFilename);
     document.body.appendChild(link);
     link.click();
-    document.body.removeChild(link);
+    link.remove();
     window.URL.revokeObjectURL(url);
+
+    return response.data;
   } catch (error) {
     console.error('Error downloading output file:', error);
     throw error;
