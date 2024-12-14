@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { Handle, Position } from '@xyflow/react';
 import { useDispatch, useSelector } from 'react-redux';
-import BaseNode from './BaseNode';
+import BaseNode from './base/BaseNode';
 import {
   setWorkflowInputVariable,
   deleteWorkflowInputVariable,
@@ -9,48 +9,44 @@ import {
 } from '../../store/flowSlice';
 import { Input, Button } from '@nextui-org/react';
 import { Icon } from '@iconify/react';
-import styles from './InputNode.module.css';
 import { useSaveWorkflow } from '../../hooks/useSaveWorkflow';
 import { RootState } from '../../store/store';
+import { BaseNodeData, BaseNodeProps, BaseNodeConfig, WorkflowNode } from '../../types/nodes/base';
 
-interface InputNodeProps {
-  id: string;
-  data?: {
-    title?: string;
-    [key: string]: any;
-  };
-  [key: string]: any;
+interface InputNodeConfig extends BaseNodeConfig {
+  input_schema?: Record<string, string>;
+  output_schema?: Record<string, string>;
 }
 
-interface WorkflowNode {
-  id: string;
-  [key: string]: any;
+interface InputNodeData extends Omit<BaseNodeData, 'config'> {
+  config: InputNodeConfig;
 }
 
-const InputNode: React.FC<InputNodeProps> = ({ id, data, ...props }) => {
+interface InputNodeProps extends Omit<BaseNodeProps, 'data'> {
+  data: InputNodeData;
+}
+
+const InputNode: React.FC<InputNodeProps> = ({ id, data, isCollapsed, setIsCollapsed, ...props }) => {
   const dispatch = useDispatch();
   const workflowInputVariables = useSelector((state: RootState) => state.flow.workflowInputVariables);
   const nodeRef = useRef<HTMLDivElement | null>(null);
   const [nodeWidth, setNodeWidth] = useState<string>('auto');
   const [editingField, setEditingField] = useState<string | null>(null);
   const [newFieldValue, setNewFieldValue] = useState<string>('');
-  const [isCollapsed, setIsCollapsed] = useState<boolean>(false);
 
   const workflowInputKeys = Object.keys(workflowInputVariables);
 
   useEffect(() => {
-    if (nodeRef.current) {
+    if (nodeRef.current && data?.config) {
       const maxLabelLength = Math.max(
-        ...workflowInputKeys.map((label) => label.length),
-        (data?.title || '').length / 1.5
+        ...workflowInputKeys.map((label: string) => label.length),
+        (data.config.title || '').length / 1.5
       );
 
       const calculatedWidth = Math.max(300, maxLabelLength * 15);
-      const finalWidth = Math.min(calculatedWidth, 600);
-
-      setNodeWidth(`${finalWidth}px`);
+      setNodeWidth(`${calculatedWidth}px`);
     }
-  }, [data, workflowInputKeys]);
+  }, [workflowInputKeys, data?.config]);
 
   const saveWorkflow = useSaveWorkflow();
   const nodes = useSelector((state: RootState) => state.flow.nodes);
@@ -63,20 +59,19 @@ const InputNode: React.FC<InputNodeProps> = ({ id, data, ...props }) => {
 
   useEffect(() => {
     syncAndSave();
-  }, [workflowInputVariables]);
+  }, [workflowInputVariables, syncAndSave]);
 
   const handleAddWorkflowInputVariable = useCallback(() => {
     if (!newFieldValue.trim()) return;
-    const newKey = newFieldValue.trim();
 
-    dispatch(
-      setWorkflowInputVariable({
-        key: newKey,
-        value: '',
-      })
-    );
+    dispatch(setWorkflowInputVariable({
+      key: newFieldValue,
+      value: ''
+    }));
+
     setNewFieldValue('');
-  }, [dispatch, newFieldValue]);
+    syncAndSave();
+  }, [dispatch, newFieldValue, syncAndSave]);
 
   const handleDeleteWorkflowInputVariable = useCallback(
     (keyToDelete: string) => {
@@ -100,14 +95,14 @@ const InputNode: React.FC<InputNodeProps> = ({ id, data, ...props }) => {
 
   const renderWorkflowInputs = () => {
     return (
-      <div className={styles.handlesWrapper} id="handles">
-        <div className={styles.handlesColumn}>
+      <div className="node-handles-wrapper" id="handles">
+        <div className="node-handles-column">
           {workflowInputKeys.length > 0 && (
-            <table style={{ width: '100%' }}>
+            <table className="w-full">
               <tbody>
                 {workflowInputKeys.map((key) => (
                   <tr key={key} className="relative w-full px-4 py-2">
-                    <td className={styles.handleLabelCell}>
+                    <td className="node-handle-cell">
                       {!isCollapsed && (
                         <div className="flex items-center gap-2">
                           {editingField === key ? (
@@ -138,7 +133,7 @@ const InputNode: React.FC<InputNodeProps> = ({ id, data, ...props }) => {
                             <div className="flex flex-col w-full gap-1">
                               <div className="flex items-center justify-between">
                                 <span
-                                  className={`${styles.handleLabel} text-sm font-medium cursor-pointer hover:text-primary`}
+                                  className="node-handle-label text-sm font-medium cursor-pointer hover:text-primary"
                                   onClick={() => setEditingField(key)}
                                 >
                                   {key}
@@ -148,6 +143,7 @@ const InputNode: React.FC<InputNodeProps> = ({ id, data, ...props }) => {
                                   size="sm"
                                   variant="light"
                                   onClick={() => handleDeleteWorkflowInputVariable(key)}
+                                  className="text-default-400 hover:text-danger"
                                 >
                                   <Icon icon="solar:trash-bin-minimalistic-linear" width={16} />
                                 </Button>
@@ -157,15 +153,13 @@ const InputNode: React.FC<InputNodeProps> = ({ id, data, ...props }) => {
                         </div>
                       )}
                     </td>
-                    <td className={`${styles.handleCell} border-l border-default-300 w-0 ml-2`}>
-                      <div className={styles.handleWrapper}>
+                    <td className="node-handle-cell border-l border-default-200 w-0 ml-2">
+                      <div className="relative">
                         <Handle
                           type="source"
                           position={Position.Right}
                           id={key}
-                          className={`${styles.handle} ${styles.handleRight} ${
-                            isCollapsed ? styles.collapsedHandleOutput : ''
-                          }`}
+                          className={`node-handle node-handle-output ${isCollapsed ? 'node-handle-collapsed' : ''}`}
                           isConnectable={!isCollapsed}
                         />
                       </div>
@@ -205,9 +199,9 @@ const InputNode: React.FC<InputNodeProps> = ({ id, data, ...props }) => {
               size="sm"
               variant="light"
               onClick={handleAddWorkflowInputVariable}
-              className="text-default-400 hover:text-default-500"
+              className="text-default-400 hover:text-primary"
             >
-              <Icon icon="solar:add-circle-bold" width={16} className="text-default-500" />
+              <Icon icon="solar:add-circle-bold" width={16} />
             </Button>
           }
         />
@@ -215,7 +209,7 @@ const InputNode: React.FC<InputNodeProps> = ({ id, data, ...props }) => {
     );
 
   return (
-    <div className={styles.inputNodeWrapper}>
+    <div className="node-container">
       <BaseNode
         id={id}
         type="input"
@@ -224,14 +218,19 @@ const InputNode: React.FC<InputNodeProps> = ({ id, data, ...props }) => {
         setIsCollapsed={setIsCollapsed}
         data={{
           ...data,
+          title: data.config?.title || 'Input Node',
+          color: data.color || '#2196F3',
           acronym: 'IN',
-          color: '#2196F3',
+          config: {
+            ...data.config,
+            title: data.config?.title || 'Input Node'
+          }
         }}
         style={{ width: nodeWidth }}
         className="hover:!bg-background"
         {...props}
       >
-        <div className={styles.nodeWrapper} ref={nodeRef}>
+        <div className="node-content" ref={nodeRef}>
           {renderWorkflowInputs()}
           {renderAddField()}
         </div>

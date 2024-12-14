@@ -1,13 +1,10 @@
 import React from 'react';
 import Markdown from 'react-markdown';
-
-interface NodeData {
-  run?: Record<string, string>;
-}
+import { BaseNodeData } from '../../types/nodes/base';
 
 interface Node {
   id: string;
-  data?: NodeData;
+  data?: BaseNodeData;
 }
 
 interface NodeOutputDisplayProps {
@@ -17,23 +14,24 @@ interface NodeOutputDisplayProps {
 const NodeOutputDisplay: React.FC<NodeOutputDisplayProps> = ({ node }) => {
   const nodeID = node?.id;
   const output = node?.data?.run;
-  console.log('NodeOutputDisplay:', nodeID, output);
 
   return (
-    <div>
+    <div className="w-full">
       {output ? (
-        <div>
+        <div className="space-y-4">
           {Object.entries(output).map(([key, value]) => (
-            <div key={key} className="my-2 flex flex-col items-start">
-              <label className="text-sm font-semibold mb-1 block">{key}:</label>
-              <div className="ml-2 mt-auto">
-                <Markdown>{value}</Markdown>
+            <div key={key} className="flex flex-col gap-2 p-2 rounded-lg bg-gray-50">
+              <label className="text-sm font-semibold text-gray-700">{key}</label>
+              <div className="prose prose-sm max-w-none">
+                <Markdown>{String(value)}</Markdown>
               </div>
             </div>
           ))}
         </div>
       ) : (
-        <div>No output available</div>
+        <div className="text-sm text-gray-500 italic text-center py-2">
+          No output available
+        </div>
       )}
     </div>
   );

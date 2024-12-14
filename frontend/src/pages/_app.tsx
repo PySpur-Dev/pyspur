@@ -4,6 +4,7 @@ import { NextUIProvider } from '@nextui-org/react';
 import { AppProps } from 'next/app';
 import store from '../store/store';
 import '../styles/globals.css';
+import '../styles/components.css';
 import { ThemeProvider as NextThemesProvider } from "next-themes";
 
 const MyApp: React.FC<AppProps> = ({ Component, pageProps }) => {

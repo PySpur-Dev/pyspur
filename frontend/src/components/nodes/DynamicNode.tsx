@@ -1,8 +1,7 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
-import { Handle, useHandleConnections, NodeProps } from '@xyflow/react';
+import { Handle, useHandleConnections, NodeProps, Position } from '@xyflow/react';
 import { useSelector, useDispatch } from 'react-redux';
-import BaseNode from './BaseNode';
-import styles from './DynamicNode.module.css';
+import BaseNode from './base/BaseNode';
 import { Input } from '@nextui-org/react';
 import {
   updateNodeData,
@@ -10,17 +9,7 @@ import {
 } from '../../store/flowSlice';
 import { selectPropertyMetadata } from '../../store/nodeTypesSlice';
 import { RootState } from '../../store/store';
-
-interface NodeData {
-  config?: {
-    input_schema?: Record<string, any>;
-    output_schema?: Record<string, any>;
-    system_message?: string;
-    user_message?: string;
-  };
-  title?: string;
-  [key: string]: any;
-}
+import { BaseNodeData, BaseNodeProps } from '../../types/nodes/base';
 
 interface SchemaMetadata {
   required?: boolean;
@@ -39,7 +28,7 @@ const updateMessageVariables = (message: string | undefined, oldKey: string, new
 interface DynamicNodeProps extends NodeProps {
   id: string;
   type: string;
-  data: NodeData;
+  data: BaseNodeData;
   position: { x: number; y: number };
   selected?: boolean;
   parentNode?: string;
@@ -82,15 +71,11 @@ const DynamicNode: React.FC<DynamicNodeProps> = ({ id, type, data, position, ...
       }
 
       const currentSchema = nodeData?.config?.[schemaType] || {};
-      // Convert to array of entries to preserve order
       const schemaEntries = Object.entries(currentSchema);
-      // Find the index of the old key
       const keyIndex = schemaEntries.findIndex(([key]) => key === oldKey);
       if (keyIndex !== -1) {
-        // Replace the old key with new key while maintaining the value and position
         schemaEntries[keyIndex] = [newKey, currentSchema[oldKey]];
       }
-      // Reconstruct the object maintaining order
       const updatedSchema = Object.fromEntries(schemaEntries);
 
       let updatedConfig = {
@@ -175,18 +160,17 @@ const DynamicNode: React.FC<DynamicNodeProps> = ({ id, type, data, position, ...
     const connections = useHandleConnections({ type: 'target', id: keyName });
 
     return (
-      <div className={`${styles.handleRow} w-full justify-end`} key={keyName} id={`input-${keyName}-row`}>
-        <div className={`${styles.handleCell} ${styles.inputHandleCell}`} id={`input-${keyName}-handle`}>
+      <div className="node-handle-row flex w-full justify-end" key={keyName} id={`input-${keyName}-row`}>
+        <div className="node-handle-cell" id={`input-${keyName}-handle`}>
           <Handle
             type="target"
-            position="left"
+            position={Position.Left}
             id={keyName}
-            className={`${styles.handle} ${styles.handleLeft} ${isCollapsed ? styles.collapsedHandleInput : ''
-              }`}
+            className={`node-handle node-handle-input ${isCollapsed ? 'node-handle-collapsed' : ''}`}
             isConnectable={!isCollapsed && connections.length === 0}
           />
         </div>
-        <div className="border-r border-gray-300 h-full mx-0"></div>
+        <div className="border-r border-default-200 h-full mx-0"></div>
         {!isCollapsed && (
           <div className="align-center flex flex-grow flex-shrink ml-[0.5rem] max-w-full overflow-hidden" id={`input-${keyName}-label`}>
             {editingField === keyName ? (
@@ -211,7 +195,7 @@ const DynamicNode: React.FC<DynamicNodeProps> = ({ id, type, data, position, ...
               />
             ) : (
               <span
-                className={`${styles.handleLabel} text-sm font-medium cursor-pointer hover:text-primary mr-auto overflow-hidden text-ellipsis whitespace-nowrap`}
+                className="node-handle-label text-sm font-medium cursor-pointer hover:text-primary mr-auto overflow-hidden text-ellipsis whitespace-nowrap"
                 onClick={() => setEditingField(keyName)}
               >
                 {keyName}
@@ -225,7 +209,7 @@ const DynamicNode: React.FC<DynamicNodeProps> = ({ id, type, data, position, ...
 
   const OutputHandleRow: React.FC<HandleRowProps> = ({ keyName }) => {
     return (
-      <div className={`${styles.handleRow} w-full justify-end`} key={`output-${keyName}`} id={`output-${keyName}-row`} >
+      <div className="node-handle-row flex w-full justify-end" key={`output-${keyName}`} id={`output-${keyName}-row`}>
         {!isCollapsed && (
           <div className="align-center flex flex-grow flex-shrink mr-[0.5rem] max-w-full overflow-hidden" id={`output-${keyName}-label`}>
             {editingField === keyName ? (
@@ -250,7 +234,7 @@ const DynamicNode: React.FC<DynamicNodeProps> = ({ id, type, data, position, ...
               />
             ) : (
               <span
-                className={`${styles.handleLabel} text-sm font-medium cursor-pointer hover:text-primary ml-auto overflow-hidden text-ellipsis whitespace-nowrap`}
+                className="node-handle-label text-sm font-medium cursor-pointer hover:text-primary ml-auto overflow-hidden text-ellipsis whitespace-nowrap"
                 onClick={() => setEditingField(keyName)}
               >
                 {keyName}
@@ -258,14 +242,13 @@ const DynamicNode: React.FC<DynamicNodeProps> = ({ id, type, data, position, ...
             )}
           </div>
         )}
-        <div className="border-l border-gray-300 h-full mx-0"></div>
-        <div className={`${styles.handleCell} ${styles.outputHandleCell}`} id={`output-${keyName}-handle`}>
+        <div className="border-l border-default-200 h-full mx-0"></div>
+        <div className="node-handle-cell" id={`output-${keyName}-handle`}>
           <Handle
             type="source"
-            position="right"
+            position={Position.Right}
             id={keyName}
-            className={`${styles.handle} ${styles.handleRight} ${isCollapsed ? styles.collapsedHandleOutput : ''
-              }`}
+            className={`node-handle node-handle-output ${isCollapsed ? 'node-handle-collapsed' : ''}`}
             isConnectable={!isCollapsed}
           />
         </div>
@@ -280,16 +263,14 @@ const DynamicNode: React.FC<DynamicNodeProps> = ({ id, type, data, position, ...
     const outputSchema = nodeData?.config?.['output_schema'] || cleanedOutputMetadata || {};
 
     return (
-      <div className={`${styles.handlesWrapper}`} id="handles">
-        {/* Input Handles */}
-        <div className={`${styles.handlesColumn} ${styles.inputHandlesColumn}`} id="input-handles">
+      <div className="node-handles-wrapper" id="handles">
+        <div className="node-handles-column node-handles-input" id="input-handles">
           {Object.keys(inputSchema).map((key) => (
             <InputHandleRow key={key} keyName={key} />
           ))}
         </div>
 
-        {/* Output Handles */}
-        <div className={`${styles.handlesColumn} ${styles.outputHandlesColumn}`} id="output-handles">
+        <div className="node-handles-column node-handles-output" id="output-handles">
           {Object.keys(outputSchema).map((key) => (
             <OutputHandleRow key={key} keyName={key} />
           ))}
@@ -301,10 +282,7 @@ const DynamicNode: React.FC<DynamicNodeProps> = ({ id, type, data, position, ...
   const isIfElseNode = type === 'IfElseNode';
 
   return (
-    <div
-      className={styles.dynamicNodeWrapper}
-      style={{ zIndex: props.parentNode ? 1 : 0 }}
-    >
+    <div className="node-container" style={{ zIndex: props.parentNode ? 1 : 0 }}>
       <BaseNode
         id={id}
         data={nodeData}
@@ -316,10 +294,10 @@ const DynamicNode: React.FC<DynamicNodeProps> = ({ id, type, data, position, ...
         selected={props.selected}
         className="hover:!bg-background"
       >
-        <div className={styles.nodeWrapper} ref={nodeRef} id={`node-${id}-wrapper`}>
+        <div className="node-content" ref={nodeRef} id={`node-${id}-wrapper`}>
           {isIfElseNode ? (
-            <div>
-              <strong>Conditional Node</strong>
+            <div className="font-semibold">
+              Conditional Node
             </div>
           ) : null}
           {renderHandles()}

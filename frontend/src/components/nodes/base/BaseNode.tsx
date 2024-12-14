@@ -159,87 +159,37 @@ const BaseNode: React.FC<BaseNodeProps> = ({
 
   const isSelected = String(id) === String(selectedNodeId);
   const status = data.run ? 'completed' : (data.status || 'default').toLowerCase();
-
-  const borderColor = isRunning ? 'blue' :
-    status === 'completed' ? '#4CAF50' :
-      status === 'failed' ? 'red' :
-        status === 'default' ? 'gray' :
-          style.borderColor || '#ccc';
-
-  const { backgroundColor, ...restStyle } = style || {};
-
-  const cardStyle: React.CSSProperties = {
-    ...restStyle,
-    borderColor: borderColor,
-    borderWidth: isSelected
-      ? '3px'
-      : status === 'completed'
-      ? '2px'
-      : isHovered
-      ? '3px'
-      : restStyle.borderWidth || '1px',
-    borderStyle: 'solid',
-    transition: 'border-color 0.1s, border-width 0.02s',
-  };
-
   const acronym = data.acronym || 'N/A';
   const color = data.color || '#ccc';
 
-  const tagStyle: React.CSSProperties = {
-    backgroundColor: color,
-    color: '#fff',
-    padding: '2px 8px',
-    borderRadius: '12px',
-    fontSize: '0.75rem',
-    display: 'inline-block',
-  };
-
   return (
-    <div style={{ position: 'relative' }} draggable={false}>
-      <div style={{ position: 'relative' }}>
+    <div className="node-container" draggable={false}>
+      <div className="node-container">
         <Handle
           type="target"
           position={Position.Top}
           id="node-body"
-          style={{
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            width: '100%',
-            height: '100%',
-            zIndex: 10,
-            opacity: 0,
-            pointerEvents: 'auto',
-          }}
+          className="node-handle node-handle-input"
           isConnectable={true}
         />
 
-        <div
-          className="react-flow__node-drag-handle"
-          style={{
-            width: '100%',
-            height: '100%',
-            pointerEvents: 'none',
-          }}
-        >
+        <div className="react-flow__node-drag-handle w-full h-full pointer-events-none">
           <Card
-            className={`base-node ${className || ''}`}
-            style={{ ...cardStyle, pointerEvents: 'auto' }}
+            className={`node-base ${
+              status === 'completed'
+                ? 'node-status-completed'
+                : status === 'failed'
+                ? 'node-status-error'
+                : isRunning
+                ? 'node-status-running'
+                : 'node-status-default'
+            } ${className || ''}`}
             onMouseEnter={handleMouseEnter}
             onMouseLeave={handleMouseLeave}
             isHoverable
-            classNames={{
-              base: "bg-background border-default-200"
-            }}
           >
             {data && data.title && (
-              <CardHeader
-                style={{
-                  position: 'relative',
-                  paddingTop: '8px',
-                  paddingBottom: isCollapsed ? '0px' : '16px',
-                }}
-              >
+              <CardHeader className="node-header">
                 {editingTitle ? (
                   <Input
                     autoFocus
@@ -283,37 +233,16 @@ const BaseNode: React.FC<BaseNodeProps> = ({
                     }}
                   />
                 ) : (
-                  <h3
-                    className="text-lg font-semibold text-center cursor-pointer hover:text-primary"
-                    style={{ marginBottom: isCollapsed ? '4px' : '8px' }}
-                    onClick={() => setEditingTitle(true)}
-                  >
+                  <h3 className="node-title" onClick={() => setEditingTitle(true)}>
                     {data?.config?.title || data?.title || 'Untitled'}
                   </h3>
                 )}
 
-                <div
-                  style={{
-                    position: 'absolute',
-                    top: '8px',
-                    right: '8px',
-                    display: 'flex',
-                    alignItems: 'center',
-                  }}
-                >
+                <div className="node-controls">
                   <Button
                     size="sm"
                     variant="flat"
-                    style={{
-                      minWidth: 'auto',
-                      height: '24px',
-                      padding: '0 8px',
-                      fontSize: '0.8rem',
-                      marginRight: '4px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                    }}
+                    className="node-controls-button"
                     onClick={(e) => {
                       e.stopPropagation();
                       setIsCollapsed(!isCollapsed);
@@ -322,7 +251,7 @@ const BaseNode: React.FC<BaseNodeProps> = ({
                     {isCollapsed ? '▼' : '▲'}
                   </Button>
 
-                  <div style={{ ...tagStyle }} className="node-acronym-tag">
+                  <div className="node-tag" style={{ backgroundColor: color }}>
                     {acronym}
                   </div>
                 </div>
@@ -330,7 +259,7 @@ const BaseNode: React.FC<BaseNodeProps> = ({
             )}
             {!isCollapsed && <Divider />}
 
-            <CardBody className="px-1">
+            <CardBody className="node-content">
               {children}
             </CardBody>
           </Card>
@@ -339,6 +268,7 @@ const BaseNode: React.FC<BaseNodeProps> = ({
 
       {(showControls || isSelected) && (
         <Card
+          className="node-controls-panel"
           onMouseEnter={() => {
             setShowControls(true);
             setIsTooltipHovered(true);
@@ -351,17 +281,6 @@ const BaseNode: React.FC<BaseNodeProps> = ({
               }
             }, 300);
           }}
-          style={{
-            position: 'absolute',
-            top: '-50px',
-            right: '0px',
-            padding: '4px',
-            boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
-            pointerEvents: 'auto',
-          }}
-          classNames={{
-            base: "bg-background border-default-200"
-          }}
         >
           <div className="flex flex-row gap-1">
             <Button
@@ -370,6 +289,7 @@ const BaseNode: React.FC<BaseNodeProps> = ({
               variant="light"
               onPress={handlePartialRun}
               disabled={loading}
+              className="node-controls-button"
             >
               <Icon className="text-default-500" icon="solar:play-linear" width={22} />
             </Button>
@@ -379,6 +299,7 @@ const BaseNode: React.FC<BaseNodeProps> = ({
                 radius="full"
                 variant="light"
                 onPress={handleDelete}
+                className="node-controls-button"
               >
                 <Icon className="text-default-500" icon="solar:trash-bin-trash-linear" width={22} />
               </Button>
@@ -388,6 +309,7 @@ const BaseNode: React.FC<BaseNodeProps> = ({
               radius="full"
               variant="light"
               onPress={handleDuplicate}
+              className="node-controls-button"
             >
               <Icon className="text-default-500" icon="solar:copy-linear" width={22} />
             </Button>
@@ -397,6 +319,7 @@ const BaseNode: React.FC<BaseNodeProps> = ({
                 radius="full"
                 variant="light"
                 onPress={handleOpenModal}
+                className="node-controls-button"
               >
                 <Icon className="text-default-500" icon="solar:eye-linear" width={22} />
               </Button>

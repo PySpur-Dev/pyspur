@@ -1,11 +1,11 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Handle, Position } from '@xyflow/react';
-import BaseNode from '../BaseNode';
+import BaseNode from '../base/BaseNode';
 import { Input, Card, Divider, Button, Select, SelectItem, RadioGroup, Radio } from '@nextui-org/react';
 import { useDispatch } from 'react-redux';
 import { updateNodeData } from '../../../store/flowSlice';
-import styles from '../DynamicNode.module.css';
 import { Icon } from "@iconify/react";
+import { BaseNodeData, BaseNodeProps, BaseNodeConfig } from '../../../types/nodes/base';
 
 interface Condition {
   logicalOperator?: 'AND' | 'OR';
@@ -18,20 +18,16 @@ interface Branch {
   conditions: Condition[];
 }
 
-interface IfElseNodeData {
-  color?: string;
-  config: {
-    branches: Branch[];
-    input_schema?: Record<string, string>;
-    output_schema?: Record<string, string>;
-    title?: string;
-  };
+interface IfElseNodeConfig extends BaseNodeConfig {
+  branches: Branch[];
 }
 
-interface IfElseNodeProps {
-  id: string;
+interface IfElseNodeData extends Omit<BaseNodeData, 'config'> {
+  config: IfElseNodeConfig;
+}
+
+interface IfElseNodeProps extends Omit<BaseNodeProps, 'data'> {
   data: IfElseNodeData;
-  selected?: boolean;
 }
 
 const OPERATORS = [
@@ -56,24 +52,20 @@ const DEFAULT_BRANCH: Branch = {
   conditions: [{ ...DEFAULT_CONDITION }]
 };
 
-export const IfElseNode: React.FC<IfElseNodeProps> = ({ id, data }) => {
-  const [isCollapsed, setIsCollapsed] = useState(false);
+export const IfElseNode: React.FC<IfElseNodeProps> = ({ id, data, isCollapsed, setIsCollapsed, ...props }) => {
   const [nodeWidth, setNodeWidth] = useState<string>('auto');
   const nodeRef = useRef<HTMLDivElement | null>(null);
   const dispatch = useDispatch();
 
-  // Get available input variables from the schema
   const inputVariables = Object.entries(data.config?.input_schema || {}).map(([key, type]) => ({
     value: key,
     label: `${key} (${type})`,
   }));
 
-  // Initialize branches if they don't exist or are invalid
   useEffect(() => {
     if (!data.config?.branches || !Array.isArray(data.config.branches) || data.config.branches.length === 0) {
       handleUpdateBranches([{ ...DEFAULT_BRANCH }]);
     } else {
-      // Ensure each branch has valid conditions
       const validBranches = data.config.branches.map(branch => ({
         conditions: Array.isArray(branch.conditions) && branch.conditions.length > 0
           ? branch.conditions.map((condition, index) => ({
@@ -194,22 +186,26 @@ export const IfElseNode: React.FC<IfElseNodeProps> = ({ id, data }) => {
       isCollapsed={isCollapsed}
       setIsCollapsed={setIsCollapsed}
       data={{
+        ...data,
         title: data.config?.title || 'Conditional Router',
         color: data.color || '#F6AD55',
         acronym: 'IF',
-        config: data.config
+        config: {
+          ...data.config,
+          title: data.config?.title || 'Conditional Router'
+        }
       }}
       style={{ width: nodeWidth }}
       className="hover:!bg-background"
+      {...props}
     >
-      <div className="p-3" ref={nodeRef}>
-        {/* Input handle */}
-        <div className={`${styles.handleRow} w-full justify-start mb-4`}>
+      <div className="node-content p-3" ref={nodeRef}>
+        <div className="node-handle-row flex w-full justify-start mb-4">
           <Handle
             type="target"
             position={Position.Left}
             id="input"
-            className={`${styles.handle} ${styles.handleLeft} ${isCollapsed ? styles.collapsedHandleInput : ''}`}
+            className="node-handle node-handle-input"
           />
           {!isCollapsed && <span className="text-sm font-medium ml-2 text-foreground">Input →</span>}
         </div>
@@ -218,13 +214,11 @@ export const IfElseNode: React.FC<IfElseNodeProps> = ({ id, data }) => {
           <>
             <Divider className="my-2" />
 
-            {/* Expressions Header */}
             <div className="flex items-center gap-2 mb-4">
               <span className="text-sm font-medium text-foreground">Expressions</span>
               <Divider className="flex-grow" />
             </div>
 
-            {/* Branches */}
             <div className="flex flex-col gap-4">
               {(data.config?.branches || []).map((branch, branchIndex) => (
                 <Card
@@ -234,7 +228,15 @@ export const IfElseNode: React.FC<IfElseNodeProps> = ({ id, data }) => {
                   }}
                 >
                   <div className="flex flex-col gap-3">
-                    {/* Conditions */}
+                    <div className="node-handle-row flex w-full justify-end">
+                      <Handle
+                        type="source"
+                        position={Position.Right}
+                        id={`branch${branchIndex + 1}`}
+                        className="node-handle node-handle-output"
+                      />
+                    </div>
+
                     {(branch.conditions || []).map((condition, conditionIndex) => (
                       <div key={conditionIndex} className="flex flex-col gap-2">
                         {conditionIndex > 0 && (
@@ -292,78 +294,66 @@ export const IfElseNode: React.FC<IfElseNodeProps> = ({ id, data }) => {
                               placeholder="Value"
                               className="flex-1"
                               classNames={{
-                                input: "bg-default-100 dark:bg-default-50",
+                                input: "bg-default-100",
                                 inputWrapper: "shadow-none"
                               }}
                             />
                           )}
-                          <Button
-                            size="sm"
-                            color="danger"
-                            isIconOnly
-                            onClick={() => removeCondition(branchIndex, conditionIndex)}
-                            disabled={branch.conditions?.length === 1}
-                          >
-                            <Icon icon="solar:trash-bin-trash-linear" width={18} />
-                          </Button>
+                          {branch.conditions.length > 1 && (
+                            <Button
+                              isIconOnly
+                              size="sm"
+                              variant="light"
+                              onClick={() => removeCondition(branchIndex, conditionIndex)}
+                              className="text-default-400 hover:text-danger"
+                            >
+                              <Icon icon="solar:trash-bin-minimalistic-linear" width={16} />
+                            </Button>
+                          )}
                         </div>
                       </div>
                     ))}
 
-                    {/* Add Condition Button */}
                     <Button
                       size="sm"
-                      variant="flat"
+                      variant="light"
                       onClick={() => addCondition(branchIndex)}
-                      startContent={<Icon icon="solar:add-circle-linear" width={18} />}
-                      className="bg-default-100 dark:bg-default-50 hover:bg-default-200 dark:hover:bg-default-100"
+                      className="text-default-400 hover:text-primary"
+                      startContent={<Icon icon="solar:add-circle-linear" width={16} />}
                     >
                       Add Condition
                     </Button>
 
-                    {/* Branch Output Handle */}
-                    <div className={`${styles.handleRow} w-full justify-end mt-2`}>
-                      <div className="align-center flex flex-grow flex-shrink mr-2">
-                        <span className="text-sm font-medium ml-auto text-foreground">Branch {branchIndex + 1} →</span>
-                      </div>
-                      <Handle
-                        type="source"
-                        position={Position.Right}
-                        id={`branch${branchIndex + 1}`}
-                        className={`${styles.handle} ${styles.handleRight} ${isCollapsed ? styles.collapsedHandleOutput : ''}`}
-                      />
-                    </div>
+                    {data.config?.branches.length > 1 && (
+                      <Button
+                        size="sm"
+                        variant="light"
+                        onClick={() => removeBranch(branchIndex)}
+                        className="text-default-400 hover:text-danger"
+                        startContent={<Icon icon="solar:trash-bin-minimalistic-linear" width={16} />}
+                      >
+                        Remove Branch
+                      </Button>
+                    )}
                   </div>
                 </Card>
               ))}
-
-              {/* Add Branch Button */}
-              <Button
-                size="sm"
-                color="primary"
-                variant="flat"
-                onClick={addBranch}
-                startContent={<Icon icon="solar:add-circle-linear" width={18} />}
-                className="bg-default-100 dark:bg-default-50 hover:bg-default-200 dark:hover:bg-default-100"
-              >
-                Add Branch
-              </Button>
             </div>
+
+            <Button
+              size="sm"
+              variant="light"
+              onClick={addBranch}
+              className="mt-4 text-default-400 hover:text-primary"
+              startContent={<Icon icon="solar:add-circle-linear" width={16} />}
+            >
+              Add Branch
+            </Button>
           </>
         )}
-
-        {/* Output handles when collapsed */}
-        {isCollapsed && (data.config?.branches || []).map((_, branchIndex) => (
-          <div key={branchIndex} className={`${styles.handleRow} w-full justify-end mt-2`}>
-            <Handle
-              type="source"
-              position={Position.Right}
-              id={`branch${branchIndex + 1}`}
-              className={`${styles.handle} ${styles.handleRight} ${styles.collapsedHandleOutput}`}
-            />
-          </div>
-        ))}
       </div>
     </BaseNode>
   );
 };
+
+export default IfElseNode;
