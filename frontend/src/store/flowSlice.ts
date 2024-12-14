@@ -1,7 +1,11 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
-import { applyNodeChanges, applyEdgeChanges, addEdge, Node, Edge, NodeChange, EdgeChange, Connection } from '@xyflow/react';
+import { applyNodeChanges, applyEdgeChanges, addEdge, Node as FlowNode, Edge, NodeChange, EdgeChange, Connection } from '@xyflow/react';
 import { v4 as uuidv4 } from 'uuid';
 import { createNode } from '../utils/nodeFactory';
+import { NodeTypes, NodeType } from '../types/nodes/base';
+import type { Draft } from 'immer';
+
+type WritableNode = Draft<FlowNode>;
 
 interface Coordinates {
   x: number;
@@ -35,8 +39,8 @@ interface TestInput {
 }
 
 interface FlowState {
-  nodeTypes: string[];
-  nodes: Node[];
+  nodeTypes: NodeTypes;
+  nodes: WritableNode[];
   edges: Edge[];
   workflowID: string | null;
   selectedNode: string | null;
@@ -46,13 +50,13 @@ interface FlowState {
   testInputs: TestInput[];
   inputNodeValues: Record<string, any>;
   history: {
-    past: Array<{nodes: Node[], edges: Edge[]}>;
-    future: Array<{nodes: Node[], edges: Edge[]}>;
+    past: Array<{nodes: WritableNode[], edges: Edge[]}>;
+    future: Array<{nodes: WritableNode[], edges: Edge[]}>;
   };
 }
 
 const initialState: FlowState = {
-  nodeTypes: [],
+  nodeTypes: {},
   nodes: [],
   edges: [],
   workflowID: null,
@@ -84,18 +88,22 @@ const flowSlice = createSlice({
       workflowID: string;
       definition: WorkflowDefinition;
       name: string;
-      nodeTypes: string[];
+      nodeTypes: Record<string, NodeType[]>;
     }>) => {
-      const { workflowID, definition, name } = action.payload;
+      const { workflowID, definition, name, nodeTypes } = action.payload;
       state.workflowID = workflowID;
       state.projectName = name;
-      state.nodeTypes = action.payload.nodeTypes;
+      state.nodeTypes = nodeTypes;
       const { nodes, links } = definition;
 
-      state.nodes = nodes.map(node =>
-        createNode(state.nodeTypes, node.node_type, node.id, { x: node.coordinates.x, y: node.coordinates.y }, { config: node.config })
-      );
-
+      // Filter out any null nodes that might be returned from createNode
+      const createdNodes = nodes
+        .map(node => createNode(nodeTypes, node.node_type, node.id,
+          { x: node.coordinates.x, y: node.coordinates.y },
+          { config: node.config }))
+        .filter((node): node is NonNullable<ReturnType<typeof createNode>> => node !== null)
+        .map(node => node as unknown as WritableNode);
+      state.nodes = createdNodes;
       state.edges = links.map(link => ({
         id: uuidv4(),
         key: uuidv4(),
@@ -124,19 +132,16 @@ const flowSlice = createSlice({
       state.edges = addEdge(action.payload.connection, state.edges);
     },
 
-    addNode: (state, action: PayloadAction<{ node: Node }>) => {
+    addNode: (state, action: PayloadAction<{ node: FlowNode }>) => {
       if (action.payload.node) {
         saveToHistory(state);
-        state.nodes = [...state.nodes, action.payload.node];
+        state.nodes = [...state.nodes, action.payload.node as unknown as WritableNode];
       }
     },
 
-    setNodes: (state, action: PayloadAction<{ nodes: Node[] }>) => {
-      state.nodes = action.payload.nodes;
+    setNodes: (state, action: PayloadAction<{ nodes: FlowNode[] }>) => {
+      state.nodes = action.payload.nodes.map(node => node as unknown as WritableNode);
     },
-
-    // // ... rest of the reducers with proper type annotations ...
-    // I'll show a few more examples and you can follow the pattern:
 
     updateNodeData: (state, action: PayloadAction<{ id: string; data: any }>) => {
       const { id, data } = action.payload;
@@ -219,11 +224,16 @@ const flowSlice = createSlice({
 
     resetFlow: (state, action: PayloadAction<{ definition: WorkflowDefinition }>) => {
       const { nodes, links } = action.payload.definition;
-      state.nodes = nodes.map(node =>
-        createNode(state.nodeTypes, node.node_type, node.id,
+
+      // Filter out any null nodes that might be returned from createNode
+      const createdNodes = nodes
+        .map(node => createNode(state.nodeTypes, node.node_type, node.id,
           { x: node.coordinates.x, y: node.coordinates.y },
-          { config: node.config })
-      );
+          { config: node.config }))
+        .filter((node): node is NonNullable<ReturnType<typeof createNode>> => node !== null)
+        .map(node => node as unknown as WritableNode);
+
+      state.nodes = createdNodes;
 
       state.edges = links.map(link => ({
         id: uuidv4(),
@@ -253,7 +263,6 @@ const flowSlice = createSlice({
         return edge;
       });
     },
-
     resetRun: (state) => {
       state.nodes = state.nodes.map(node => ({
         ...node,
@@ -372,6 +381,6 @@ export const {
 
 export default flowSlice.reducer;
 
-export const selectNodeById = (state: { flow: FlowState }, nodeId: string): Node | undefined => {
-  return state.flow.nodes.find((node) => node.id === nodeId);
+export const selectNodeById = (state: { flow: FlowState }, nodeId: string): FlowNode | undefined => {
+  return state.flow.nodes.find((node) => node.id === nodeId) as FlowNode | undefined;
 };

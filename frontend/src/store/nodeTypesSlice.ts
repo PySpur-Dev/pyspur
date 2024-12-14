@@ -35,7 +35,7 @@ interface IfElseNodeConfig {
 }
 
 // Define interfaces for the metadata structure
-interface NodeMetadata {
+export interface NodeMetadata {
   name: string;
   config?: {
     branches?: BranchCondition[];

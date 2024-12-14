@@ -4,6 +4,8 @@ import storage from 'redux-persist/lib/storage';
 import flowReducer from './flowSlice';
 import nodeTypesReducer from './nodeTypesSlice';
 import type { Node, Edge } from '@xyflow/react';
+import { NodeTypes } from '../types/nodes/base';
+import type { NodeMetadata } from './nodeTypesSlice';
 
 // Define the RootState type
 export interface RootState {
@@ -15,11 +17,14 @@ export interface RootState {
     projectName: string;
     testInputs: Record<string, any>;
     selectedNode: string | null;
-    nodeTypes: string[];
+    nodeTypes: NodeTypes;
     sidebarWidth: number;
   };
   nodeTypes: {
     data: Record<string, any>;
+    metadata: Record<string, NodeMetadata[]>;
+    status: 'idle' | 'loading' | 'succeeded' | 'failed';
+    error: string | null;
   };
 }
 

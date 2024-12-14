@@ -34,4 +34,23 @@ export interface BaseNodeProps {
   className?: string;
 }
 
+export interface NodeType {
+  name: string;
+  visual_tag: {
+    acronym: string;
+    color: string;
+  };
+  config: BaseNodeConfig;
+  input?: {
+    properties: Record<string, unknown>;
+  };
+  output?: {
+    properties: Record<string, unknown>;
+  };
+}
+
+export interface NodeTypes {
+  [category: string]: NodeType[];
+}
+
 export type WorkflowNode = FlowNode<BaseNodeData>;

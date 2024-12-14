@@ -1,24 +1,6 @@
+import { Node as FlowNode } from '@xyflow/react';
 import cloneDeep from 'lodash/cloneDeep';
-
-// Define types for the node structure
-interface NodeType {
-  name: string;
-  visual_tag: {
-    acronym: string;
-    color: string;
-  };
-  config: Record<string, any>;
-  input?: {
-    properties: Record<string, any>;
-  };
-  output?: {
-    properties: Record<string, any>;
-  };
-}
-
-interface NodeTypes {
-  [category: string]: NodeType[];
-}
+import { NodeTypes, NodeType, BaseNodeData } from '../types/nodes/base';
 
 interface Position {
   x: number;
@@ -26,102 +8,64 @@ interface Position {
 }
 
 interface AdditionalData {
+  config?: Record<string, any>;
   input?: {
-    properties?: Record<string, any>;
+    properties: Record<string, any>;
   };
   output?: {
-    properties?: Record<string, any>;
-  };
-  [key: string]: any;
-}
-
-interface Node {
-  id: string;
-  type: string;
-  position: Position;
-  data: {
-    title: string;
-    acronym: string;
-    color: string;
-    config: Record<string, any>;
-    input: {
-      properties: Record<string, any>;
-      [key: string]: any;
-    };
-    output: {
-      properties: Record<string, any>;
-      [key: string]: any;
-    };
-    [key: string]: any;
+    properties: Record<string, any>;
   };
 }
 
-// Function to create a node based on its type
-export const createNode = (
+export function createNode(
   nodeTypes: NodeTypes,
-  type: string,
+  nodeType: string,
   id: string,
   position: Position,
   additionalData: AdditionalData = {}
-): Node | null => {
-  let nodeType: NodeType | null = null;
+): FlowNode<BaseNodeData> | null {
+  const category = Object.keys(nodeTypes).find(cat =>
+    nodeTypes[cat].some(type => type.name === nodeType)
+  );
 
-  for (const category in nodeTypes) {
-    const found = nodeTypes[category].find((node) => node.name === type);
-    if (found) {
-      nodeType = found;
-      break;
-    }
-  }
-  if (!nodeType) {
+  if (!category) {
+    console.error(`Node type ${nodeType} not found in any category`);
     return null;
   }
 
-  const inputProperties = cloneDeep(nodeType.input?.properties) || {};
-  const outputProperties = cloneDeep(nodeType.output?.properties) || {};
+  const nodeTypeData = nodeTypes[category].find(type => type.name === nodeType);
+  if (!nodeTypeData) {
+    console.error(`Node type ${nodeType} not found in category ${category}`);
+    return null;
+  }
 
-  let processedAdditionalData = cloneDeep(additionalData);
+  const processedAdditionalData = cloneDeep(additionalData);
 
-  // If the additional data has input/output properties, merge them with the default properties
-  if (additionalData.input?.properties) {
+  if (!processedAdditionalData.input) {
     processedAdditionalData.input = {
-      ...processedAdditionalData.input,
-      properties: {
-        ...inputProperties,
-        ...additionalData.input.properties,
-      },
+      properties: {}
     };
   }
 
-  if (additionalData.output?.properties) {
+  if (!processedAdditionalData.output) {
     processedAdditionalData.output = {
-      ...processedAdditionalData.output,
-      properties: {
-        ...outputProperties,
-        ...additionalData.output.properties,
-      },
+      properties: {}
     };
   }
 
-  const node: Node = {
+  const node: FlowNode<BaseNodeData> = {
     id,
-    type: nodeType.name,
+    type: nodeType,
     position,
     data: {
-      title: nodeType.name,
-      acronym: nodeType.visual_tag.acronym,
-      color: nodeType.visual_tag.color,
-      config: cloneDeep(nodeType.config),
-      input: {
-        properties: inputProperties,
-        ...processedAdditionalData.input,
-      },
-      output: {
-        properties: outputProperties,
-        ...processedAdditionalData.output,
-      },
-      ...processedAdditionalData,
+      title: nodeTypeData.name,
+      acronym: nodeTypeData.visual_tag.acronym,
+      color: nodeTypeData.visual_tag.color,
+      config: processedAdditionalData.config || {},
+      input: processedAdditionalData.input,
+      output: processedAdditionalData.output,
     },
   };
+
   return node;
-};
+}
