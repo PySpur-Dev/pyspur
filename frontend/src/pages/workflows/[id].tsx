@@ -2,6 +2,9 @@ import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
 import dynamic from 'next/dynamic';
 import Header from '../../components/Header';
+import { WorkflowNode } from '../../types/nodes/base';
+import { CustomEdge } from '../../types/reactflow';
+import { TestInput } from '../../types/workflow';
 import { PersistGate } from 'redux-persist/integration/react';
 import { persistor } from '../../store/store';
 import { getWorkflow } from '../../utils/api';
@@ -18,11 +21,13 @@ const FlowCanvas = dynamic(() => import('../../components/canvas/FlowCanvas'), {
 
 interface WorkflowData {
   id: string;
+  name?: string;
+  description?: string;
   definition: {
-    test_inputs?: Record<string, any>;
-    // Add other workflow definition properties as needed
+    nodes: WorkflowNode[];
+    edges: CustomEdge[];
+    test_inputs?: TestInput[];
   };
-  // Add other workflow properties as needed
 }
 
 const WorkflowPage: React.FC = () => {

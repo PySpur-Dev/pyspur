@@ -2,10 +2,10 @@ from typing import Optional
 from sqlalchemy import Computed, Integer, String, DateTime
 from sqlalchemy.orm import Mapped, mapped_column
 from datetime import datetime, timezone
-from .base_model import BaseModel
+from .base_model import Base
 
 
-class DatasetModel(BaseModel):
+class DatasetModel(Base):
     __tablename__ = "datasets"
 
     _intid: Mapped[int] = mapped_column(Integer, primary_key=True)

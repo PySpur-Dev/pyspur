@@ -1,26 +1,28 @@
 import axios from 'axios';
-import testInput from '../constants/test_input.js'; // Import the test input directly
-import JSPydanticModel from './JSPydanticModel'; // Import the JSPydanticModel class
+import JSPydanticModel from './JSPydanticModel';
+import {
+  NodeType,
+  NodeTypesByCategory,
+  BaseNodeConfig
+} from '../types/nodes/base';
+import {
+  NodeTypeRegistry,
+  NodeTypesResponse
+} from '../types/nodes/custom';
 import {
   WorkflowNodeCoordinates,
   WorkflowNode,
-  WorkflowLink,
   WorkflowDefinition,
   Workflow,
   Template,
-  Dataset
+  Dataset,
+  WorkflowData,
+  RunOutputData
 } from '../types/workflow';
-import { NodeType } from '../types/nodes/base';
 
 const API_BASE_URL = typeof window !== 'undefined'
   ? `http://${window.location.host}/api`
-  : 'http://localhost:6080/api';
-
-// Define types for API responses and request payloads
-export interface NodeTypesResponse {
-  schema: Record<string, unknown>;
-  metadata: Record<string, NodeType[]>;
-}
+  : 'http://localhost:8000/api';
 
 export interface WorkflowVersion {
   version: number;
@@ -34,12 +36,15 @@ export interface WorkflowVersion {
 
 export interface RunStatusResponse {
   id: string;
+  workflow_id: string;
+  workflow_version: WorkflowData;
   status: string;
   start_time?: string;
   end_time?: string;
-  tasks: Record<string, any>[];
-  outputs?: Record<string, any>;
+  tasks: Record<string, unknown>[];
+  outputs?: Record<string, RunOutputData>;
   output_file_id?: string;
+  results?: Record<string, unknown>;
 }
 
 export interface ApiKey {
@@ -50,23 +55,82 @@ export interface ApiKey {
 export const getNodeTypes = async (): Promise<NodeTypesResponse> => {
   try {
     const response = await axios.get(`${API_BASE_URL}/node/supported_types/`);
-    console.log('Raw Node Types Response:', response.data);
-    const model = new JSPydanticModel(response.data);
+    console.log('Raw API response:', response);
+    console.log('Response data type:', typeof response.data);
+    console.log('Response data:', JSON.stringify(response.data, null, 2));
 
-    // Get both the processed schema and metadata
-    const schema = model.createObjectFromSchema();
-    const metadata = model.getAllMetadata();
+    // Ensure we have a valid response structure
+    if (!response.data || typeof response.data !== 'object') {
+      throw new Error('Invalid API response format');
+    }
 
-    console.log('Processed Schema:', schema);
-    console.log('Schema Metadata:', metadata);
+    // Extract schema and metadata from response
+    const rawSchema = response.data.schema || response.data;
+    const metadata = response.data.metadata || {};
 
-    // Return both schema and metadata
+    // Transform the schema into the correct format
+    const processedSchema: NodeTypesByCategory = {};
+
+    // Process each category in the schema
+    Object.entries(rawSchema).forEach(([category, nodes]) => {
+      if (!Array.isArray(nodes)) {
+        console.warn(`Invalid nodes array for category ${category}, skipping`);
+        return;
+      }
+
+      // Process nodes for this category
+      const validNodes = nodes
+        .filter((node): node is NodeType => {
+          if (!node || typeof node !== 'object' || !node.name) {
+            console.warn(`Skipping invalid node in category ${category}:`, node);
+            return false;
+          }
+          return true;
+        })
+        .map(node => ({
+          ...node,
+          type: node.name.toLowerCase(),
+          name: node.name,
+          category
+        }));
+
+      if (validNodes.length > 0) {
+        processedSchema[category] = validNodes;
+      }
+    });
+
+    // Add dynamic node type to Logic category if not present
+    if (!processedSchema.Logic) {
+      processedSchema.Logic = [];
+    }
+
+    const dynamicNodeType: NodeType = {
+      name: 'Dynamic Node',
+      type: 'dynamic',
+      visual_tag: {
+        acronym: 'DN',
+        color: '#4A90E2',
+        icon: 'code'
+      },
+      config: { properties: {} },
+      input: { properties: {} },
+      output: { properties: {} }
+    };
+
+    if (!processedSchema.Logic.some(node => node.type === 'dynamic')) {
+      processedSchema.Logic.push(dynamicNodeType);
+      console.log('Added dynamic node type to schema');
+    }
+
+    console.log('Final processed schema:', processedSchema);
+
+    // Return in the format expected by NodeTypesResponse
     return {
-      schema,
-      metadata,
+      schema: processedSchema,
+      metadata
     };
   } catch (error) {
-    console.error('Error getting node types:', error);
+    console.error('Error fetching node types:', error);
     throw error;
   }
 };
@@ -84,7 +148,6 @@ export const runWorkflow = async (workflowData: WorkflowDefinition): Promise<any
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
-    console.log('New Data:', testInput);
 
     const response = await axios.post(`${API_BASE_URL}/run_workflow/`, workflowData);
     return response.data;

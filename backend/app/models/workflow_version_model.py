@@ -2,11 +2,11 @@ from sqlalchemy import Integer, String, DateTime, JSON, ForeignKey
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from datetime import datetime, timezone
 from typing import List, Optional, Any
-from .base_model import BaseModel
+from .base_model import Base
 from .run_model import RunModel
 
 
-class WorkflowVersionModel(BaseModel):
+class WorkflowVersionModel(Base):
     __tablename__ = "workflow_versions"
 
     _intid: Mapped[int] = mapped_column(Integer, primary_key=True)

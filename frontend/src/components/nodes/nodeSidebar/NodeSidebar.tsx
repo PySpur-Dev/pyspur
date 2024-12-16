@@ -1,17 +1,12 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { RootState } from '../../../store/store';
+import type { RootState } from '../../../types/store';
 import {
   updateNodeData,
   selectNodeById,
   setSidebarWidth,
   setSelectedNode,
 } from '../../../store/flowSlice';
-import NumberInput from '../../NumberInput';
-import CodeEditor from '../../CodeEditor';
-import { jsonOptions } from '../../../constants/jsonOptions';
-import FewShotEditor from '../../textEditor/FewShotEditor';
-import TextEditor from '../../textEditor/TextEditor';
 import {
   Button,
   Slider,
@@ -23,139 +18,121 @@ import {
   Accordion,
   AccordionItem,
   Card,
+  Selection
 } from '@nextui-org/react';
 import { Icon } from '@iconify/react';
 import NodeOutput from '../NodeOutputDisplay';
 import SchemaEditor from './SchemaEditor';
 import { selectPropertyMetadata } from '../../../store/nodeTypesSlice';
 import { cloneDeep, set, debounce } from 'lodash';
+import { MergeEditor } from '../../mergeEditor/MergeEditor';
 import IfElseEditor from './IfElseEditor';
-import MergeEditor from './MergeEditor';
+import {
+  NodeType,
+  NodeData,
+  DynamicNodeConfig,
+  WorkflowNode,
+  BaseNodeConfig,
+  FieldMetadata,
+  findNodeSchema as findNodeSchemaBase
+} from '../../../types/nodes/base';
+import type { Key } from '@react-types/shared';
+import NumberInput from '../../NumberInput';
+import CodeEditor from '../../CodeEditor';
+import { jsonOptions } from '../../../constants/jsonOptions';
+import FewShotEditor from '../../textEditor/FewShotEditor';
+import TextEditor from '../../textEditor/TextEditor';
+import type { AppDispatch } from '../../../store/store';
+import type { Branch } from './IfElseEditor';
+
 // Define types for props and state
 interface NodeSidebarProps {
   nodeID: string;
 }
 
-interface NodeSchema {
-  name: string;
-  config: {
-    [key: string]: any;
-    title?: string;
-    type?: string;
-    input_schema?: Record<string, any>;
-    output_schema?: Record<string, any>;
-    system_message?: string;
-    user_message?: string;
-    few_shot_examples?: Array<{
-      input: string;
-      output: string;
-    }>;
-  };
-}
+// Use DynamicNodeConfig as our NodeConfig type
+type NodeConfig = DynamicNodeConfig;
 
-interface DynamicModel {
-  [key: string]: any;
-  title?: string;
-  type?: string;
-  input_schema?: Record<string, any>;
-  output_schema?: Record<string, any>;
-  system_message?: string;
-  user_message?: string;
-  few_shot_examples?: Array<{
-    input: string;
-    output: string;
-  }>;
-  branch_refs: string[];
-}
-
-interface FieldMetadata {
-  enum?: string[];
-  default?: any;
-  title?: string;
-  minimum?: number;
-  maximum?: number;
-  type?: string;
-}
-
-interface NodeType {
-  name: string;
-  config: Record<string, any>;
-}
-
-interface NodeData {
-  config?: DynamicModel;
-  run?: any;
-  type?: string;
-  id?: string;
-}
-
-interface Node {
+interface Node extends WorkflowNode {
   type: string;
   id: string;
   data: NodeData;
 }
 
-type NodeTypes = Record<string, NodeType[]>;
-
-// Update the `findNodeSchema` function to resolve the "used before declaration" error
-const findNodeSchema = (nodeType: string, nodeTypes: NodeTypes): NodeSchema | null => {
-  if (!nodeTypes) return null;
-
-  for (const category in nodeTypes) {
-    const nodeSchema = nodeTypes[category]?.find((n: NodeType) => n.name === nodeType);
-    if (nodeSchema) {
-      return nodeSchema;
-    }
-  }
-  return null;
-};
+// Use the imported base function instead of redefining
+const findNodeSchema = findNodeSchemaBase;
 
 const NodeSidebar: React.FC<NodeSidebarProps> = ({ nodeID }) => {
-  const dispatch = useDispatch();
+  const dispatch = useDispatch<AppDispatch>();
+  const [width, setWidth] = useState<number>(400);
+  const [isResizing, setIsResizing] = useState<boolean>(false);
+  const [fewShotIndex, setFewShotIndex] = useState<number | null>(null);
+  const [selectedKeys, setSelectedKeys] = useState<Selection>(new Set(['title']));
   const nodeTypes = useSelector((state: RootState) => state.nodeTypes.data);
   const node = useSelector((state: RootState) => selectNodeById(state, nodeID));
   const storedWidth = useSelector((state: RootState) => state.flow.sidebarWidth);
   const metadata = useSelector((state: RootState) => state.nodeTypes.metadata);
 
-  const hasRunOutput = !!node?.data?.run;
+  const [nodeSchema, setNodeSchema] = useState<NodeType | null>(null);
+  const [dynamicModel, setDynamicModel] = useState<DynamicNodeConfig>(() => {
+    const defaultConfig: DynamicNodeConfig = {
+      title: '',
+      input_schema: {},
+      output_schema: {},
+      input_schemas: {},
+      branches: [],
+      branch_refs: []
+    };
 
-  const [width, setWidth] = useState<number>(storedWidth);
-  const [isResizing, setIsResizing] = useState<boolean>(false);
+    const nodeConfig = node?.data?.config || {};
+    return { ...defaultConfig, ...nodeConfig };
+  });
 
-  const [nodeType, setNodeType] = useState<string>(node?.type || 'ExampleNode');
-  const [nodeSchema, setNodeSchema] = useState<NodeSchema | null>(
-    findNodeSchema(node?.type || 'ExampleNode', nodeTypes)
-  );
-  const [dynamicModel, setDynamicModel] = useState<DynamicModel>(node?.data?.config || {});
-  const [fewShotIndex, setFewShotIndex] = useState<number | null>(null);
+  const hasRunOutput = Boolean(node?.data?.output);
 
-  // Create a debounced version of the dispatch update
   const debouncedDispatch = useCallback(
-    debounce((id: string, updatedModel: DynamicModel) => {
+    debounce((id: string, updatedModel: DynamicNodeConfig) => {
       dispatch(updateNodeData({ id, data: { config: updatedModel } }));
     }, 300),
     [dispatch]
   );
 
-  // Update dynamicModel when nodeID changes
   useEffect(() => {
     if (node) {
-      setNodeType(node.type || 'ExampleNode');
-      setNodeSchema(findNodeSchema(node.type || 'ExampleNode', nodeTypes));
-      setDynamicModel(node.data?.config || {});
+      const schema = findNodeSchema(node.type || 'ExampleNode', nodeTypes);
+      if (schema) {
+        setNodeSchema({
+          name: schema.name,
+          type: schema.name,  // Use schema.name as type since it's used in findNodeSchema
+          config: schema.config as BaseNodeConfig,
+          visual_tag: {
+            color: '#ccc',
+            acronym: 'N',
+            icon: undefined
+          }
+        });
+      }
+      const config = node.data?.config as Partial<DynamicNodeConfig> || {};
+      setDynamicModel({
+        title: config.title || '',
+        input_schema: config.input_schema || {},
+        output_schema: config.output_schema || {},
+        input_schemas: config.input_schemas || {},
+        branches: config.branches || [],
+        branch_refs: config.branch_refs || [],
+        ...config
+      });
     }
-  }, [nodeID, node, nodeTypes]);
+  }, [node, nodeTypes]);
 
-  // Helper function to update nested object by path
-  const updateNestedModel = (obj: DynamicModel, path: string, value: any): DynamicModel => {
+  const updateNestedModel = (obj: DynamicNodeConfig, path: string, value: unknown): DynamicNodeConfig => {
     const deepClone = cloneDeep(obj);
     set(deepClone, path, value);
     return deepClone;
   };
 
-  // Update the input change handler to use local state immediately but debounce Redux updates for Slider
   const handleInputChange = (key: string, value: any, isSlider: boolean = false) => {
-    let updatedModel: DynamicModel;
+    let updatedModel: DynamicNodeConfig;
 
     if (key.includes('.')) {
       updatedModel = updateNestedModel(dynamicModel, key, value);
@@ -184,7 +161,7 @@ const NodeSidebar: React.FC<NodeSidebarProps> = ({ nodeID }) => {
       <div key={key}>
         <Select
           label={label}
-          defaultSelectedKeys={[defaultSelected || dynamicModel[key] || '']}
+          defaultSelectedKeys={defaultSelected ? [defaultSelected] : undefined}
           onChange={(e) => handleInputChange(lastTwoDots, e.target.value)}
           fullWidth
         >
@@ -210,35 +187,54 @@ const NodeSidebar: React.FC<NodeSidebarProps> = ({ nodeID }) => {
     handleInputChange('few_shot_examples', updatedExamples);
   };
 
-  // Update the `getFieldMetadata` function
   const getFieldMetadata = (fullPath: string): FieldMetadata | undefined => {
-    return selectPropertyMetadata({ nodeTypes: { metadata } }, fullPath);
+    const state: RootState = {
+      flow: {
+        nodes: [], edges: [], selectedNodes: [], selectedEdges: [], copiedNodes: [], copiedEdges: [],
+        nodeTypes, isRunning: false, runStatus: '', runOutput: {}, runError: null, runId: null,
+        workflowId: null, workflowVersion: null, workflowName: '', workflowDescription: '', workflowTags: [],
+        sidebarWidth: width, selectedNode: null, projectName: '', workflowInputVariables: {},
+        testInputs: {}, inputNodeValues: {}, history: { past: [], future: [] }
+      },
+      nodeTypes: { data: nodeTypes, metadata: {}, status: 'idle', error: null }
+    };
+    return selectPropertyMetadata(state, fullPath) as FieldMetadata | undefined;
   };
 
-  // Update the `renderField` function to include missing cases
   const renderField = (
-    key: string,
-    field: any,
-    value: any,
+    fieldKey: string,
+    field: FieldMetadata | Record<string, unknown>,
+    value: Record<string, unknown> | string | number | boolean | null,
     parentPath: string = '',
     isLast: boolean = false
   ) => {
-    const fullPath = `${parentPath ? `${parentPath}.` : ''}${key}`;
+    const fullPath = `${parentPath ? `${parentPath}.` : ''}${fieldKey}`;
     const fieldMetadata = getFieldMetadata(fullPath);
 
-    // Handle enum fields
-    if (fieldMetadata?.enum) {
-      const defaultSelected = value || fieldMetadata.default;
-      return renderEnumSelect(key, fieldMetadata.title || key, fieldMetadata.enum, fullPath, defaultSelected);
+    // Handle special field types
+    if (fieldKey === 'system_message') {
+      return (
+        <div key={fieldKey}>
+          <TextEditor
+            key={fieldKey}
+            nodeID={nodeID}
+            fieldName={fieldKey}
+            inputSchema={dynamicModel?.input_schema || {}}
+            fieldTitle="System Message"
+            content={String(value || '')}
+            setContent={(newValue: string) => handleInputChange(fieldKey, newValue)}
+          />
+          {!isLast && <hr className="my-2" />}
+        </div>
+      );
     }
 
-    // Handle specific cases for input_schema, output_schema, and system_prompt
-    if (key === 'input_schema') {
+    if (fieldKey === 'input_schema') {
       return (
-        <div key={key} className="my-2">
+        <div key={fieldKey} className="my-2">
           <label className="font-semibold mb-1 block">Input Schema</label>
           <SchemaEditor
-            jsonValue={dynamicModel.input_schema || {}}
+            jsonValue={dynamicModel?.input_schema || {}}
             onChange={(newValue) => {
               handleInputChange('input_schema', newValue);
             }}
@@ -251,17 +247,16 @@ const NodeSidebar: React.FC<NodeSidebarProps> = ({ nodeID }) => {
       );
     }
 
-    // Add branches editor for conditional nodes
-    if (key === 'branches') {
+    if (fieldKey === 'branches') {
       return (
-        <div key={key} className="my-2">
+        <div key={fieldKey} className="my-2">
           <label className="font-semibold mb-1 block">Conditional Branches</label>
           <IfElseEditor
-            branches={dynamicModel.branches || []}
-            onChange={(newBranches) => {
-              handleInputChange('branches', newBranches);
+            branches={(dynamicModel?.branches || []) as Branch[]}
+            onChange={(branches) => {
+              handleInputChange('branches', branches);
             }}
-            inputSchema={dynamicModel.input_schema || {}}
+            inputSchema={dynamicModel?.input_schema || {}}
             disabled={false}
           />
           {!isLast && <hr className="my-2" />}
@@ -269,12 +264,12 @@ const NodeSidebar: React.FC<NodeSidebarProps> = ({ nodeID }) => {
       );
     }
 
-    if (key === 'input_schemas' && nodeType === 'MergeNode') {
+    if (fieldKey === 'input_schemas' && node?.type === 'MergeNode') {
       return (
-        <div key={key} className="my-2">
+        <div key={fieldKey} className="my-2">
           <label className="font-semibold mb-1 block">Input Schemas</label>
           <MergeEditor
-            inputSchemas={dynamicModel.input_schemas || {}}
+            inputSchemas={dynamicModel?.input_schemas}
             onChange={(newValue) => {
               handleInputChange('input_schemas', newValue);
             }}
@@ -285,12 +280,12 @@ const NodeSidebar: React.FC<NodeSidebarProps> = ({ nodeID }) => {
       );
     }
 
-    if (key === 'output_schema') {
+    if (fieldKey === 'output_schema') {
       return (
-        <div key={key} className="my-2">
+        <div key={fieldKey} className="my-2">
           <label className="font-semibold mb-1 block">Output Schema</label>
           <SchemaEditor
-            jsonValue={dynamicModel.output_schema || {}}
+            jsonValue={dynamicModel?.output_schema || {}}
             onChange={(newValue) => {
               handleInputChange('output_schema', newValue);
             }}
@@ -303,34 +298,17 @@ const NodeSidebar: React.FC<NodeSidebarProps> = ({ nodeID }) => {
       );
     }
 
-    if (key === 'system_message') {
+    if (fieldKey === 'user_message') {
       return (
-        <div key={key}>
+        <div key={fieldKey}>
           <TextEditor
-            key={key}
+            key={fieldKey}
             nodeID={nodeID}
-            fieldName={key}
-            inputSchema={dynamicModel.input_schema || {}}
-            fieldTitle="System Message"
-            content={dynamicModel[key] || ''}
-            setContent={(value: string) => handleInputChange(key, value)}
-          />
-          {!isLast && <hr className="my-2" />}
-        </div>
-      );
-    }
-
-    if (key === 'user_message') {
-      return (
-        <div key={key}>
-          <TextEditor
-            key={key}
-            nodeID={nodeID}
-            fieldName={key}
-            inputSchema={dynamicModel.input_schema || {}}
+            fieldName={fieldKey}
+            inputSchema={dynamicModel?.input_schema || {}}
             fieldTitle="User Message"
-            content={dynamicModel[key] || ''}
-            setContent={(value) => handleInputChange(key, value)}
+            content={String(value || '')}
+            setContent={(newValue: string) => handleInputChange(fieldKey, newValue)}
           />
           {renderFewShotExamples()}
           {!isLast && <hr className="my-2" />}
@@ -338,43 +316,43 @@ const NodeSidebar: React.FC<NodeSidebarProps> = ({ nodeID }) => {
       );
     }
 
-    if (key.endsWith('_prompt') || key.endsWith('_message')) {
+    if (fieldKey.endsWith('_prompt') || fieldKey.endsWith('_message')) {
       return (
-        <div key={key}>
+        <div key={fieldKey}>
           <TextEditor
-            key={key}
+            key={fieldKey}
             nodeID={nodeID}
-            fieldName={key}
-            inputSchema={dynamicModel.input_schema || {}}
-            fieldTitle={key}
-            content={dynamicModel[key] || ''}
-            setContent={(value) => handleInputChange(key, value)}
+            fieldName={fieldKey}
+            inputSchema={dynamicModel?.input_schema || {}}
+            fieldTitle={fieldKey}
+            content={String(value || '')}
+            setContent={(newValue: string) => handleInputChange(fieldKey, newValue)}
           />
           {!isLast && <hr className="my-2" />}
         </div>
       );
     }
 
-    if (key === 'code') {
+    if (fieldKey === 'code') {
       return (
         <CodeEditor
-          key={key}
-          code={value}
-          onChange={(newValue: string) => handleInputChange(key, newValue)}
+          key={fieldKey}
+          code={typeof value === 'string' ? value : ''}
+          onChange={(newValue: string) => handleInputChange(fieldKey, newValue)}
         />
       );
     }
 
-    // Handle other types (string, number, boolean, object)
+    // Handle different field types
     switch (typeof field) {
       case 'string':
         return (
-          <div key={key} className="my-4">
+          <div key={fieldKey} className="my-4">
             <Textarea
               fullWidth
-              label={fieldMetadata?.title || key}
-              value={value}
-              onChange={(e) => handleInputChange(key, e.target.value)}
+              label={fieldMetadata?.title || fieldKey}
+              value={typeof value === 'string' ? value : ''}
+              onChange={(e) => handleInputChange(fieldKey, e.target.value)}
               placeholder="Enter your input"
             />
             {!isLast && <hr className="my-2" />}
@@ -386,24 +364,19 @@ const NodeSidebar: React.FC<NodeSidebarProps> = ({ nodeID }) => {
           const max = fieldMetadata.maximum ?? 100;
 
           return (
-            <div key={key} className="my-4">
+            <div key={fieldKey} className="my-4">
               <div className="flex justify-between items-center mb-2">
-                <label className="font-semibold">{fieldMetadata.title || key}</label>
-                <span className="text-sm">{value}</span>
+                <label className="font-semibold">{fieldMetadata.title || fieldKey}</label>
+                <span className="text-sm">{typeof value === 'string' ? value : String(value)}</span>
               </div>
               <Slider
-                aria-label={fieldMetadata.title || key}
-                value={value}
+                aria-label={fieldMetadata.title || fieldKey}
+                value={typeof value === 'number' ? value : 0}
                 minValue={min}
                 maxValue={max}
                 step={fieldMetadata.type === 'integer' ? 1 : 0.1}
                 className="w-full"
-                onChange={(newValue) => {
-                  const path = parentPath ? `${parentPath}.${key}` : key;
-                  const lastTwoDots = path.split('.').slice(-2);
-                  const finalPath = lastTwoDots[0] === 'config' ? lastTwoDots[1] : lastTwoDots.join('.');
-                  handleInputChange(finalPath, newValue, true);
-                }}
+                onChange={(newValue) => handleInputChange(fieldKey, newValue, true)}
               />
               {!isLast && <hr className="my-2" />}
             </div>
@@ -411,23 +384,24 @@ const NodeSidebar: React.FC<NodeSidebarProps> = ({ nodeID }) => {
         }
         return (
           <NumberInput
-            key={key}
-            label={key}
-            value={value}
-            onChange={(e) => {
-              const newValue = parseFloat(e.target.value);
-              handleInputChange(key, isNaN(newValue) ? 0 : newValue);
+            key={fieldKey}
+            label={fieldKey}
+            value={String(typeof value === 'number' ? value : 0)}
+            onChange={(val) => {
+              const newValue = typeof val === 'number' ? val : parseFloat(String(val));
+              handleInputChange(fieldKey, isNaN(newValue) ? 0 : newValue);
             }}
           />
         );
       case 'boolean':
         return (
-          <div key={key} className="my-4">
+          <div key={fieldKey} className="my-4">
             <div className="flex justify-between items-center">
-              <label className="font-semibold">{fieldMetadata?.title || key}</label>
+              <label className="font-semibold">{fieldMetadata?.title || fieldKey}</label>
               <Switch
-                checked={value}
-                onChange={(e) => handleInputChange(key, e.target.checked)}
+                isSelected={Boolean(value)}
+                onValueChange={(checked: boolean) => handleInputChange(fieldKey, checked)}
+                size="sm"
               />
             </div>
             {!isLast && <hr className="my-2" />}
@@ -436,9 +410,16 @@ const NodeSidebar: React.FC<NodeSidebarProps> = ({ nodeID }) => {
       case 'object':
         if (field && typeof field === 'object' && !Array.isArray(field)) {
           return (
-            <div key={key} className="my-2">
-              {Object.keys(field).map((subKey) => renderField(subKey, field[subKey], value?.[subKey], fullPath))}
-              {!isLast && <hr className="my-2" />}
+            <div key={fieldKey} className="my-2">
+              {Object.entries(field as Record<string, unknown>).map(([subKey, subField], index, arr) =>
+                renderField(
+                  subKey,
+                  subField as Record<string, unknown>,
+                  ((value as Record<string, unknown> | null)?.[subKey] ?? {}) as Record<string, unknown> | string | number | boolean | null,
+                  fullPath,
+                  index === arr.length - 1
+                )
+              )}
             </div>
           );
         }
@@ -448,41 +429,39 @@ const NodeSidebar: React.FC<NodeSidebarProps> = ({ nodeID }) => {
     }
   };
 
-  // Update the `renderConfigFields` function to include missing logic
-  const renderConfigFields = () => {
-    if (!nodeSchema || !nodeSchema.config || !dynamicModel) return null;
-    const properties = nodeSchema.config;
-    const keys = Object.keys(properties).filter((key) => key !== 'title' && key !== 'type');
+  const renderConfigFields = useCallback(() => {
+    if (!nodeSchema?.config || !dynamicModel) return null;
 
-    // Special handling for MergeNode
-    if (nodeType === 'MergeNode') {
+    const properties = nodeSchema.config;
+    const keys = Object.keys(properties).filter((fieldKey) => fieldKey !== 'title' && fieldKey !== 'type');
+
+    if (node?.type === 'MergeNode') {
       return (
         <MergeEditor
-          branchRefs={dynamicModel.branch_refs || []}
-          onChange={(newBranchRefs) => {
-            const updatedModel = {
-              ...dynamicModel,
-              branch_refs: newBranchRefs,
-            };
-            setDynamicModel(updatedModel);
-            dispatch(updateNodeData({ id: nodeID, data: { config: updatedModel } }));
+          branchRefs={dynamicModel.branch_refs as string[]}
+          inputSchemas={dynamicModel.input_schemas as Record<string, unknown>}
+          onChange={(newValue: string[] | Record<string, unknown>) => {
+            if (Array.isArray(newValue)) {
+              handleInputChange('branch_refs', newValue);
+            } else {
+              handleInputChange('input_schemas', newValue);
+            }
           }}
           nodeId={nodeID}
         />
       );
     }
 
-    return keys.map((key, index) => {
-      const field = properties[key];
-      const value = dynamicModel[key];
+    return keys.map((fieldKey, index) => {
+      const field = properties[fieldKey] as FieldMetadata | Record<string, unknown>;
+      const value = dynamicModel[fieldKey as keyof DynamicNodeConfig] as string | number | boolean | Record<string, unknown> | null;
       const isLast = index === keys.length - 1;
-      return renderField(key, field, value, `${nodeType}.config`, isLast);
+      return renderField(fieldKey, field, value, `${node?.type}.config`, isLast);
     });
-  };
+  }, [nodeSchema, dynamicModel, node?.type, nodeID, handleInputChange, renderField]);
 
-  // Update the `renderFewShotExamples` function
-  const renderFewShotExamples = () => {
-    const fewShotExamples = node?.data?.config?.few_shot_examples || [];
+  const renderFewShotExamples = useCallback(() => {
+    const fewShotExamples = (dynamicModel?.few_shot_examples || []) as Array<Record<string, string>>;
 
     return (
       <div>
@@ -497,73 +476,73 @@ const NodeSidebar: React.FC<NodeSidebarProps> = ({ nodeID }) => {
           <div>
             <h3 className="my-2 font-semibold">Few Shot Examples</h3>
             <div className="flex flex-wrap gap-2">
-              {fewShotExamples.map((example, index) => (
+              {fewShotExamples.map((example: Record<string, string>, index: number) => (
                 <div
                   key={`few-shot-${index}`}
                   className="flex items-center space-x-2 p-2 bg-gray-100 rounded-full cursor-pointer"
                   onClick={() => setFewShotIndex(index)}
                 >
                   <span>Example {index + 1}</span>
-                  <Button
-                    isIconOnly
-                    radius="full"
-                    variant="light"
+                  <button
                     onClick={(e) => {
                       e.stopPropagation();
                       handleDeleteExample(index);
                     }}
-                    color="primary"
+                    className="text-red-500 hover:text-red-700"
                   >
-                    <Icon icon="solar:trash-bin-trash-linear" width={22} />
-                  </Button>
+                    <Icon icon="mdi:close" />
+                  </button>
                 </div>
               ))}
-
-              <Button
-                isIconOnly
-                radius="full"
-                variant="light"
+              <button
                 onClick={handleAddNewExample}
-                color="primary"
+                className="flex items-center space-x-1 p-2 bg-blue-100 rounded-full hover:bg-blue-200"
               >
-                <Icon icon="solar:add-circle-linear" width={22} />
-              </Button>
+                <Icon icon="mdi:plus" />
+                <span>Add Example</span>
+              </button>
             </div>
           </div>
         )}
       </div>
     );
-  };
+  }, [dynamicModel, fewShotIndex, nodeID, handleAddNewExample, handleDeleteExample, setFewShotIndex]);
 
-  const handleMouseDown = useCallback((e: React.MouseEvent) => {
+  const handleMouseDown = useCallback(() => {
     setIsResizing(true);
-    e.preventDefault();
   }, []);
 
-  useEffect(() => {
-    const handleMouseMove = (e: MouseEvent) => {
-      if (!isResizing) return;
+  const handleMouseMove = useCallback((e: MouseEvent) => {
+    if (!isResizing) return;
+    setWidth(e.clientX);
+  }, [isResizing]);
 
-      const newWidth = window.innerWidth - e.clientX;
-      const constrainedWidth = Math.min(Math.max(newWidth, 300), 800);
-      setWidth(constrainedWidth);
-    };
-
-    const handleMouseUp = () => {
-      setIsResizing(false);
+  const handleMouseUp = useCallback(() => {
+    setIsResizing(false);
+    if (dispatch) {
       dispatch(setSidebarWidth(width));
-    };
-
-    if (isResizing) {
-      window.addEventListener('mousemove', handleMouseMove);
-      window.addEventListener('mouseup', handleMouseUp);
     }
+  }, [dispatch, width]);
 
-    return () => {
-      window.removeEventListener('mousemove', handleMouseMove);
-      window.removeEventListener('mouseup', handleMouseUp);
-    };
-  }, [isResizing, dispatch, width]);
+  useEffect(() => {
+    if (node?.type && nodeTypes) {
+      const schema = findNodeSchema(node.type, nodeTypes);
+      if (schema) {
+        setNodeSchema({
+          name: schema.name,
+          type: node.type,  // Use node.type since we already verified it exists
+          config: schema.config as Record<string, FieldMetadata | Record<string, unknown>>,
+          visual_tag: schema.visual_tag || {
+            color: '#666666',
+            acronym: schema.name.substring(0, 2).toUpperCase(),
+            icon: undefined
+          },
+          input: schema.input,
+          output: schema.output
+        });
+      }
+    }
+  }, [node?.type, nodeTypes]);
 
   return (
     <Card
@@ -590,9 +569,9 @@ const NodeSidebar: React.FC<NodeSidebarProps> = ({ nodeID }) => {
           <div className="flex justify-between items-center mb-2">
             <div>
               <h1 className="text-lg font-semibold">
-                {node?.data?.config?.title || node?.id || 'Node Details'}
+                {dynamicModel.title || node?.id || 'Node Details'}
               </h1>
-              <h2 className="text-xs font-semibold">{nodeType}</h2>
+              <h2 className="text-xs font-semibold">{node?.type || ''}</h2>
             </div>
             <Button
               isIconOnly
@@ -609,29 +588,31 @@ const NodeSidebar: React.FC<NodeSidebarProps> = ({ nodeID }) => {
           </div>
 
           <Accordion
+            defaultSelectedKeys={selectedKeys}
+            onSelectionChange={setSelectedKeys}
             selectionMode="multiple"
-            defaultExpandedKeys={hasRunOutput ? ['output'] : ['title', 'config']}
+            className="w-full"
+            variant="bordered"
           >
-            {nodeType !== 'InputNode' && (
-              <AccordionItem key="output" aria-label="Output" title="Outputs">
-                <NodeOutput node={node} />
+            {[
+              node?.type !== 'InputNode' ? (
+                <AccordionItem key="output" aria-label="Output" title="Outputs">
+                  <NodeOutput node={node} />
+                </AccordionItem>
+              ) : null,
+              <AccordionItem key="title" aria-label="Node Title" title="Node Title">
+                <Input
+                  value={dynamicModel.title || ''}
+                  onChange={(e) => handleInputChange('title', e.target.value)}
+                  placeholder="Enter node title"
+                  size="sm"
+                  fullWidth
+                />
+              </AccordionItem>,
+              <AccordionItem key="config" aria-label="Node Configuration" title="Node Configuration">
+                {renderConfigFields()}
               </AccordionItem>
-            )}
-
-            <AccordionItem key="title" aria-label="Node Title" title="Node Title">
-              <Input
-                value={node?.data?.config?.title || ''}
-                onChange={(e) => handleInputChange('title', e.target.value)}
-                placeholder="Enter node title"
-                maxRows={1}
-                label="Node Title"
-                fullWidth
-              />
-            </AccordionItem>
-
-            <AccordionItem key="config" aria-label="Node Configuration" title="Node Configuration">
-              {renderConfigFields()}
-            </AccordionItem>
+            ].filter(Boolean)}
           </Accordion>
         </div>
       </div>

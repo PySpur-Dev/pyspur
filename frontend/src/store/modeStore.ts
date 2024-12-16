@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 
-type Mode = 'hand' | 'select' | 'connect'; // Add other valid modes as needed
+type Mode = 'pointer' | 'hand' | 'select' | 'connect';
 
 interface ModeState {
   mode: Mode;
@@ -8,6 +8,6 @@ interface ModeState {
 }
 
 export const useModeStore = create<ModeState>((set) => ({
-  mode: 'hand',
+  mode: 'pointer',
   setMode: (mode) => set({ mode }),
 }));

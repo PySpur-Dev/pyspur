@@ -2,10 +2,10 @@ from sqlalchemy import Computed, Integer, String, DateTime, JSON
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from datetime import datetime, timezone
 from typing import Optional, Any
-from .base_model import BaseModel
+from .base_model import Base
 
 
-class WorkflowModel(BaseModel):
+class WorkflowModel(Base):
     """
     Represents a workflow in the system.
 

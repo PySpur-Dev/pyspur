@@ -1,13 +1,16 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { useKeyPress, getConnectedEdges } from '@xyflow/react';
+import { WritableDraft } from 'immer';
 import { setNodes, setEdges } from '../store/flowSlice';
-import type { RootState } from '../store/store'; // Assuming you have a RootState type for Redux
-import type { Node, Edge } from '@xyflow/react'; // Assuming these types are provided by the library
+import type { RootState } from '../store/store';
+import type { Node, Edge } from '@xyflow/react';
+import { WorkflowNode, DynamicNodeConfig } from '../types/nodes/base';
+import { CustomEdge } from '../types/reactflow';
 
 // Define types for buffered nodes and edges
-type BufferedNode = Node & { selected?: boolean };
-type BufferedEdge = Edge & { selected?: boolean };
+type BufferedNode = WorkflowNode<DynamicNodeConfig>;
+type BufferedEdge = CustomEdge;
 
 export function useCopyPaste() {
   // Use proper types for Redux selectors
@@ -48,8 +51,8 @@ export function useCopyPaste() {
     const updatedNodes = nodes.filter((node) => !node.selected);
     const updatedEdges = edges.filter((edge) => !selectedEdges.includes(edge));
 
-    dispatch(setNodes({ nodes: updatedNodes }));
-    dispatch(setEdges({ edges: updatedEdges }));
+    dispatch(setNodes(updatedNodes as WritableDraft<WorkflowNode>[]));
+    dispatch(setEdges(updatedEdges));
   }, [nodes, edges, dispatch]);
 
   const paste = useCallback(() => {
@@ -95,8 +98,8 @@ export function useCopyPaste() {
       ...newEdges,
     ];
 
-    dispatch(setNodes({ nodes: updatedNodes }));
-    dispatch(setEdges({ edges: updatedEdges }));
+    dispatch(setNodes(updatedNodes as WritableDraft<WorkflowNode>[]));
+    dispatch(setEdges(updatedEdges));
   }, [bufferedNodes, bufferedEdges, nodes, edges, dispatch]);
 
   // Handle keyboard shortcuts

@@ -3,9 +3,10 @@ import { Icon } from '@iconify/react';
 import { Button, Accordion, AccordionItem, Input } from '@nextui-org/react';
 import { useSelector, useDispatch } from 'react-redux';
 import { ReactFlowInstance, useReactFlow } from '@xyflow/react';
+import { Selection } from '@react-types/shared';
 
 import { AppDispatch, RootState } from '../../store/store';
-import type { NodeType } from '../../store/nodeTypesSlice';
+import { NodeType, NODE_TYPES } from '../../types/nodes/base';
 import { addNodeWithoutConnection } from '../canvas/AddNodePopoverCanvas';
 
 interface NodeTypesByCategory {
@@ -18,12 +19,15 @@ const CollapsibleNodePanel: React.FC = () => {
   const nodeTypes = useSelector((state: RootState) => state.nodeTypes.data as NodeTypesByCategory);
   const reactFlowInstance = useReactFlow();
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState<Set<string>>(new Set());
+  const [selectedCategory, setSelectedCategory] = useState<Selection>(new Set<string>());
   const [filteredNodeTypes, setFilteredNodeTypes] = useState<NodeTypesByCategory>({});
 
   const handleAddNode = (nodeName: string): void => {
     if (reactFlowInstance) {
-      addNodeWithoutConnection(nodeTypes, nodeName, reactFlowInstance, dispatch);
+      const nodeTypeArray = nodeTypes[nodeName];
+      if (nodeTypeArray && nodeTypeArray.length > 0) {
+        addNodeWithoutConnection(nodeTypes, nodeName, reactFlowInstance, dispatch);
+      }
     }
   };
 
@@ -71,7 +75,7 @@ const CollapsibleNodePanel: React.FC = () => {
             startContent={<Icon icon="akar-icons:search" className="text-default-500" />}
           />
           <div className="mt-4 max-h-[calc(100vh-16rem)] overflow-auto" id="node-type-accordion">
-            <Accordion selectionMode="multiple" selectedKeys={Array.from(selectedCategory)} onSelectionChange={setSelectedCategory}>
+            <Accordion selectionMode="multiple" selectedKeys={selectedCategory} onSelectionChange={(keys: Selection) => setSelectedCategory(keys)}>
               {Object.keys(filteredNodeTypes).map((category) => (
                 <AccordionItem key={category} title={category}>
                   {filteredNodeTypes[category].map((node: NodeType) => (
@@ -83,9 +87,9 @@ const CollapsibleNodePanel: React.FC = () => {
                       <div className="w-16 flex-shrink-0">
                         <div
                           className={`node-acronym-tag float-left text-white px-2 py-1 rounded-full text-xs inline-block`}
-                          style={{ backgroundColor: node.visual_tag.color }}
+                          style={{ backgroundColor: node.visual_tag?.color ?? '#666666' }}
                         >
-                          {node.visual_tag.acronym}
+                          {node.visual_tag?.acronym ?? 'N/A'}
                         </div>
                       </div>
                       <span

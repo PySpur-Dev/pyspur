@@ -10,7 +10,7 @@ from sqlalchemy.orm import Mapped, mapped_column
 from enum import Enum as PyEnum
 from datetime import datetime, timezone
 from typing import Optional, Any
-from .base_model import BaseModel
+from .base_model import Base
 
 class EvalRunStatus(PyEnum):
     PENDING = "PENDING"
@@ -18,7 +18,7 @@ class EvalRunStatus(PyEnum):
     COMPLETED = "COMPLETED"
     FAILED = "FAILED"
 
-class EvalRunModel(BaseModel):
+class EvalRunModel(Base):
     __tablename__ = "eval_runs"
 
     _intid: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement="auto")

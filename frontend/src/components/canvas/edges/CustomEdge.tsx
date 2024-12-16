@@ -4,34 +4,31 @@ import {
   EdgeLabelRenderer,
   getBezierPath,
   useReactFlow,
-  Edge,
-  Node,
+  EdgeProps,
   Position,
-  EdgeProps
 } from '@xyflow/react';
 import { Button } from '@nextui-org/react';
 import { Icon } from "@iconify/react";
 import { useDispatch } from 'react-redux';
 import { deleteEdge } from '../../../store/flowSlice';
+import { ReactFlowNode } from '../../../types/reactflow';
 
-interface CustomEdgeData {
-  onPopoverOpen: (params: {
-    sourceNode: {
-      id: string;
-      position: { x: number; y: number };
-      data: any;
-    };
-    targetNode: {
-      id: string;
-      position: { x: number; y: number };
-      data: any;
-    };
+export interface CustomEdgeData {
+  showPlusButton?: boolean;
+  onPopoverOpen?: (params: {
+    sourceNode: ReactFlowNode;
+    targetNode: ReactFlowNode;
     edgeId: string;
   }) => void;
-  showPlusButton: boolean;
 }
 
-type CustomEdgeProps = EdgeProps<CustomEdgeData>;
+export interface CustomEdgeProps extends Omit<EdgeProps, 'data'> {
+  data?: CustomEdgeData;
+  id: string;
+  source: string;
+  target: string;
+  style?: React.CSSProperties;
+}
 
 const CustomEdge: React.FC<CustomEdgeProps> = ({
   id,
@@ -47,31 +44,24 @@ const CustomEdge: React.FC<CustomEdgeProps> = ({
   source,
   target,
 }) => {
-  const { onPopoverOpen, showPlusButton } = data;
+  const edgeData = data as CustomEdgeData;
+  const { onPopoverOpen, showPlusButton } = edgeData || {};
   const reactFlowInstance = useReactFlow();
   const dispatch = useDispatch();
 
   // Get the full node objects
-  const sourceNode = reactFlowInstance.getNode(source);
-  const targetNode = reactFlowInstance.getNode(target);
+  const sourceNode = reactFlowInstance.getNode(source) as ReactFlowNode | null;
+  const targetNode = reactFlowInstance.getNode(target) as ReactFlowNode | null;
 
   // Add validation to ensure nodes exist
   const handleAddNode = () => {
-    if (!sourceNode || !targetNode) {
-      console.error('Source or target node not found');
+    if (!sourceNode || !targetNode || !onPopoverOpen) {
+      console.error('Source or target node not found or onPopoverOpen not provided');
       return;
     }
     onPopoverOpen({
-      sourceNode: {
-        id: sourceNode.id,
-        position: sourceNode.position,
-        data: sourceNode.data
-      },
-      targetNode: {
-        id: targetNode.id,
-        position: targetNode.position,
-        data: targetNode.data
-      },
+      sourceNode,
+      targetNode,
       edgeId: id
     });
   };

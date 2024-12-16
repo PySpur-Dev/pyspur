@@ -1,14 +1,11 @@
 import React from 'react';
 import Markdown from 'react-markdown';
-import { BaseNodeData } from '../../types/nodes/base';
-
-interface Node {
-  id: string;
-  data?: BaseNodeData;
-}
+import { NodeData, DynamicNodeConfig } from '../../types/nodes/base';
+import { WorkflowNode } from '../../types/workflow';
 
 interface NodeOutputDisplayProps {
-  node?: Node;
+  node?: WorkflowNode;
+  data?: NodeData<DynamicNodeConfig>;
 }
 
 const NodeOutputDisplay: React.FC<NodeOutputDisplayProps> = ({ node }) => {

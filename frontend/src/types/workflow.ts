@@ -1,27 +1,27 @@
+import { BaseNodeConfig, NodeData, WorkflowNode as BaseWorkflowNode, DynamicNodeConfig } from './nodes/base';
+import { CustomEdge } from './reactflow';
+
 export interface WorkflowNodeCoordinates {
   x: number;
   y: number;
 }
 
-export interface WorkflowNode {
-  id: string;
-  title?: string;
-  node_type: string;
-  config: Record<string, any>;
-  coordinates?: WorkflowNodeCoordinates;
-}
+export type WorkflowNode = BaseWorkflowNode<DynamicNodeConfig>;
 
-export interface WorkflowLink {
-  source_id: string;
-  source_output_key: string;
-  target_id: string;
-  target_input_key: string;
+export interface TestInput {
+  id?: string;
+  initial_inputs: Record<string, Record<string, unknown>>;
+  [key: string]: unknown;
 }
 
 export interface WorkflowDefinition {
   nodes: WorkflowNode[];
-  links: WorkflowLink[];
-  test_inputs: Record<string, any>[];
+  edges: CustomEdge[];
+  links?: CustomEdge[];  // For backward compatibility
+  test_inputs?: TestInput[];
+  name?: string;
+  description?: string;
+  input_variables?: Record<string, unknown>;
 }
 
 export interface Workflow {
@@ -30,8 +30,18 @@ export interface Workflow {
   name: string;
   description: string;
   definition: WorkflowDefinition;
-  created_at: string; // ISO datetime string
-  updated_at: string; // ISO datetime string
+  created_at: string;
+  updated_at: string;
+}
+
+export interface WorkflowData {
+  id?: string;
+  key?: string;
+  name?: string;
+  description?: string;
+  definition: WorkflowDefinition;
+  created_at?: string;
+  updated_at?: string;
 }
 
 export interface Template {
@@ -45,4 +55,31 @@ export interface Dataset {
   id: string;
   name: string;
   description: string;
+}
+
+export interface ApiKey {
+  name: string;
+  value: string;
+}
+
+export interface RunOutputData {
+  status: string;
+  output: Record<string, unknown>;
+}
+
+export interface RunOutputs {
+  [key: string]: RunOutputData;
+}
+
+export interface RunStatusResponse {
+  id: string;
+  workflow_id: string;
+  workflow_version: WorkflowData;
+  status: string;
+  start_time?: string;
+  end_time?: string;
+  tasks: Record<string, unknown>[];
+  outputs?: RunOutputs;
+  output_file_id?: string;
+  results?: Record<string, unknown>;
 }

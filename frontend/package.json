@@ -27,6 +27,7 @@
     "@tiptap/pm": "^2.7.4",
     "@tiptap/react": "^2.0.0",
     "@tiptap/starter-kit": "^2.0.0",
+    "@types/dagre": "^0.7.52",
     "@types/node": "^22.10.1",
     "@types/react": "^18.3.12",
     "@types/uuid": "^10.0.0",
@@ -39,8 +40,10 @@
     "clsx": "^2.1.1",
     "cmdk": "1.0.0",
     "codemirror": "^6.0.1",
+    "dagre": "^0.8.5",
     "date-fns": "^4.1.0",
     "framer-motion": "^11.13.5",
+    "immer": "^10.1.1",
     "install": "^0.13.0",
     "lodash.isequal": "^4.5.0",
     "lucide-react": "^0.446.0",
@@ -69,13 +72,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
-  },
-  "eslintConfig": {
-    "extends": [
-      "react-app",
-      "react-app/jest"
-    ]
+    "lint": "next lint",
+    "typecheck": "tsc --noEmit"
   },
   "browserslist": {
     "production": [
@@ -90,7 +88,12 @@
     ]
   },
   "devDependencies": {
+    "@types/react-syntax-highlighter": "^15.5.13",
+    "@typescript-eslint/eslint-plugin": "^8.18.0",
+    "@typescript-eslint/parser": "^8.18.0",
     "autoprefixer": "^10.x",
+    "eslint": "^9.17.0",
+    "eslint-config-next": "^15.1.0",
     "postcss": "^8.x",
     "tailwindcss": "^3.x",
     "typescript": "^5.7.2"

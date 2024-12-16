@@ -6,37 +6,7 @@ import { getEvals, startEvalRun, listEvalRuns, getEvalRunStatus } from "../utils
 import EvalCard from "../components/cards/EvalCard";
 import { Spinner, Button, Table, TableHeader, TableColumn, TableBody, TableRow, TableCell, Chip, Alert } from "@nextui-org/react";
 import { RadialBarChart, RadialBar, PolarAngleAxis } from 'recharts';
-
-interface EvalItem {
-  name: string;
-  description: string;
-  type: string;
-  num_samples: number;
-  paper_link?: string;
-}
-
-interface EvalRun {
-  run_id: string;
-  eval_name: string;
-  workflow_id: string;
-  status: 'PENDING' | 'RUNNING' | 'COMPLETED' | 'FAILED';
-  results?: {
-    accuracy: number;
-    [key: string]: any;
-  };
-}
-
-interface EvalRunData {
-  run_id: string;
-  results: string | null;
-  status: string;
-}
-
-interface EvalCardRunProps {
-  workflowId: string;
-  numSamples: number;
-  outputVariable: string;
-}
+import { EvalItem, EvalRun, EvalRunResponse, EvalRunData, EvalCardRunProps } from '../types/eval';
 
 const statusColorMap: Record<string, "warning" | "primary" | "success" | "danger"> = {
   PENDING: "primary",
@@ -105,7 +75,7 @@ const EvalsPage: React.FC = () => {
             if (run.status === "COMPLETED") {
               try {
                 const evalRunData = await getEvalRunStatus(run.run_id);
-                const parsedResults = parseResults(evalRunData.results);
+                const parsedResults = parseResults(JSON.stringify(evalRunData.results));
                 return {
                   ...run,
                   results: parsedResults,
@@ -149,7 +119,7 @@ const EvalsPage: React.FC = () => {
       showAlert(`Launching eval with output variable: ${outputVariable} and ${numSamples} samples...`, "default");
       const evalRunResponse = await startEvalRun(workflowId, evalName, outputVariable, numSamples);
       showAlert(`Eval run started.`, "success");
-      setEvalRuns((prevRuns) => [...prevRuns, evalRunResponse]);
+      setEvalRuns((prevRuns: EvalRun[]) => [...prevRuns, evalRunResponse as EvalRun]);
     } catch (error) {
       console.error("Error launching eval:", error);
       showAlert(`Failed to launch eval.`, "danger");

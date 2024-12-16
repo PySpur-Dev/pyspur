@@ -1,71 +1,80 @@
 import { Node as FlowNode } from '@xyflow/react';
-import cloneDeep from 'lodash/cloneDeep';
-import { NodeTypes, NodeType, BaseNodeData, WorkflowNode } from '../types/nodes/base';
+import { v4 as uuidv4 } from 'uuid';
+import { NodeTypes, NodeType, NodeData, BaseNodeConfig, WorkflowNode, findNodeSchema, NODE_TYPES } from '../types/nodes/base';
 
-interface Position {
-  x: number;
-  y: number;
-}
+// Convert string node type to node type constant
+export const getNodeType = (type: string): string => {
+  const nodeType = type.toLowerCase();
+  switch (nodeType) {
+    case 'input':
+      return NODE_TYPES.INPUT;
+    case 'output':
+    case 'output_display':
+      return NODE_TYPES.OUTPUT_DISPLAY;
+    case 'dynamic':
+      return NODE_TYPES.DYNAMIC;
+    case 'if_else':
+      return NODE_TYPES.IF_ELSE;
+    case 'merge':
+      return NODE_TYPES.MERGE;
+    case 'loop':
+      return NODE_TYPES.LOOP;
+    default:
+      return nodeType; // Return the original type if no match found
+  }
+};
 
-interface AdditionalData {
-  config?: Record<string, unknown>;
-  input?: {
-    properties: Record<string, unknown>;
-  };
-  output?: {
-    properties: Record<string, unknown>;
-  };
-}
-
-export function createNode(
-  nodeTypes: NodeTypes,
+export const createNode = (
+  nodeTypes: Record<string, NodeType[]>,
   nodeType: string,
-  id: string,
-  position: Position,
-  additionalData: AdditionalData = {}
-): WorkflowNode | null {
-  const category = Object.keys(nodeTypes).find(cat =>
-    nodeTypes[cat].some(type => type.name === nodeType)
-  );
+  id: string = uuidv4(),
+  position: { x: number; y: number } = { x: 100, y: 100 },
+  data: Partial<NodeData> = {}
+): WorkflowNode | null => {
+  // Convert string type to node type constant if needed
+  const enumNodeType = typeof nodeType === 'string' ? getNodeType(nodeType) : nodeType;
+  console.log('Creating node with type:', enumNodeType);
 
-  if (!category) {
-    console.error(`Node type ${nodeType} not found in any category`);
+  // Find the node schema from nodeTypes
+  const schema = findNodeSchema(enumNodeType.toString(), nodeTypes);
+  console.log('Looking for schema:', {
+    searchType: enumNodeType.toString(),
+    availableTypes: nodeTypes,
+    foundSchema: schema
+  });
+
+  if (!schema) {
+    console.error('Node schema not found. Available types:',
+      Object.entries(nodeTypes).map(([category, types]) =>
+        `${category}: [${types.map(t => `${t.type} (${t.name})`).join(', ')}]`
+      ).join('\n')
+    );
     return null;
   }
 
-  const nodeTypeData = nodeTypes[category].find(type => type.name === nodeType);
-  if (!nodeTypeData) {
-    console.error(`Node type ${nodeType} not found in category ${category}`);
-    return null;
-  }
-
-  const processedAdditionalData = cloneDeep(additionalData);
-
-  if (!processedAdditionalData.input) {
-    processedAdditionalData.input = {
-      properties: {}
-    };
-  }
-
-  if (!processedAdditionalData.output) {
-    processedAdditionalData.output = {
-      properties: {}
-    };
-  }
-
-  const node: WorkflowNode = {
-    id,
-    type: nodeType,
-    position,
-    data: {
-      title: nodeTypeData.name,
-      acronym: nodeTypeData.visual_tag.acronym,
-      color: nodeTypeData.visual_tag.color,
-      config: processedAdditionalData.config || {},
-      input: processedAdditionalData.input,
-      output: processedAdditionalData.output,
-    },
+  const defaultConfig: BaseNodeConfig = {
+    title: data.title || schema.name || 'New Node',
+    input_schema: data.config?.input_schema || schema.input?.properties || {},
+    output_schema: data.config?.output_schema || schema.output?.properties || {},
+    ...data.config
   };
 
-  return node;
-}
+  const nodeData: NodeData = {
+    title: data.title || defaultConfig.title,
+    color: data.color || schema.visual_tag?.color,
+    acronym: data.acronym || schema.visual_tag?.acronym,
+    config: defaultConfig,
+    run: data.run,
+    status: data.status
+  };
+
+  return {
+    id,
+    type: enumNodeType,
+    position,
+    data: nodeData,
+    draggable: true,
+    selectable: true,
+    connectable: true,
+  };
+};

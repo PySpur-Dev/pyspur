@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { deleteNode, setSelectedNode, updateNodeData, addNode, setEdges } from '../../store/flowSlice';
-import { Handle, getConnectedEdges, Node, Edge, Position } from '@xyflow/react';
+import { Handle, getConnectedEdges, Position, Edge } from '@xyflow/react';
 import { v4 as uuidv4 } from 'uuid';
 import {
   Card,
@@ -13,23 +13,12 @@ import {
 } from "@nextui-org/react";
 import { Icon } from "@iconify/react";
 import usePartialRun from '../../hooks/usePartialRun';
-
-interface NodeData {
-  run?: Record<string, any>;
-  status?: string;
-  acronym?: string;
-  color?: string;
-  title?: string;
-  config?: {
-    title?: string;
-    [key: string]: any;
-  };
-  [key: string]: any;
-}
+import { WorkflowNode, NodeData, BaseNodeConfig, DynamicNodeConfig, NodeTypes } from '../../types/nodes/base';
+import { ReactFlowNode, reactFlowToWorkflowNode, workflowToReactFlowNode, CustomEdge } from '../../types/reactflow';
 
 interface RootState {
   flow: {
-    nodes: Node[];
+    nodes: ReactFlowNode[];
     edges: Edge[];
     selectedNode: string | null;
     testInputs?: Array<{ id: string; [key: string]: any }>;
@@ -40,11 +29,12 @@ interface BaseNodeProps {
   isCollapsed: boolean;
   setIsCollapsed: (collapsed: boolean) => void;
   id: string;
-  data?: NodeData;
+  data?: NodeData<DynamicNodeConfig>;
   children?: React.ReactNode;
   style?: React.CSSProperties;
   isInputNode?: boolean;
   className?: string;
+  handleOpenModal?: () => void;
 }
 
 const BaseNode: React.FC<BaseNodeProps> = ({
@@ -126,8 +116,8 @@ const BaseNode: React.FC<BaseNodeProps> = ({
     executePartialRun({
       workflowId,
       nodeId: id,
-      inputs: initialInputs,
-      availableOutputs,
+      initialInputs,
+      partialOutputs: availableOutputs,
       rerunPredecessors
     }).then((result) => {
       if (result) {
@@ -164,12 +154,12 @@ const BaseNode: React.FC<BaseNodeProps> = ({
     const newNodeId = `node_${Date.now()}`;
 
     // Create the new node with an offset position
-    const newNode = {
-      ...node,
+    const newNode = workflowToReactFlowNode({
+      ...reactFlowToWorkflowNode(node),
       id: newNodeId,
       position: { x: node.position.x + 20, y: node.position.y + 20 }, // Offset the position slightly
       selected: false, // Ensure the new node is not selected by default
-    };
+    });
 
     // Duplicate the edges connected to the node
     const newEdges = connectedEdges.map((edge) => {

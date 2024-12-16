@@ -7,7 +7,7 @@ module.exports = {
     "./pages/**/*.{js,ts,jsx,tsx,mdx}",
     "./components/**/*.{js,ts,jsx,tsx,mdx}",
     "./node_modules/@nextui-org/theme/dist/components/(button|navbar|table|ripple|spinner|checkbox|spacer).js",
-    "./src/**/*.{js,ts,jsx,tsx}",
+    "./src/**/*.{js,ts,jsx,tsx,css}",  // Added CSS files to be processed
     "./node_modules/@nextui-org/theme/dist/**/*.{js,ts,jsx,tsx}",
   ],
   theme: {
@@ -62,6 +62,8 @@ module.exports = {
     }
   },
   plugins: [
-    require("@nextui-org/react"), // Add this line
-    require('tailwindcss-animate'), nextui()],
+    require("@nextui-org/react"),
+    require('tailwindcss-animate'),
+    nextui()
+  ],
 }

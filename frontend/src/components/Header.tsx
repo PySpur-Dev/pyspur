@@ -41,6 +41,7 @@ interface RootState {
     nodes: Node[];
     projectName: string;
     workflowInputVariables: Record<string, any>;
+    workflowID: string | null;  // Add workflowID to match FlowState
   };
 }
 
@@ -62,28 +63,31 @@ interface AlertState {
   isVisible: boolean;
 }
 
-const Header: React.FC<HeaderProps> = ({ activePage }) => {
+const Header: React.FC<HeaderProps> = ({ activePage }): JSX.Element => {
   const dispatch = useDispatch();
   const nodes = useSelector((state: RootState) => state.flow.nodes);
   const projectName = useSelector((state: RootState) => state.flow.projectName);
+  const workflowId = useSelector((state: RootState) => state.flow.workflowID);
+  const workflowInputVariables = useSelector((state: RootState) => state.flow.workflowInputVariables);
+
   const [isRunning, setIsRunning] = useState<boolean>(false);
   const [isDebugModalOpen, setIsDebugModalOpen] = useState<boolean>(false);
   const [isDeployModalOpen, setIsDeployModalOpen] = useState<boolean>(false);
   const [workflowRuns, setWorkflowRuns] = useState<any[]>([]);
   const [isHistoryOpen, setIsHistoryOpen] = useState<boolean>(false);
-  const workflowId = useSelector((state: RootState) => state.flow.workflowID);
   const [alert, setAlert] = useState<AlertState>({ message: '', color: 'default', isVisible: false });
+  const [currentStatusInterval, setCurrentStatusInterval] = useState<NodeJS.Timeout | null>(null);
 
   const router = useRouter();
-  const { id } = router.query;
-  const isRun = id && id[0] == 'R';
-
-  let currentStatusInterval: NodeJS.Timeout | null = null;
+  const { id: routerId } = router.query;
+  const isRun = routerId && routerId[0] === 'R';
 
   const fetchWorkflowRuns = async () => {
     try {
-      const response = await getWorkflowRuns(workflowId);
-      setWorkflowRuns(response);
+      if (workflowId) {
+        const response = await getWorkflowRuns(workflowId);
+        setWorkflowRuns(response);
+      }
     }
     catch (error) {
       console.error('Error fetching workflow runs:', error);
@@ -105,15 +109,20 @@ const Header: React.FC<HeaderProps> = ({ activePage }) => {
     let pollCount = 0;
     if (currentStatusInterval) {
       clearInterval(currentStatusInterval);
+      setCurrentStatusInterval(null);
     }
-    currentStatusInterval = setInterval(async () => {
+
+    const interval = setInterval(async () => {
       try {
         const statusResponse: RunStatusResponse = await getRunStatus(runID);
         const outputs = statusResponse.outputs;
 
         if (statusResponse.status === 'FAILED') {
           setIsRunning(false);
-          clearInterval(currentStatusInterval);
+          if (interval) {
+            clearInterval(interval);
+            setCurrentStatusInterval(null);
+          }
           showAlert('Workflow run failed.', 'danger');
           return;
         }
@@ -129,22 +138,31 @@ const Header: React.FC<HeaderProps> = ({ activePage }) => {
 
         if (statusResponse.status !== 'RUNNING') {
           setIsRunning(false);
-          clearInterval(currentStatusInterval);
+          if (interval) {
+            clearInterval(interval);
+            setCurrentStatusInterval(null);
+          }
           showAlert('Workflow run completed.', 'success');
         }
 
         pollCount += 1;
       } catch (error) {
         console.error('Error fetching workflow status:', error);
-        clearInterval(currentStatusInterval);
+        if (interval) {
+          clearInterval(interval);
+          setCurrentStatusInterval(null);
+        }
       }
     }, 1000);
+
+    setCurrentStatusInterval(interval);
   };
 
-  const workflowID = typeof window !== 'undefined' ? window.location.pathname.split('/').pop() : null;
+  // Get workflow ID from URL for trace page
+  const urlWorkflowId = typeof window !== 'undefined' ? window.location.pathname.split('/').pop() : null;
 
   const executeWorkflow = async (inputValues: Record<string, any>): Promise<void> => {
-    if (!workflowID) return;
+    if (!workflowId) return;
 
     try {
       showAlert('Starting workflow run...', 'default');
@@ -168,6 +186,7 @@ const Header: React.FC<HeaderProps> = ({ activePage }) => {
     setIsRunning(false);
     if (currentStatusInterval) {
       clearInterval(currentStatusInterval);
+      setCurrentStatusInterval(null);
     }
     showAlert('Workflow run stopped.', 'warning');
   };
@@ -177,10 +196,10 @@ const Header: React.FC<HeaderProps> = ({ activePage }) => {
   };
 
   const handleDownloadWorkflow = async (): Promise<void> => {
-    if (!workflowID) return;
+    if (!workflowId) return;
 
     try {
-      const workflow: WorkflowResponse = await getWorkflow(workflowID);
+      const workflow: WorkflowResponse = await getWorkflow(workflowId);
 
       const workflowDetails = {
         name: workflow.name,
@@ -219,8 +238,6 @@ const Header: React.FC<HeaderProps> = ({ activePage }) => {
     return `${baseUrl}/api/wf/${workflowId}/start_run/?run_type=non_blocking`;
   };
 
-  const workflowInputVariables = useSelector((state: RootState) => state.flow.workflowInputVariables);
-
   return (
     <>
       {alert.isVisible && (
@@ -251,10 +268,7 @@ const Header: React.FC<HeaderProps> = ({ activePage }) => {
           ],
         }}
       >
-        <NavbarBrand
-          justify="start"
-          className="h-12 max-w-fit"
-        >
+        <NavbarBrand className="h-12 max-w-fit flex items-center">
           {activePage === "home" ? (
             <p className="font-bold text-inherit cursor-pointer">PySpur</p>
           ) : (

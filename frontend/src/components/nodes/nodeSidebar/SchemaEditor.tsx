@@ -1,12 +1,12 @@
-import React, { useState } from 'react';
+import React, { useState, ChangeEvent } from 'react';
 import { Button, Input, Select, SelectItem } from '@nextui-org/react';
 import { Icon } from '@iconify/react';
 import { useDispatch } from 'react-redux';
 import { deleteEdgeByHandle, updateEdgesOnHandleRename } from '../../../store/flowSlice';
 
 interface SchemaEditorProps {
-  jsonValue?: Record<string, string>;
-  onChange: (value: Record<string, string>) => void;
+  jsonValue?: Record<string, unknown>;
+  onChange: (value: Record<string, unknown>) => void;
   options?: string[];
   disabled?: boolean;
   schemaType?: 'input_schema' | 'output_schema';
@@ -100,7 +100,7 @@ const SchemaEditor: React.FC<SchemaEditorProps> = ({
           className="p-2 flex-grow w-2/3"
         />
         <Select
-          selectedValue={newType}
+          value={newType}
           onChange={(e) => setNewType(e.target.value)}
           disabled={disabled}
           label="Type"
@@ -119,7 +119,7 @@ const SchemaEditor: React.FC<SchemaEditorProps> = ({
           onClick={handleAddKey}
           color="primary"
           disabled={disabled || !newKey}
-          auto
+          size="sm"
         >
           <Icon icon="solar:add-circle-linear" width={22} />
         </Button>
@@ -135,10 +135,11 @@ const SchemaEditor: React.FC<SchemaEditorProps> = ({
                 size="sm"
                 variant="faded"
                 radius="lg"
-                onBlur={(e) => handleKeyEdit(key, e.target.value)}
-                onKeyDown={(e) => {
+                onBlur={(e: ChangeEvent<HTMLInputElement>) => handleKeyEdit(key, e.target.value)}
+                onKeyDown={(e: React.KeyboardEvent<HTMLInputElement>) => {
                   if (e.key === 'Enter') {
-                    handleKeyEdit(key, e.target.value);
+                    const target = e.target as HTMLInputElement;
+                    handleKeyEdit(key, target.value);
                   } else if (e.key === 'Escape') {
                     setEditingField(null);
                   }
@@ -165,7 +166,7 @@ const SchemaEditor: React.FC<SchemaEditorProps> = ({
               onClick={() => handleRemoveKey(key)}
               color="primary"
               disabled={disabled}
-              auto
+              size="sm"
             >
               <Icon icon="solar:trash-bin-trash-linear" width={22} />
             </Button>

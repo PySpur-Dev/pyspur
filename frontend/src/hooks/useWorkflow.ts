@@ -3,7 +3,8 @@ import { useDispatch, useSelector } from 'react-redux';
 import { getRunStatus, startRun, getWorkflow } from '../utils/api';
 import { updateNodeData, setProjectName } from '../store/flowSlice';
 import { RootState } from '../store/store';
-import { Node, NodeData, RunOutputData, RunOutputs, RunStatusResponse } from '../types';
+import { WorkflowNode } from '../types/nodes/base';
+import { RunStatusResponse, TestInput } from '../types/workflow';
 
 // Import clearCanvas from flowSlice
 import { clearCanvas } from '../store/flowSlice';
@@ -11,7 +12,7 @@ import { clearCanvas } from '../store/flowSlice';
 const useWorkflow = () => {
     const dispatch = useDispatch();
     const nodes = useSelector((state: RootState) => state.flow.nodes);
-    const workflowID = useSelector((state: RootState) => state.flow.workflowID);
+    const workflowId = useSelector((state: RootState) => state.flow.workflowId);
     const inputNodeValues = useSelector((state: RootState) => state.flow.inputNodeValues);
     const projectName = useSelector((state: RootState) => state.flow.projectName);
     const [isRunning, setIsRunning] = useState(false);
@@ -20,17 +21,17 @@ const useWorkflow = () => {
         const checkStatusInterval = setInterval(async () => {
             try {
                 const statusResponse: RunStatusResponse = await getRunStatus(runID);
-                const outputs = statusResponse.outputs;
+                const outputs = statusResponse.outputs || {};
                 console.log('Status Response:', statusResponse);
 
                 if (outputs) {
                     Object.entries(outputs).forEach(([nodeId, data]) => {
-                        const node = nodes.find((node: Node) => node.id === nodeId);
+                        const node = nodes.find((node: WorkflowNode) => node.id === nodeId);
                         if (data && node) {
                             dispatch(updateNodeData({
                                 id: nodeId,
                                 data: {
-                                    status: data.status,
+                                    status: data.status || 'unknown',
                                     run: { ...node.data.run, ...data }
                                 }
                             }));
@@ -51,19 +52,24 @@ const useWorkflow = () => {
 
     const handleRunWorkflow = async (): Promise<void> => {
         try {
+            if (!workflowId) {
+                console.error('No workflow ID available');
+                return;
+            }
+
             console.log('Input Node Values:', inputNodeValues);
 
             // Set all nodes' status to 'pending'
-            nodes.forEach((node: Node) => {
+            nodes.forEach((node: WorkflowNode) => {
                 dispatch(updateNodeData({ id: node.id, data: { status: 'pending' } }));
             });
 
-            const test_inputs = {
-                "initial_inputs": {
+            const test_inputs: TestInput = {
+                initial_inputs: {
                     "node_1731066766087": { "user_message": "Give me weather in London" }
                 }
             };
-            const result = await startRun(workflowID, test_inputs, null, 'interactive');
+            const result = await startRun(workflowId, test_inputs, null, 'interactive');
 
             setIsRunning(true);
             updateWorkflowStatus(result.id);
@@ -75,7 +81,12 @@ const useWorkflow = () => {
 
     const handleDownloadWorkflow = async (): Promise<void> => {
         try {
-            const workflow = await getWorkflow(workflowID);
+            if (!workflowId) {
+                console.error('No workflow ID available');
+                return;
+            }
+
+            const workflow = await getWorkflow(workflowId);
             const blob = new Blob([JSON.stringify(workflow, null, 2)], { type: 'application/json' });
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');

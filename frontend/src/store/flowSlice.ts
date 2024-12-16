@@ -1,70 +1,91 @@
-import { createSlice, PayloadAction } from '@reduxjs/toolkit';
-import { applyNodeChanges, applyEdgeChanges, addEdge, Node as FlowNode, Edge, NodeChange, EdgeChange, Connection } from '@xyflow/react';
+import {
+  Edge,
+  Node,
+  EdgeChange,
+  Connection,
+  applyEdgeChanges,
+  applyNodeChanges,
+  addEdge,
+  NodeChange
+} from '@xyflow/react';
+import { PayloadAction, createSlice } from '@reduxjs/toolkit';
 import { v4 as uuidv4 } from 'uuid';
-import { createNode } from '../utils/nodeFactory';
+import { WritableDraft } from 'immer';
+import { CustomEdge } from '../types/reactflow';
+import { WorkflowNode } from '../types/workflow';
 import { NodeTypes, NodeType } from '../types/nodes/base';
-import type { Draft } from 'immer';
+import { createNode, getNodeType } from '../utils/nodeFactory';
+import type { RootState } from '../types/store';
 
-type WritableNode = Draft<FlowNode>;
+type WritableNode = WritableDraft<Node>;
+type WritableEdge = WritableDraft<Edge>;
 
 interface Coordinates {
   x: number;
   y: number;
 }
 
-interface WorkflowNode {
-  node_type: string;
-  id: string;
-  coordinates: Coordinates;
-  config: Record<string, any>;
-}
-
-interface WorkflowLink {
-  selected?: boolean;
-  source_id: string;
-  target_id: string;
-  source_output_key: string;
-  target_input_key: string;
-}
-
 interface WorkflowDefinition {
   nodes: WorkflowNode[];
-  links: WorkflowLink[];
+  edges: CustomEdge[];
+  test_inputs?: TestInput[];
   input_variables?: Record<string, any>;
 }
 
 interface TestInput {
-  id: string;
+  id?: string;
   [key: string]: any;
 }
 
 interface FlowState {
-  nodeTypes: NodeTypes;
-  nodes: WritableNode[];
-  edges: Edge[];
-  workflowID: string | null;
+  nodes: WritableDraft<WorkflowNode>[];
+  edges: WritableEdge[];
   selectedNode: string | null;
   sidebarWidth: number;
   projectName: string;
-  workflowInputVariables: Record<string, any>;
-  testInputs: TestInput[];
-  inputNodeValues: Record<string, any>;
+  workflowID?: string;
+  nodeTypes: Record<string, NodeType[]>;
+  testInputs: Record<string, unknown>[];
+  workflowInputVariables: Record<string, unknown>;
+  inputNodeValues: Record<string, unknown>;
   history: {
-    past: Array<{nodes: WritableNode[], edges: Edge[]}>;
-    future: Array<{nodes: WritableNode[], edges: Edge[]}>;
+    past: Array<{
+      nodes: WritableDraft<WorkflowNode>[];
+      edges: WritableEdge[];
+      selectedNode: string | null;
+      sidebarWidth: number;
+      projectName: string;
+      workflowID?: string;
+      nodeTypes: Record<string, NodeType[]>;
+      testInputs: Record<string, unknown>[];
+      workflowInputVariables: Record<string, unknown>;
+      inputNodeValues: Record<string, unknown>;
+    }>;
+    future: Array<{
+      nodes: WritableDraft<WorkflowNode>[];
+      edges: WritableEdge[];
+      selectedNode: string | null;
+      sidebarWidth: number;
+      projectName: string;
+      workflowID?: string;
+      nodeTypes: Record<string, NodeType[]>;
+      testInputs: Record<string, unknown>[];
+      workflowInputVariables: Record<string, unknown>;
+      inputNodeValues: Record<string, unknown>;
+    }>;
   };
 }
 
 const initialState: FlowState = {
-  nodeTypes: {},
   nodes: [],
   edges: [],
-  workflowID: null,
   selectedNode: null,
   sidebarWidth: 400,
   projectName: 'Untitled Project',
-  workflowInputVariables: {},
+  workflowID: undefined,
+  nodeTypes: {},
   testInputs: [],
+  workflowInputVariables: {},
   inputNodeValues: {},
   history: {
     past: [],
@@ -72,10 +93,18 @@ const initialState: FlowState = {
   }
 };
 
-const saveToHistory = (state: FlowState) => {
+const saveToHistory = (state: WritableDraft<FlowState>) => {
   state.history.past.push({
     nodes: JSON.parse(JSON.stringify(state.nodes)),
-    edges: JSON.parse(JSON.stringify(state.edges))
+    edges: JSON.parse(JSON.stringify(state.edges)),
+    selectedNode: state.selectedNode,
+    sidebarWidth: state.sidebarWidth,
+    projectName: state.projectName,
+    workflowID: state.workflowID,
+    nodeTypes: state.nodeTypes,
+    testInputs: state.testInputs,
+    workflowInputVariables: state.workflowInputVariables,
+    inputNodeValues: state.inputNodeValues
   });
   state.history.future = [];
 };
@@ -88,30 +117,53 @@ const flowSlice = createSlice({
       workflowID: string;
       definition: WorkflowDefinition;
       name: string;
-      nodeTypes: Record<string, NodeType[]>;
+      nodeTypes: NodeTypes;
     }>) => {
       const { workflowID, definition, name, nodeTypes } = action.payload;
       state.workflowID = workflowID;
       state.projectName = name;
       state.nodeTypes = nodeTypes;
-      const { nodes, links } = definition;
+      const { nodes, edges } = definition;
 
       // Filter out any null nodes that might be returned from createNode
       const createdNodes = nodes
-        .map(node => createNode(nodeTypes, node.node_type, node.id,
-          { x: node.coordinates.x, y: node.coordinates.y },
-          { config: node.config }))
+        .map(node => {
+          // Extract additional properties excluding required fields
+          const additionalConfig: Record<string, unknown> = {};
+          Object.entries(node.data?.config || {}).forEach(([key, value]) => {
+            if (!['title', 'input_schema', 'output_schema'].includes(key)) {
+              additionalConfig[key] = value;
+            }
+          });
+
+          // Create node config with required fields last to ensure they're not overwritten
+          const nodeConfig = {
+            ...additionalConfig,
+            title: String(node.data?.config?.title || node.type),
+            input_schema: node.data?.config?.input_schema || {},
+            output_schema: node.data?.config?.output_schema || {},
+          };
+
+          return createNode(
+            nodeTypes,
+            node.type || 'dynamic',
+            node.id,
+            { x: node.position?.x ?? 100, y: node.position?.y ?? 100 },
+            { config: nodeConfig }
+          );
+        })
         .filter((node): node is NonNullable<ReturnType<typeof createNode>> => node !== null)
-        .map(node => node as unknown as WritableNode);
+        .map(node => node as unknown as WritableDraft<WorkflowNode>);
       state.nodes = createdNodes;
-      state.edges = links.map(link => ({
-        id: uuidv4(),
+      state.edges = edges.map(edge => ({
+        id: edge.id || uuidv4(),
         key: uuidv4(),
-        selected: link.selected || false,
-        source: link.source_id,
-        target: link.target_id,
-        sourceHandle: link.source_output_key,
-        targetHandle: link.target_input_key
+        selected: edge.selected || false,
+        source: edge.source,
+        target: edge.target,
+        sourceHandle: edge.sourceHandle,
+        targetHandle: edge.targetHandle,
+        data: edge.data
       }));
 
       if (definition.input_variables) {
@@ -120,30 +172,42 @@ const flowSlice = createSlice({
     },
 
     nodesChange: (state, action: PayloadAction<{ changes: NodeChange[] }>) => {
-      state.nodes = applyNodeChanges(action.payload.changes, state.nodes);
+      saveToHistory(state);
+      const newNodes = applyNodeChanges(action.payload.changes, state.nodes);
+      state.nodes = newNodes as WritableDraft<WorkflowNode>[];
     },
 
     edgesChange: (state, action: PayloadAction<{ changes: EdgeChange[] }>) => {
-      state.edges = applyEdgeChanges(action.payload.changes, state.edges);
+      const newEdges = applyEdgeChanges(action.payload.changes, state.edges);
+      state.edges = newEdges.map(edge => ({
+        ...edge,
+        key: edge.id,
+        data: edge.data || {}
+      })) as CustomEdge[];
     },
 
-    connect: (state, action: PayloadAction<{ connection: Connection }>) => {
+    connect: (state, action: PayloadAction<{ connection: Connection & { data?: Record<string, unknown> } }>) => {
       saveToHistory(state);
-      state.edges = addEdge(action.payload.connection, state.edges);
+      const newEdge: CustomEdge = {
+        ...action.payload.connection,
+        id: uuidv4(),
+        key: uuidv4(),
+        data: action.payload.connection.data || {}
+      };
+      state.edges = [...state.edges, newEdge];
     },
 
-    addNode: (state, action: PayloadAction<{ node: FlowNode }>) => {
-      if (action.payload.node) {
-        saveToHistory(state);
-        state.nodes = [...state.nodes, action.payload.node as unknown as WritableNode];
-      }
+    addNode: (state, action: PayloadAction<{ node: WorkflowNode }>) => {
+      saveToHistory(state);
+      state.nodes = [...state.nodes, action.payload.node];
     },
 
-    setNodes: (state, action: PayloadAction<{ nodes: FlowNode[] }>) => {
-      state.nodes = action.payload.nodes.map(node => node as unknown as WritableNode);
+    setNodes: (state, action: PayloadAction<WritableDraft<WorkflowNode>[]>) => {
+      saveToHistory(state);
+      state.nodes = action.payload;
     },
 
-    updateNodeData: (state, action: PayloadAction<{ id: string; data: any }>) => {
+    updateNodeData: (state, action: PayloadAction<{ id: string; data: Partial<WorkflowNode['data']> }>) => {
       const { id, data } = action.payload;
       const node = state.nodes.find((node) => node.id === id);
       if (node) {
@@ -159,7 +223,7 @@ const flowSlice = createSlice({
       const nodeId = action.payload.nodeId;
       saveToHistory(state);
       state.nodes = state.nodes.filter((node) => node.id !== nodeId);
-      state.edges = state.edges.filter((edge) => edge.source !== nodeId && edge.target !== nodeId);
+      state.edges = state.edges.filter((edge: WritableDraft<Edge>) => edge.source !== nodeId && edge.target !== nodeId);
       if (state.selectedNode === nodeId) {
         state.selectedNode = null;
       }
@@ -168,12 +232,12 @@ const flowSlice = createSlice({
     deleteEdge: (state, action: PayloadAction<{ edgeId: string }>) => {
       saveToHistory(state);
       const edgeId = action.payload.edgeId;
-      state.edges = state.edges.filter((edge) => edge.id !== edgeId);
+      state.edges = state.edges.filter((edge: WritableDraft<Edge>) => edge.id !== edgeId);
     },
 
     deleteEdgeByHandle: (state, action: PayloadAction<{ nodeId: string; handleKey: string }>) => {
       const { nodeId, handleKey } = action.payload;
-      state.edges = state.edges.filter((edge) => {
+      state.edges = state.edges.filter((edge: WritableDraft<Edge>) => {
         if (edge.source === nodeId && edge.sourceHandle === handleKey) {
           return false;
         }
@@ -186,7 +250,7 @@ const flowSlice = createSlice({
 
     deleteEdgesBySource: (state, action: PayloadAction<{ sourceId: string }>) => {
       const { sourceId } = action.payload;
-      state.edges = state.edges.filter((edge) => edge.source !== sourceId);
+      state.edges = state.edges.filter((edge: WritableDraft<Edge>) => edge.source !== sourceId);
     },
 
     setSidebarWidth: (state, action: PayloadAction<number>) => {
@@ -222,28 +286,24 @@ const flowSlice = createSlice({
       }
     },
 
-    resetFlow: (state, action: PayloadAction<{ definition: WorkflowDefinition }>) => {
-      const { nodes, links } = action.payload.definition;
-
-      // Filter out any null nodes that might be returned from createNode
-      const createdNodes = nodes
-        .map(node => createNode(state.nodeTypes, node.node_type, node.id,
-          { x: node.coordinates.x, y: node.coordinates.y },
-          { config: node.config }))
-        .filter((node): node is NonNullable<ReturnType<typeof createNode>> => node !== null)
-        .map(node => node as unknown as WritableNode);
-
+    resetFlow: (state, action: PayloadAction<{ nodes: WorkflowNode[]; edges: Edge[] }>) => {
+      const createdNodes = action.payload.nodes.map(node => ({
+        ...node,
+        id: node.id || uuidv4(),
+      })) as WritableDraft<WorkflowNode>[];
       state.nodes = createdNodes;
 
-      state.edges = links.map(link => ({
-        id: uuidv4(),
+      state.edges = action.payload.edges.map(edge => ({
+        id: edge.id || uuidv4(),
         key: uuidv4(),
-        selected: link.selected || false,
-        source: link.source_id,
-        target: link.target_id,
-        sourceHandle: link.source_output_key,
-        targetHandle: link.target_input_key
-      }));
+        selected: edge.selected || false,
+        source: edge.source,
+        target: edge.target,
+        sourceHandle: edge.sourceHandle,
+        targetHandle: edge.targetHandle,
+        data: edge.data
+      })) as WritableEdge[];
+      saveToHistory(state);
     },
 
     updateEdgesOnHandleRename: (state, action: PayloadAction<{
@@ -322,14 +382,23 @@ const flowSlice = createSlice({
     },
 
     undo: (state) => {
-      const previous = state.history.past.pop();
-      if (previous) {
+      if (state.history.past.length > 0) {
+        const previous = state.history.past[state.history.past.length - 1];
         state.history.future.push({
           nodes: JSON.parse(JSON.stringify(state.nodes)),
-          edges: JSON.parse(JSON.stringify(state.edges))
+          edges: JSON.parse(JSON.stringify(state.edges)),
+          selectedNode: state.selectedNode,
+          sidebarWidth: state.sidebarWidth,
+          projectName: state.projectName,
+          workflowID: state.workflowID,
+          nodeTypes: state.nodeTypes,
+          testInputs: state.testInputs,
+          workflowInputVariables: state.workflowInputVariables,
+          inputNodeValues: state.inputNodeValues
         });
         state.nodes = previous.nodes;
         state.edges = previous.edges;
+        state.history.past.pop();
       }
     },
 
@@ -338,7 +407,15 @@ const flowSlice = createSlice({
       if (next) {
         state.history.past.push({
           nodes: JSON.parse(JSON.stringify(state.nodes)),
-          edges: JSON.parse(JSON.stringify(state.edges))
+          edges: JSON.parse(JSON.stringify(state.edges)),
+          selectedNode: state.selectedNode,
+          sidebarWidth: state.sidebarWidth,
+          projectName: state.projectName,
+          workflowID: state.workflowID,
+          nodeTypes: state.nodeTypes,
+          testInputs: state.testInputs,
+          workflowInputVariables: state.workflowInputVariables,
+          inputNodeValues: state.inputNodeValues
         });
         state.nodes = next.nodes;
         state.edges = next.edges;
@@ -381,6 +458,6 @@ export const {
 
 export default flowSlice.reducer;
 
-export const selectNodeById = (state: { flow: FlowState }, nodeId: string): FlowNode | undefined => {
-  return state.flow.nodes.find((node) => node.id === nodeId) as FlowNode | undefined;
+export const selectNodeById = (state: RootState, nodeId: string): WorkflowNode | undefined => {
+  return state.flow.nodes.find((node) => node.id === nodeId) as WorkflowNode | undefined;
 };

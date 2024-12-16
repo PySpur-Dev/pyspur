@@ -19,6 +19,8 @@ interface TextEditorProps {
   fullScreen?: boolean;
   inputSchema?: Record<string, unknown>;
   fieldTitle?: string;
+  nodeID?: string;
+  fieldName?: string;
 }
 
 interface TextEditorRef {

@@ -2,34 +2,18 @@ import { useEffect, useCallback, useState } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import { addNode } from '../store/flowSlice';
 import { createNode } from '../utils/nodeFactory';
-import { Node } from 'reactflow'; // Import Node type from reactflow
-import { AppDispatch } from '../store/store'; // Import AppDispatch type
-
-interface Position {
-  x: number;
-  y: number;
-}
-
-interface CustomNode extends Node {
-  type: string;
-  position: Position;
-  data: {
-    title?: string;
-    acronym?: string;
-    color?: string;
-    config?: any; // You might want to define a more specific type
-    input?: any;  // You might want to define a more specific type
-    output?: any; // You might want to define a more specific type
-    [key: string]: any;
-  };
-}
+import { AppDispatch } from '../store/store';
+import { WorkflowNode } from '../types/nodes/base';
+import { useSelector } from 'react-redux';
+import { RootState } from '../store/store';
 
 export const useKeyboardShortcuts = (
   selectedNodeID: string | null,
-  nodes: CustomNode[],
+  nodes: WorkflowNode[],
   dispatch: AppDispatch
 ) => {
-  const [copiedNode, setCopiedNode] = useState<CustomNode | null>(null);
+  const [copiedNode, setCopiedNode] = useState<WorkflowNode | null>(null);
+  const nodeTypes = useSelector((state: RootState) => state.nodeTypes.data);
 
   const handleKeyDown = useCallback(
     (event: KeyboardEvent) => {
@@ -44,8 +28,9 @@ export const useKeyboardShortcuts = (
             }
             break;
           case 'v': // CMD + V or CTRL + V
-            if (copiedNode) {
+            if (copiedNode && nodeTypes) {
               const newNode = createNode(
+                nodeTypes,
                 copiedNode.type,
                 uuidv4(),
                 {
@@ -54,7 +39,9 @@ export const useKeyboardShortcuts = (
                 },
                 copiedNode.data
               );
-              dispatch(addNode({ node: newNode }));
+              if (newNode) {
+                dispatch(addNode({ node: newNode }));
+              }
             }
             break;
           default:
@@ -62,7 +49,7 @@ export const useKeyboardShortcuts = (
         }
       }
     },
-    [selectedNodeID, copiedNode, nodes, dispatch]
+    [selectedNodeID, copiedNode, nodes, dispatch, nodeTypes]
   );
 
   useEffect(() => {

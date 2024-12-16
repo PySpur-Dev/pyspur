@@ -11,7 +11,7 @@ from sqlalchemy.orm import relationship, Mapped, mapped_column
 from enum import Enum as PyEnum
 from datetime import datetime, timezone
 from typing import Optional, Any
-from .base_model import BaseModel
+from .base_model import Base
 
 
 class TaskStatus(PyEnum):
@@ -21,7 +21,7 @@ class TaskStatus(PyEnum):
     FAILED = "FAILED"
 
 
-class TaskModel(BaseModel):
+class TaskModel(Base):
     __tablename__ = "tasks"
 
     _intid: Mapped[int] = mapped_column(Integer, primary_key=True)

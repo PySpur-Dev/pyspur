@@ -59,12 +59,12 @@ const EvalResultsPage: React.FC = () => {
       if (!id) return;
 
       try {
-        const evalRunData: EvalRunData = await getEvalRunStatus(id as string);
+        const evalRunData = await getEvalRunStatus(id as string);
         const normalizedResults: EvalResults = {
           run_id: evalRunData.run_id,
           eval_name: evalRunData.eval_name,
-          accuracy: evalRunData.results.accuracy,
-          per_example_results: evalRunData.results.subset_metrics?.default?.per_example_results || []
+          accuracy: evalRunData.results?.accuracy || 0,
+          per_example_results: evalRunData.results?.subset_metrics?.default?.per_example_results || []
         };
 
         setResults(normalizedResults);

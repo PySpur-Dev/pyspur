@@ -1,13 +1,20 @@
 import { v4 as uuidv4 } from 'uuid';
-import { createNode } from './nodeFactory';
-import { NodeType, BaseNodeData } from '../types/nodes/base';
+import { createNode, getNodeType } from './nodeFactory';
+import { NodeType, NodeData } from '../types/nodes/base';
 
 // Define types for the function parameters and return values
 interface NodeDefinition {
   id: string;
   node_type: string;
   coordinates: { x: number; y: number };
-  additionalData?: Record<string, any>;
+  additionalData?: {
+    config?: {
+      title?: string;
+      input_schema?: Record<string, unknown>;
+      output_schema?: Record<string, unknown>;
+    };
+    [key: string]: unknown;
+  };
 }
 
 interface LinkDefinition {
@@ -23,15 +30,15 @@ interface Definition {
   links: LinkDefinition[];
 }
 
-interface NodeTypes {
-  [key: string]: NodeType[];
+interface NodeTypeRegistry {
+  [key: string]: NodeType;
 }
 
 interface MappedNode {
   id: string;
   type: string;
   position: { x: number; y: number };
-  data: BaseNodeData;
+  data: NodeData;
 }
 
 interface MappedEdge {
@@ -46,24 +53,33 @@ interface MappedEdge {
 
 export const mapNodesAndEdges = (
   definition: Definition,
-  nodeTypes: NodeTypes
+  nodeTypes: Record<string, NodeType[]>
 ): { nodes: MappedNode[]; edges: MappedEdge[] } => {
   const { nodes, links } = definition;
-  console.log('nodes', nodes);
 
   // Map nodes to the expected format
   const mappedNodes = nodes.map((node) => {
-    const createdNode = createNode(
+    const nodeType = getNodeType(node.node_type);
+    const defaultData: Partial<NodeData> = {
+      title: node.additionalData?.config?.title || node.node_type,
+      config: {
+        title: node.additionalData?.config?.title || node.node_type,
+        input_schema: node.additionalData?.config?.input_schema || {},
+        output_schema: node.additionalData?.config?.output_schema || {},
+        ...node.additionalData?.config
+      }
+    };
+
+    return createNode(
       nodeTypes,
-      node.node_type,
+      nodeType,
       node.id,
       { x: node.coordinates.x, y: node.coordinates.y },
-      node.additionalData || {}
-    );
-    return createdNode as MappedNode;
+      defaultData
+    ) as MappedNode;
   }).filter((node): node is MappedNode => node !== null);
 
-  // Map links to the expected edge format
+  // Map links to edges
   const mappedEdges: MappedEdge[] = links.map((link) => ({
     id: uuidv4(),
     key: uuidv4(),

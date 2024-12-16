@@ -11,7 +11,7 @@ from sqlalchemy.orm import relationship, Mapped, mapped_column
 from enum import Enum as PyEnum
 from datetime import datetime, timezone
 from typing import Dict, List, Optional, Any
-from .base_model import BaseModel
+from .base_model import Base
 from .task_model import TaskModel
 from .output_file_model import OutputFileModel
 
@@ -23,7 +23,7 @@ class RunStatus(PyEnum):
     FAILED = "FAILED"
 
 
-class RunModel(BaseModel):
+class RunModel(Base):
     __tablename__ = "runs"
 
     _intid: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement="auto")

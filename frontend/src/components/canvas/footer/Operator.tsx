@@ -1,13 +1,16 @@
 import React, { memo } from 'react';
 import ZoomInOut from './ZoomInOut';
 import { MiniMap } from '@xyflow/react';
-import UndoRedo from './UndoRedo';
 import { Button, ButtonGroup } from '@nextui-org/react';
 import { useModeStore } from '../../../store/modeStore';
 import { Icon } from "@iconify/react";
 import TipPopup from './TipPopUp';
 
-function Operator({ handleLayout }) {
+interface OperatorProps {
+  handleLayout: () => void;
+}
+
+function Operator({ handleLayout }: OperatorProps) {
   const mode = useModeStore((state) => state.mode);
   const setMode = useModeStore((state) => state.setMode);
 
@@ -67,7 +70,8 @@ function Operator({ handleLayout }) {
           </TipPopup>
         </ButtonGroup>
         <ButtonGroup>
-          <UndoRedo handleUndo={null} handleRedo={null} />
+          <Button onClick={() => {}} className="bg-default-100">Undo</Button>
+          <Button onClick={() => {}} className="bg-default-100">Redo</Button>
         </ButtonGroup>
       </div>
     </>

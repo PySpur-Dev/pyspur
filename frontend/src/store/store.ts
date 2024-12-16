@@ -4,29 +4,12 @@ import storage from 'redux-persist/lib/storage';
 import flowReducer from './flowSlice';
 import nodeTypesReducer from './nodeTypesSlice';
 import type { Node, Edge } from '@xyflow/react';
-import { NodeTypes } from '../types/nodes/base';
+import { NodeType } from '../types/nodes/base';
 import type { NodeMetadata } from './nodeTypesSlice';
+import type { FlowState, RootState as StoreRootState } from '../types/store';
 
-// Define the RootState type
-export interface RootState {
-  flow: {
-    nodes: Node[];
-    edges: Edge[];
-    workflowID: string | null;
-    workflowInputVariables: Record<string, any>;
-    projectName: string;
-    testInputs: Record<string, any>;
-    selectedNode: string | null;
-    nodeTypes: NodeTypes;
-    sidebarWidth: number;
-  };
-  nodeTypes: {
-    data: Record<string, any>;
-    metadata: Record<string, NodeMetadata[]>;
-    status: 'idle' | 'loading' | 'succeeded' | 'failed';
-    error: string | null;
-  };
-}
+// Re-export RootState from store/index.ts
+export type { StoreRootState as RootState };
 
 // Define the persist config
 const persistConfig = {

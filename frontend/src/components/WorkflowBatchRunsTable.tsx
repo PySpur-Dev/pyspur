@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { getKeyValue, Table, TableHeader, TableColumn, TableBody, TableRow, TableCell, Button, Progress, Key } from '@nextui-org/react';
+import { getKeyValue, Table, TableHeader, TableColumn, TableBody, TableRow, TableCell, Button, Progress } from '@nextui-org/react';
+import { Key } from '@react-types/shared';
 import { Icon } from '@iconify/react';
 import { getAllRuns, downloadOutputFile } from '../utils/api';
 

@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
-import { Handle, useHandleConnections, NodeProps, Position } from '@xyflow/react';
+import { Handle, useHandleConnections, Position } from '@xyflow/react';
 import { useSelector, useDispatch } from 'react-redux';
 import BaseNode from './base/BaseNode';
 import { Input } from '@nextui-org/react';
@@ -9,13 +9,13 @@ import {
 } from '../../store/flowSlice';
 import { selectPropertyMetadata } from '../../store/nodeTypesSlice';
 import { RootState } from '../../store/store';
-import { BaseNodeData, BaseNodeProps } from '../../types/nodes/base';
+import { NodeData, BaseNodeProps, DynamicNodeConfig, WorkflowNode } from '../../types/nodes/base';
 
 interface SchemaMetadata {
   required?: boolean;
   title?: string;
   type?: string;
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 const updateMessageVariables = (message: string | undefined, oldKey: string, newKey: string): string | undefined => {
@@ -25,33 +25,28 @@ const updateMessageVariables = (message: string | undefined, oldKey: string, new
   return message.replace(regex, `{{${newKey}}}`);
 };
 
-interface DynamicNodeProps extends NodeProps {
-  id: string;
-  type: string;
-  data: BaseNodeData;
-  position: { x: number; y: number };
-  selected?: boolean;
-  parentNode?: string;
-}
+type DynamicNodeProps = BaseNodeProps<DynamicNodeConfig>;
 
-const DynamicNode: React.FC<DynamicNodeProps> = ({ id, type, data, position, ...props }) => {
+const DynamicNode: React.FC<DynamicNodeProps> = ({
+  id,
+  data,
+  isCollapsed,
+  setIsCollapsed,
+  ...props
+}) => {
   const nodeRef = useRef<HTMLDivElement | null>(null);
   const [nodeWidth, setNodeWidth] = useState<string>('auto');
   const [editingField, setEditingField] = useState<string | null>(null);
-  const [isCollapsed, setIsCollapsed] = useState<boolean>(false);
-
-  const node = useSelector((state: RootState) => state.flow.nodes.find((n) => n.id === id));
-  const nodeData = data || (node && node.data);
   const dispatch = useDispatch();
 
+  const node = useSelector((state: RootState) => state.flow.nodes.find((n) => n.id === id));
   const edges = useSelector((state: RootState) => state.flow.edges);
+  const inputMetadata = useSelector((state: RootState) => selectPropertyMetadata(state, `${data.type}.input`)) as SchemaMetadata;
+  const outputMetadata = useSelector((state: RootState) => selectPropertyMetadata(state, `${data.type}.output`)) as SchemaMetadata;
 
-  const inputMetadata = useSelector((state: RootState) => selectPropertyMetadata(state, `${type}.input`));
-  const outputMetadata = useSelector((state: RootState) => selectPropertyMetadata(state, `${type}.output`));
-
-  const excludeSchemaKeywords = (metadata: SchemaMetadata): Record<string, any> => {
+  const excludeSchemaKeywords = (metadata: SchemaMetadata): Record<string, unknown> => {
     const schemaKeywords = ['required', 'title', 'type'];
-    return Object.keys(metadata).reduce((acc: Record<string, any>, key) => {
+    return Object.keys(metadata).reduce((acc: Record<string, unknown>, key) => {
       if (!schemaKeywords.includes(key)) {
         acc[key] = metadata[key];
       }
@@ -59,8 +54,8 @@ const DynamicNode: React.FC<DynamicNodeProps> = ({ id, type, data, position, ...
     }, {});
   };
 
-  const cleanedInputMetadata = excludeSchemaKeywords(inputMetadata || {});
-  const cleanedOutputMetadata = excludeSchemaKeywords(outputMetadata || {});
+  const cleanedInputMetadata = excludeSchemaKeywords(inputMetadata || { type: 'object' });
+  const cleanedOutputMetadata = excludeSchemaKeywords(outputMetadata || { type: 'object' });
 
   const handleSchemaKeyEdit = useCallback(
     (oldKey: string, newKey: string, schemaType: 'input_schema' | 'output_schema') => {
@@ -70,7 +65,7 @@ const DynamicNode: React.FC<DynamicNodeProps> = ({ id, type, data, position, ...
         return;
       }
 
-      const currentSchema = nodeData?.config?.[schemaType] || {};
+      const currentSchema = data?.config?.[schemaType] || {};
       const schemaEntries = Object.entries(currentSchema);
       const keyIndex = schemaEntries.findIndex(([key]) => key === oldKey);
       if (keyIndex !== -1) {
@@ -79,21 +74,21 @@ const DynamicNode: React.FC<DynamicNodeProps> = ({ id, type, data, position, ...
       const updatedSchema = Object.fromEntries(schemaEntries);
 
       let updatedConfig = {
-        ...nodeData?.config,
+        ...data?.config,
         [schemaType]: updatedSchema,
       };
 
       if (schemaType === 'input_schema') {
-        if (nodeData?.config?.system_message) {
+        if (data?.config?.system_message) {
           updatedConfig.system_message = updateMessageVariables(
-            nodeData.config.system_message,
+            data.config.system_message,
             oldKey,
             newKey
           );
         }
-        if (nodeData?.config?.user_message) {
+        if (data?.config?.user_message) {
           updatedConfig.user_message = updateMessageVariables(
-            nodeData.config.user_message,
+            data.config.user_message,
             oldKey,
             newKey
           );
@@ -120,21 +115,21 @@ const DynamicNode: React.FC<DynamicNodeProps> = ({ id, type, data, position, ...
 
       setEditingField(null);
     },
-    [dispatch, id, nodeData]
+    [dispatch, id, data]
   );
 
   useEffect(() => {
-    if (!nodeRef.current || !nodeData) return;
+    if (!nodeRef.current || !data) return;
 
-    const inputSchema = nodeData?.config?.['input_schema'] || cleanedInputMetadata || {};
-    const outputSchema = nodeData?.config?.['output_schema'] || cleanedOutputMetadata || {};
+    const inputSchema = data?.config?.['input_schema'] || cleanedInputMetadata || {};
+    const outputSchema = data?.config?.['output_schema'] || cleanedOutputMetadata || {};
 
     const inputLabels = Object.keys(inputSchema);
     const outputLabels = Object.keys(outputSchema);
 
     const maxInputLabelLength = inputLabels.reduce((max, label) => Math.max(max, label.length), 0);
     const maxOutputLabelLength = outputLabels.reduce((max, label) => Math.max(max, label.length), 0);
-    const titleLength = ((nodeData?.title || '').length + 10) * 1.25;
+    const titleLength = ((data?.title || '').length + 10) * 1.25;
 
     const maxLabelLength = Math.max(
       (maxInputLabelLength + maxOutputLabelLength + 5),
@@ -150,7 +145,7 @@ const DynamicNode: React.FC<DynamicNodeProps> = ({ id, type, data, position, ...
     );
 
     setNodeWidth(`${finalWidth}px`);
-  }, [nodeData, cleanedInputMetadata, cleanedOutputMetadata]);
+  }, [data, cleanedInputMetadata, cleanedOutputMetadata]);
 
   interface HandleRowProps {
     keyName: string;
@@ -257,10 +252,10 @@ const DynamicNode: React.FC<DynamicNodeProps> = ({ id, type, data, position, ...
   };
 
   const renderHandles = () => {
-    if (!nodeData) return null;
+    if (!data) return null;
 
-    const inputSchema = nodeData?.config?.['input_schema'] || cleanedInputMetadata || {};
-    const outputSchema = nodeData?.config?.['output_schema'] || cleanedOutputMetadata || {};
+    const inputSchema = data?.config?.['input_schema'] || cleanedInputMetadata || {};
+    const outputSchema = data?.config?.['output_schema'] || cleanedOutputMetadata || {};
 
     return (
       <div className="node-handles-wrapper" id="handles">
@@ -279,27 +274,18 @@ const DynamicNode: React.FC<DynamicNodeProps> = ({ id, type, data, position, ...
     );
   };
 
-  const isIfElseNode = type === 'IfElseNode';
-
   return (
-    <div className="node-container" style={{ zIndex: props.parentNode ? 1 : 0 }}>
+    <div className="node-container">
       <BaseNode
         id={id}
-        data={nodeData}
-        style={{
-          width: nodeWidth,
-        }}
+        data={data}
         isCollapsed={isCollapsed}
         setIsCollapsed={setIsCollapsed}
-        selected={props.selected}
+        style={{ width: nodeWidth }}
         className="hover:!bg-background"
+        {...props}
       >
-        <div className="node-content" ref={nodeRef} id={`node-${id}-wrapper`}>
-          {isIfElseNode ? (
-            <div className="font-semibold">
-              Conditional Node
-            </div>
-          ) : null}
+        <div className="node-content" ref={nodeRef}>
           {renderHandles()}
         </div>
       </BaseNode>

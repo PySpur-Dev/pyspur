@@ -2,14 +2,15 @@ import React, { useState, useEffect } from "react";
 import { Card, CardBody, CardHeader, Button, Modal, ModalContent, ModalHeader, ModalBody, ModalFooter, Alert, Dropdown, DropdownTrigger, DropdownMenu, DropdownSection, DropdownItem, Slider } from "@nextui-org/react";
 import { Icon } from "@iconify/react";
 import { getWorkflows, getWorkflowOutputVariables, startEvalRun } from "../../utils/api";
-import { Radio, RadioGroup, RadioValue } from "@nextui-org/react";
+import { Key } from '@react-types/shared';
+
 interface EvalCardProps {
   title: string;
   description: string;
   type: string;
   numSamples: number;
   paperLink?: string;
-  onRun?: () => void;
+  onRun?: (workflowId: string, numSamples: number, outputVariable: string) => void;
 }
 
 interface Workflow {

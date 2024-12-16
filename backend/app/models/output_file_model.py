@@ -1,10 +1,10 @@
 from sqlalchemy import Computed, Integer, String, DateTime
 from sqlalchemy.orm import Mapped, mapped_column
 from datetime import datetime, timezone
-from .base_model import BaseModel
+from .base_model import Base
 
 
-class OutputFileModel(BaseModel):
+class OutputFileModel(Base):
     __tablename__ = "output_files"
 
     _intid: Mapped[int] = mapped_column(Integer, primary_key=True)

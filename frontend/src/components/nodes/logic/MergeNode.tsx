@@ -3,29 +3,37 @@ import { Handle, Position } from '@xyflow/react';
 import { useSelector } from 'react-redux';
 import { RootState } from '../../../store/store';
 import BaseNode from '../base/BaseNode';
-import { BaseNodeData, BaseNodeConfig } from '../../../types/nodes/base';
+import { NodeData, BaseNodeConfig, WorkflowNode, BaseNodeProps } from '../../../types/nodes/base';
 
 interface MergeNodeConfig extends BaseNodeConfig {
   branch_refs: string[];
 }
 
-interface MergeNodeData extends BaseNodeData {
-  config?: MergeNodeConfig;
+interface MergeNodeData extends NodeData<MergeNodeConfig> {
+  config: MergeNodeConfig;
 }
 
-interface MergeNodeProps {
+interface MergeNodeProps extends Omit<BaseNodeProps<MergeNodeConfig>, 'isCollapsed' | 'setIsCollapsed'> {
   id: string;
   data: MergeNodeData;
   selected?: boolean;
 }
 
-interface FlowNode {
-  id: string;
-  data: BaseNodeData;
-  [key: string]: any;
-}
+// Use WorkflowNode instead of custom FlowNode interface
+type FlowNode = WorkflowNode<MergeNodeConfig>;
 
-const MergeNode: React.FC<MergeNodeProps> = ({ id, data, selected }) => {
+const MergeNode: React.FC<MergeNodeProps> = ({
+  id,
+  data,
+  selected,
+  type,
+  dragging,
+  zIndex,
+  isConnectable = true,
+  positionAbsoluteX,
+  positionAbsoluteY,
+  ...props
+}) => {
   const edges = useSelector((state: RootState) => state.flow.edges);
   const nodes = useSelector((state: RootState) => state.flow.nodes) as FlowNode[];
   const [isCollapsed, setIsCollapsed] = useState(false);
@@ -56,9 +64,17 @@ const MergeNode: React.FC<MergeNodeProps> = ({ id, data, selected }) => {
       <BaseNode
         id={id}
         data={data}
+        type={type}
+        dragging={dragging}
+        zIndex={zIndex}
+        isConnectable={isConnectable}
+        selected={selected}
         isCollapsed={isCollapsed}
         setIsCollapsed={setIsCollapsed}
+        positionAbsoluteX={positionAbsoluteX}
+        positionAbsoluteY={positionAbsoluteY}
         className="hover:!bg-background"
+        {...props}
       >
         <div className="flex flex-col gap-3" ref={nodeRef}>
           {!isCollapsed && (

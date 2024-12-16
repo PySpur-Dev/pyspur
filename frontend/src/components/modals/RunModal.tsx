@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Key, ReactElement, useMemo } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import {
   Modal,
@@ -9,17 +9,19 @@ import {
   Button,
   Table,
   TableHeader,
-  TableColumn,
   TableBody,
+  TableColumn,
   TableRow,
   TableCell,
-  Input
+  Input,
+  Tooltip
 } from "@nextui-org/react";
 import { Icon } from "@iconify/react";
 import TextEditor from '../textEditor/TextEditor';
-import { addTestInput, deleteTestInput } from '../../store/flowSlice';
+import { addTestInput, deleteTestInput, updateTestInput } from '../../store/flowSlice';
 import { RootState } from '../../store/store';
 import { AppDispatch } from '../../store/store';
+import type { Selection } from "@nextui-org/react";
 
 interface RunModalProps {
   isOpen: boolean;
@@ -29,13 +31,23 @@ interface RunModalProps {
 }
 
 interface TestInput {
-  id: number;
+  id: string;
   [key: string]: any;
 }
 
 interface EditingCell {
-  rowId: number;
+  rowId: string;
   field: string;
+}
+
+type TestData = {
+  id: string;
+  [key: string]: string | number | boolean;
+};
+
+type TestTableColumn = {
+  key: string;
+  label: string;
 }
 
 const RunModal: React.FC<RunModalProps> = ({ isOpen, onOpenChange, onRun, onSave }) => {
@@ -53,12 +65,14 @@ const RunModal: React.FC<RunModalProps> = ({ isOpen, onOpenChange, onRun, onSave
   const testInputs = useSelector((state: RootState) => state.flow.testInputs);
 
   useEffect(() => {
-    setTestData(testInputs);
+    if (Array.isArray(testInputs)) {
+      setTestData(testInputs);
+    }
   }, [testInputs]);
 
   const handleAddRow = () => {
     const newTestInput: TestInput = {
-      id: Date.now(),
+      id: Date.now().toString(),
       ...editorContents,
     };
     setTestData([...testData, newTestInput]);
@@ -66,19 +80,22 @@ const RunModal: React.FC<RunModalProps> = ({ isOpen, onOpenChange, onRun, onSave
     dispatch(addTestInput(newTestInput));
   };
 
-  const handleDeleteRow = (id: number) => {
+  const handleDeleteRow = (id: string) => {
     setTestData(testData.filter((row) => row.id !== id));
     dispatch(deleteTestInput({ id }));
   };
 
-  const handleDoubleClick = (rowId: number, field: string) => {
+  const handleDoubleClick = (rowId: string, field: string) => {
     setEditingCell({ rowId, field });
   };
 
-  const handleCellEdit = (rowId: number, field: string, value: string) => {
-    setTestData(testData.map(row =>
-      row.id === rowId ? { ...row, [field]: value } : row
-    ));
+  const handleCellEdit = (rowId: string, field: string, value: string) => {
+    setTestData(prevData =>
+      prevData.map(row =>
+        row.id === rowId ? { ...row, [field]: value } : row
+      )
+    );
+    dispatch(updateTestInput({ id: rowId, [field]: value }));
   };
 
   const handleBlur = () => {
@@ -139,7 +156,7 @@ const RunModal: React.FC<RunModalProps> = ({ isOpen, onOpenChange, onRun, onSave
   const handleRun = () => {
     if (!selectedRow) return;
 
-    const selectedTestCase = testData.find(row => row.id.toString() === selectedRow);
+    const selectedTestCase = testData.find(row => row.id === selectedRow);
     if (!selectedTestCase) return;
 
     const { id, ...inputValues } = selectedTestCase;
@@ -177,41 +194,60 @@ const RunModal: React.FC<RunModalProps> = ({ isOpen, onOpenChange, onRun, onSave
               <Table
                 aria-label="Test cases table"
                 selectionMode="single"
-                disabledKeys={editingCell ? new Set([editingCell.rowId.toString()]) : new Set()}
-                selectedKeys={selectedRow ? [selectedRow] : new Set()}
+                disabledKeys={editingCell ? new Set([editingCell.rowId]) : new Set()}
+                selectedKeys={selectedRow ? new Set([selectedRow]) : new Set()}
                 onSelectionChange={(selection) => {
                   const selectedKey = Array.from(selection)[0]?.toString() || null;
                   setSelectedRow(selectedKey);
                 }}
               >
-                <TableHeader>
-                  <TableColumn>#</TableColumn>
-                  {workflowInputVariableNames.map(field => (
-                    <TableColumn key={field}>{field.toUpperCase()}</TableColumn>
-                  ))}
-                  <TableColumn>ACTIONS</TableColumn>
-                </TableHeader>
-                <TableBody>
-                  {testData.map((row) => (
-                    <TableRow key={row.id}>
-                      <TableCell>{row.id}</TableCell>
-                      {workflowInputVariableNames.map(field => (
-                        <TableCell key={field}>
-                          {renderCell(row, field)}
-                        </TableCell>
+                {useMemo(() => {
+                  const columns: TestTableColumn[] = [
+                    { key: 'id', label: '#' },
+                    ...workflowInputVariableNames.map(field => ({
+                      key: field,
+                      label: field.toUpperCase()
+                    })),
+                    { key: 'actions', label: 'ACTIONS' }
+                  ];
+
+                  return (
+                    <TableHeader>
+                      {columns.map(column => (
+                        <TableColumn key={column.key} align={column.key === 'actions' ? 'center' : 'start'}>
+                          {column.label}
+                        </TableColumn>
                       ))}
-                      <TableCell>
+                    </TableHeader>
+                  );
+                }, [workflowInputVariableNames])}
+                <TableBody items={testData}>
+                  {(item: TestInput) => {
+                    const cells = [
+                      <TableCell key="id">{item.id}</TableCell>,
+                      ...workflowInputVariableNames.map((field: string) => (
+                        <TableCell key={field}>
+                          {renderCell(item, field)}
+                        </TableCell>
+                      )),
+                      <TableCell key="actions">
                         <Button
                           isIconOnly
                           size="sm"
                           variant="light"
-                          onPress={() => handleDeleteRow(row.id)}
+                          onPress={() => handleDeleteRow(item.id)}
                         >
                           <Icon icon="solar:trash-bin-trash-linear" />
                         </Button>
                       </TableCell>
-                    </TableRow>
-                  ))}
+                    ];
+
+                    return (
+                      <TableRow key={item.id}>
+                        {cells}
+                      </TableRow>
+                    );
+                  }}
                 </TableBody>
               </Table>
 

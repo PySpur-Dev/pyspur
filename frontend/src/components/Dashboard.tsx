@@ -121,6 +121,7 @@ const Dashboard: React.FC = () => {
         name: uniqueName,
         description: '',
         nodes: [],
+        edges: [],
         links: [],
         test_inputs: []
       };
@@ -159,6 +160,7 @@ const Dashboard: React.FC = () => {
               name: jsonContent.name || uniqueName,
               description: jsonContent.description || '',
               nodes: jsonContent.nodes || [],
+              edges: jsonContent.edges || [],
               links: jsonContent.links || [],
               test_inputs: jsonContent.test_inputs || []
             };

@@ -22,14 +22,14 @@ interface Condition {
   logicalOperator?: LogicalOperator;
 }
 
-interface BranchCondition {
+export interface Branch {
   conditions: Condition[];
 }
 
 interface IfElseEditorProps {
-  branches: BranchCondition[];
-  onChange: (branches: BranchCondition[]) => void;
-  inputSchema?: Record<string, string>;
+  branches: Branch[];
+  onChange: (branches: Branch[]) => void;
+  inputSchema?: Record<string, unknown>;
   disabled?: boolean;
 }
 
@@ -52,7 +52,7 @@ const DEFAULT_CONDITION: Condition = {
   logicalOperator: "AND"
 };
 
-const DEFAULT_BRANCH: BranchCondition = {
+const DEFAULT_BRANCH: Branch = {
   conditions: [{ ...DEFAULT_CONDITION }]
 };
 

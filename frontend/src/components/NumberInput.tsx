@@ -13,7 +13,7 @@ const NumberInput: React.FC<NumberInputProps> = ({ label, value, onChange, disab
     <Input
       type="number"
       label={label}
-      value={value}
+      value={value.toString()}
       onChange={onChange}
       disabled={disabled}
       fullWidth

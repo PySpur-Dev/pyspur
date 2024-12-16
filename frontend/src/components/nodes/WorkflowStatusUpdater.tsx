@@ -2,16 +2,15 @@ import { useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { updateNodeData } from '../../store/flowSlice';
 import { getRunStatus } from '../../utils/api';
+import { RunStatusResponse } from '../../types/workflow';
 
 interface NodeStatus {
     status: string;
-    output: any; // You might want to make this more specific based on your actual output type
+    output: Record<string, unknown>;
 }
 
-interface RunStatusResponse {
-    outputs: {
-        [key: string]: NodeStatus;
-    };
+interface NodeOutputs {
+    [key: string]: NodeStatus;
 }
 
 interface WorkflowStatusUpdaterProps {
@@ -20,7 +19,10 @@ interface WorkflowStatusUpdaterProps {
 
 interface RootState {
     flow: {
-        nodes: any[]; // You might want to make this more specific based on your actual nodes type
+        nodes: Array<{
+            id: string;
+            data: Record<string, unknown>;
+        }>;
     };
 }
 
@@ -32,14 +34,19 @@ const WorkflowStatusUpdater: React.FC<WorkflowStatusUpdaterProps> = ({ runID }) 
         const interval = setInterval(async () => {
             try {
                 const response = await getRunStatus(runID);
-                const outputs = response.outputs;
+                const outputs = response.outputs as NodeOutputs;
 
-                // Iterate over the outputs from the backend
-                for (const [nodeId, nodeStatus] of Object.entries(outputs)) {
-                    dispatch(updateNodeData({
-                        id: nodeId,
-                        data: { status: nodeStatus.status, runoutput: nodeStatus.output }
-                    }));
+                if (outputs) {
+                    // Iterate over the outputs from the backend
+                    Object.entries(outputs).forEach(([nodeId, nodeStatus]) => {
+                        dispatch(updateNodeData({
+                            id: nodeId,
+                            data: {
+                                status: nodeStatus.status,
+                                runoutput: nodeStatus.output
+                            }
+                        }));
+                    });
                 }
             } catch (error) {
                 console.error('Error fetching workflow status:', error);

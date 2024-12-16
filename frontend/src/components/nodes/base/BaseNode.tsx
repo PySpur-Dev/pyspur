@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { deleteNode, setSelectedNode, updateNodeData, addNode, setEdges } from '../../../store/flowSlice';
-import { Handle, getConnectedEdges, Node, Edge, Position } from '@xyflow/react';
+import { Handle, getConnectedEdges, Position, Edge, NodeProps } from '@xyflow/react';
 import { v4 as uuidv4 } from 'uuid';
 import {
   Card,
@@ -13,27 +13,42 @@ import {
 } from "@nextui-org/react";
 import { Icon } from "@iconify/react";
 import usePartialRun from '../../../hooks/usePartialRun';
-import { BaseNodeData, BaseNodeProps } from '../../../types/nodes/base';
+import { NodeData, WorkflowNode, DynamicNodeConfig } from '../../../types/nodes/base';
+
+export interface BaseNodeProps<T extends DynamicNodeConfig = DynamicNodeConfig> extends Omit<NodeProps, 'data'> {
+  data: NodeData<T>;
+  type: string;
+  isCollapsed?: boolean;
+  setIsCollapsed?: (collapsed: boolean) => void;
+  isInputNode?: boolean;
+  onOpenModal?: () => void;
+  handleOpenModal?: () => void;
+  children?: React.ReactNode;
+  className?: string;
+  style?: React.CSSProperties;
+}
 
 interface RootState {
   flow: {
-    nodes: Node[];
+    nodes: WorkflowNode[];
     edges: Edge[];
     selectedNode: string | null;
     testInputs?: Array<{ id: string; [key: string]: unknown }>;
   };
 }
 
-const BaseNode: React.FC<BaseNodeProps> = ({
-  isCollapsed,
-  setIsCollapsed,
-  handleOpenModal, id,
-  data = {} as BaseNodeData,
+const BaseNode = <T extends DynamicNodeConfig>({
+  id,
+  data,
+  isCollapsed = false,
+  setIsCollapsed = () => {},
+  isInputNode = false,
+  onOpenModal,
   children,
   style = {},
-  isInputNode = false,
-  className = ''
-}) => {
+  className = '',
+  ...props
+}: BaseNodeProps<T>) => {
   const [isHovered, setIsHovered] = useState(false);
   const [showControls, setShowControls] = useState(false);
   const [isTooltipHovered, setIsTooltipHovered] = useState(false);
@@ -136,11 +151,12 @@ const BaseNode: React.FC<BaseNodeProps> = ({
     const connectedEdges = getConnectedEdges([node], edges);
     const newNodeId = `node_${Date.now()}`;
 
-    const newNode = {
+    const newNode: WorkflowNode = {
       ...node,
       id: newNodeId,
       position: { x: node.position.x + 20, y: node.position.y + 20 },
       selected: false,
+      type: node.type
     };
 
     const newEdges = connectedEdges.map((edge) => {
@@ -158,10 +174,9 @@ const BaseNode: React.FC<BaseNodeProps> = ({
   };
 
   const isSelected = String(id) === String(selectedNodeId);
-  const status = data.run ? 'completed' : (data.status || 'default').toLowerCase();
-  const acronym = data.acronym || 'N/A';
-  const color = data.color || '#ccc';
-
+  const status = data?.run ? 'completed' : (data?.status || 'default').toLowerCase();
+  const acronym = data?.acronym || 'N/A';
+  const color = data?.color || '#ccc';
   return (
     <div className="node-container" draggable={false}>
       <div className="node-container">
@@ -313,12 +328,12 @@ const BaseNode: React.FC<BaseNodeProps> = ({
             >
               <Icon className="text-default-500" icon="solar:copy-linear" width={22} />
             </Button>
-            {handleOpenModal && (
+            {onOpenModal && (
               <Button
                 isIconOnly
                 radius="full"
                 variant="light"
-                onPress={handleOpenModal}
+                onPress={onOpenModal}
                 className="node-controls-button"
               >
                 <Icon className="text-default-500" icon="solar:eye-linear" width={22} />

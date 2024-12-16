@@ -1,8 +1,30 @@
 import React, { useState, useCallback, useMemo, useEffect } from 'react';
-import { ReactFlow, Background, ReactFlowProvider, Node, Edge, NodeChange, EdgeChange, Connection, OnNodesChange, OnEdgesChange, OnConnect, NodeTypes, EdgeTypes, ReactFlowInstance, XYPosition } from '@xyflow/react';
+import {
+  ReactFlow,
+  Background,
+  ReactFlowProvider,
+  NodeChange,
+  EdgeChange,
+  Connection,
+  OnNodesChange,
+  OnEdgesChange,
+  OnConnect,
+  NodeTypes,
+  EdgeTypes,
+  ReactFlowInstance,
+  XYPosition,
+  Node,
+  Edge,
+  OnInit,
+  NodeMouseHandler,
+  OnNodesDelete,
+  SelectionMode,
+  ConnectionMode,
+} from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import { useSelector, useDispatch } from 'react-redux';
 import Operator from './footer/Operator';
+import AddNodePopoverFooter from './footer/AddNodePopoverFooter';
 import {
   nodesChange,
   edgesChange,
@@ -14,7 +36,7 @@ import {
   setNodes,
 } from '../../store/flowSlice';
 import NodeSidebar from '../nodes/nodeSidebar/NodeSidebar';
-import { Dropdown, DropdownMenu, DropdownSection, DropdownItem } from '@nextui-org/react';
+import { Dropdown, DropdownTrigger, DropdownMenu, DropdownSection, DropdownItem, Button } from '@nextui-org/react';
 import DynamicNode from '../nodes/DynamicNode';
 import { v4 as uuidv4 } from 'uuid';
 import { addNodeBetweenNodes } from './AddNodePopoverCanvas';
@@ -26,42 +48,28 @@ import useCopyPaste from '../../utils/useCopyPaste';
 import { useModeStore } from '../../store/modeStore';
 import { initializeFlow } from '../../store/flowSlice';
 import InputNode from '../nodes/InputNode';
-import { IfElseNode } from '../nodes/logic/IfElseNode';
+import IfElseNode from '../nodes/logic/IfElseNode';
 import MergeNode from '../nodes/logic/MergeNode';
 import { useSaveWorkflow } from '../../hooks/useSaveWorkflow';
 import LoadingSpinner from '../LoadingSpinner';
 import dagre from '@dagrejs/dagre';
 import CollapsibleNodePanel from '../nodes/CollapsibleNodePanel';
+import { WorkflowNode, Workflow, TestInput, WorkflowData } from '../../types/workflow';
+import { ReactFlowNode, CustomEdge as CustomEdgeType, workflowToReactFlowNode, reactFlowToWorkflowNode, ReactFlowInstance as CustomReactFlowInstance } from '../../types/reactflow';
+import { WritableDraft } from 'immer';
+import { findNodeSchema, NODE_TYPES, NodeTypesByCategory } from '../../types/nodes/base';
+import { NodeType } from '../../types/nodes/custom';
+import { NodeTypesConfig } from '../../types/store/nodeTypes';
 
 // Type definitions
-interface NodeTypesConfig {
-  [category: string]: Array<{
-    name: string;
-    [key: string]: any;
-  }>;
-}
-
-interface WorkflowData {
-  definition: {
-    nodes: Array<{
-      node_type: string;
-      config: {
-        input_schema?: {
-          [key: string]: string;
-        };
-      };
-    }>;
-  };
-}
-
 interface FlowCanvasProps {
   workflowData?: WorkflowData;
   workflowID?: string;
 }
 
 interface HelperLines {
-  horizontal: number | null;
-  vertical: number | null;
+  horizontal: number | undefined;
+  vertical: number | undefined;
 }
 
 interface RootState {
@@ -69,27 +77,34 @@ interface RootState {
     data: NodeTypesConfig;
   };
   flow: {
-    nodes: Node[];
-    edges: Edge[];
+    nodes: WorkflowNode[];
+    edges: CustomEdgeType[];
     selectedNode: string | null;
+    workflowID?: string;
   };
 }
 
-const useNodeTypes = ({ nodeTypesConfig }: { nodeTypesConfig: NodeTypesConfig | undefined }) => {
-  const nodeTypes = useMemo<NodeTypes>(() => {
+const useNodeTypes = ({ nodeTypesConfig }: { nodeTypesConfig: Record<string, NodeType[]> | undefined }) => {
+  const nodeTypes = useMemo<Record<string, React.ComponentType<any>>>(() => {
     if (!nodeTypesConfig) return {};
-    return Object.keys(nodeTypesConfig).reduce<NodeTypes>((acc, category) => {
+    return Object.keys(nodeTypesConfig).reduce<Record<string, React.ComponentType<any>>>((acc, category) => {
       nodeTypesConfig[category].forEach(node => {
-        if (node.name === 'InputNode') {
-          acc[node.name] = InputNode;
-        } else if (node.name === 'IfElseNode') {
-          acc[node.name] = IfElseNode;
-        } else if (node.name === 'MergeNode') {
-          acc[node.name] = MergeNode;
+        const nodeType = node.type || node.name;
+        const schema = findNodeSchema(nodeType, nodeTypesConfig);
+        if (!schema) {
+          console.warn(`Node schema for type "${nodeType}" not found in category ${category}`);
+          return;
+        }
+        if (nodeType === 'InputNode') {
+          acc[nodeType] = InputNode;
+        } else if (nodeType === 'IfElseNode') {
+          acc[nodeType] = IfElseNode;
+        } else if (nodeType === 'MergeNode') {
+          acc[nodeType] = MergeNode;
         } else {
-          acc[node.name] = (props: any) => {
-            return <DynamicNode {...props} type={node.name} />;
-          };
+          acc[nodeType] = (props: any) => (
+            <DynamicNode {...props} type={nodeType} config={schema.config} />
+          );
         }
       });
       return acc;
@@ -101,7 +116,7 @@ const useNodeTypes = ({ nodeTypesConfig }: { nodeTypesConfig: NodeTypesConfig | 
 };
 
 const edgeTypes: EdgeTypes = {
-  custom: CustomEdge,
+  custom: CustomEdge as any, // TODO: Fix this type assertion once EdgeTypes is properly typed
 };
 
 // Create a wrapper component that includes ReactFlow logic
@@ -112,24 +127,44 @@ const FlowCanvasContent: React.FC<FlowCanvasProps> = (props) => {
   const nodeTypesConfig = useSelector((state: RootState) => state.nodeTypes.data);
 
   useEffect(() => {
-    if (workflowData) {
-      console.log('workflowData', workflowData);
-      if (workflowData.definition.nodes) {
-        const inputNode = workflowData.definition.nodes.filter(node => node.node_type === 'InputNode');
-        if (inputNode.length > 0) {
-          const inputSchema = inputNode[0].config.input_schema;
-          if (inputSchema) {
-            const workflowInputVariables = Object.entries(inputSchema).map(([key, type]) => {
-              return { key, value: '' };
-            });
-            workflowInputVariables.forEach(variable => {
-              dispatch(setWorkflowInputVariable(variable));
-            });
-          }
-        }
-      }
-      dispatch(initializeFlow({ nodeTypes: nodeTypesConfig, ...workflowData, workflowID }));
+    if (!workflowData) return;
+
+    console.log('workflowData', workflowData);
+    const nodes = workflowData.definition.nodes || [];
+    const edges = workflowData.definition.edges || [];
+
+    const inputNode = nodes.find(
+      (node: WorkflowNode) => node.type === 'InputNode'
+    );
+    if (inputNode?.data?.config?.input_schema) {
+      const workflowInputVariables = Object.entries(inputNode.data.config.input_schema).map(([key, type]) => ({
+        key,
+        value: '',
+      }));
+      workflowInputVariables.forEach(variable => {
+        dispatch(setWorkflowInputVariable(variable));
+      });
     }
+    dispatch(initializeFlow({
+      nodeTypes: Object.entries(nodeTypesConfig).reduce((acc, [key, value]) => {
+        acc[key] = (Array.isArray(value) ? value : [value]).map(node => ({
+          name: node.name || key,
+          type: node.type || node.name || key,
+          visual_tag: node.visual_tag,
+          config: node.config,
+          input: { properties: {} },
+          output: { properties: {} }
+        } as NodeType));
+        return acc;
+      }, {} as NodeTypesByCategory),
+      definition: {
+        nodes: nodes,
+        edges: edges,
+        test_inputs: workflowData.definition.test_inputs || []
+      },
+      workflowID: workflowID || '',
+      name: workflowData.name || 'Untitled Workflow'
+    }));
   }, [dispatch, workflowData, workflowID, nodeTypesConfig]);
 
   const { nodeTypes, isLoading } = useNodeTypes({ nodeTypesConfig });
@@ -140,12 +175,12 @@ const FlowCanvasContent: React.FC<FlowCanvasProps> = (props) => {
 
   const saveWorkflow = useSaveWorkflow([nodes, edges], 10000);
 
-  const [reactFlowInstance, setReactFlowInstance] = useState<ReactFlowInstance | null>(null);
-  const [helperLines, setHelperLines] = useState<HelperLines>({ horizontal: null, vertical: null });
+  const [reactFlowInstance, setReactFlowInstance] = useState<ReactFlowInstance<ReactFlowNode, CustomEdgeType> | null>(null);
+  const [helperLines, setHelperLines] = useState<HelperLines>({ horizontal: undefined, vertical: undefined });
   const [hoveredNode, setHoveredNode] = useState<string | null>(null);
   const [hoveredEdge, setHoveredEdge] = useState<string | null>(null);
   const [isPopoverContentVisible, setPopoverContentVisible] = useState(false);
-  const [selectedEdge, setSelectedEdge] = useState<{ sourceNode: Node; targetNode: Node; edgeId: string } | null>(null);
+  const [selectedEdge, setSelectedEdge] = useState<{ sourceNode: ReactFlowNode; targetNode: ReactFlowNode; edgeId: string } | null>(null);
   const [popoverPosition, setPopoverPosition] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
 
   const showHelperLines = false;
@@ -153,7 +188,7 @@ const FlowCanvasContent: React.FC<FlowCanvasProps> = (props) => {
   const onNodesChange: OnNodesChange = useCallback(
     (changes: NodeChange[]) => {
       if (!changes.some((c) => c.type === 'position')) {
-        setHelperLines({ horizontal: null, vertical: null });
+        setHelperLines({ horizontal: undefined, vertical: undefined });
         dispatch(nodesChange({ changes }));
         return;
       }
@@ -163,14 +198,28 @@ const FlowCanvasContent: React.FC<FlowCanvasProps> = (props) => {
           c.type === 'position' && c.position !== undefined
       );
 
-      if (positionChange && showHelperLines) {
-        const { horizontal, vertical } = getHelperLines(positionChange, nodes);
-        setHelperLines({ horizontal, vertical });
+      if (positionChange?.position && showHelperLines) {
+        const movingNode = nodes.find(n => n.id === positionChange.id);
+        const { horizontal, vertical } = getHelperLines(
+          {
+            id: positionChange.id,
+            position: positionChange.position
+          },
+          nodes.map(node => ({
+            id: node.id,
+            position: node.position || { x: 0, y: 0 }
+          }))
+        );
 
-        if (horizontal || vertical) {
-          const snapPosition = { x: positionChange.position.x, y: positionChange.position.y };
-          if (horizontal) snapPosition.y = horizontal;
-          if (vertical) snapPosition.x = vertical;
+        setHelperLines({
+          horizontal: horizontal ?? undefined,
+          vertical: vertical ?? undefined
+        });
+
+        if (horizontal !== undefined || vertical !== undefined) {
+          const snapPosition = { ...positionChange.position };
+          if (horizontal !== undefined) snapPosition.y = horizontal;
+          if (vertical !== undefined) snapPosition.x = vertical;
           positionChange.position = snapPosition;
         }
       }
@@ -200,7 +249,7 @@ const FlowCanvasContent: React.FC<FlowCanvasProps> = (props) => {
           }
 
           const updatedInputSchema = {
-            ...targetNode.data?.config?.input_schema,
+            ...targetNode.data.config.input_schema,
             [outputHandleName]: 'str',
           };
 
@@ -209,7 +258,7 @@ const FlowCanvasContent: React.FC<FlowCanvasProps> = (props) => {
               id: targetNode.id,
               data: {
                 config: {
-                  ...targetNode.data?.config,
+                  ...targetNode.data.config,
                   input_schema: updatedInputSchema,
                 },
               },
@@ -223,17 +272,19 @@ const FlowCanvasContent: React.FC<FlowCanvasProps> = (props) => {
         }
       }
 
-      const newEdge: Edge = {
-        ...connection,
-        id: uuidv4(),
-        key: uuidv4(),
+      const newConnection: Connection = {
+        source: connection.source,
+        target: connection.target,
+        sourceHandle: connection.sourceHandle,
+        targetHandle: connection.targetHandle,
       };
-      dispatch(connect({ connection: newEdge }));
+
+      dispatch(connect({ connection: newConnection }));
     },
     [dispatch, nodes]
   );
 
-  const handlePopoverOpen = useCallback(({ sourceNode, targetNode, edgeId }: { sourceNode: Node; targetNode: Node; edgeId: string }) => {
+  const handlePopoverOpen = useCallback(({ sourceNode, targetNode, edgeId }: { sourceNode: ReactFlowNode; targetNode: ReactFlowNode; edgeId: string }) => {
     if (!reactFlowInstance) return;
 
     const centerX = (sourceNode.position.x + targetNode.position.x) / 2;
@@ -274,7 +325,7 @@ const FlowCanvasContent: React.FC<FlowCanvasProps> = (props) => {
   }, [edges, hoveredNode, hoveredEdge, handlePopoverOpen]);
 
   const onEdgeMouseEnter = useCallback(
-    (_: React.MouseEvent, edge: Edge) => {
+    (_: React.MouseEvent, edge: CustomEdgeType) => {
       setHoveredEdge(edge.id);
     },
     []
@@ -284,13 +335,13 @@ const FlowCanvasContent: React.FC<FlowCanvasProps> = (props) => {
     setHoveredEdge(null);
   }, []);
 
-  const onInit = useCallback((instance: ReactFlowInstance) => {
+  const onInit: OnInit<ReactFlowNode, CustomEdgeType> = useCallback((instance: ReactFlowInstance<ReactFlowNode, CustomEdgeType>) => {
     setReactFlowInstance(instance);
-    instance.setViewport({ x: 0, y: 0, zoom: 0.8 });
+    instance.fitView();
   }, []);
 
-  const onNodeClick = useCallback(
-    (_: React.MouseEvent, node: Node) => {
+  const onNodeClick: NodeMouseHandler<ReactFlowNode> = useCallback(
+    (_: React.MouseEvent, node: ReactFlowNode) => {
       dispatch(setSelectedNode({ nodeId: node.id }));
     },
     [dispatch]
@@ -302,13 +353,15 @@ const FlowCanvasContent: React.FC<FlowCanvasProps> = (props) => {
     }
   }, [dispatch, selectedNodeID]);
 
-  const onNodesDelete = useCallback(
-    (deletedNodes: Node[]) => {
+  const onNodesDelete: OnNodesDelete<ReactFlowNode> = useCallback(
+    (deletedNodes: ReactFlowNode[]) => {
       deletedNodes.forEach((node) => {
-        dispatch(deleteNode({ nodeId: node.id }));
+        if (node.id) {
+          dispatch(deleteNode({ nodeId: node.id }));
 
-        if (selectedNodeID === node.id) {
-          dispatch(setSelectedNode({ nodeId: null }));
+          if (selectedNodeID === node.id) {
+            dispatch(setSelectedNode({ nodeId: null }));
+          }
         }
       });
     },
@@ -330,7 +383,7 @@ const FlowCanvasContent: React.FC<FlowCanvasProps> = (props) => {
     [nodes, onNodesDelete]
   );
 
-  const getLayoutedNodes = (nodes: Node[], edges: Edge[], direction = 'LR') => {
+  const getLayoutedNodes = (nodes: ReactFlowNode[], edges: CustomEdgeType[], direction = 'LR') => {
     const dagreGraph = new dagre.graphlib.Graph();
     dagreGraph.setGraph({
       rankdir: direction,
@@ -342,8 +395,8 @@ const FlowCanvasContent: React.FC<FlowCanvasProps> = (props) => {
     dagreGraph.setDefaultEdgeLabel(() => ({}));
 
     nodes.forEach((node) => {
-      if (node.measured) {
-        dagreGraph.setNode(node.id, { width: node.measured.width, height: node.measured.height });
+      if (node.width && node.height) {
+        dagreGraph.setNode(node.id, { width: node.width, height: node.height });
       }
     });
 
@@ -362,11 +415,11 @@ const FlowCanvasContent: React.FC<FlowCanvasProps> = (props) => {
     });
 
     // Perform a topological sort to determine the order of processing nodes
-    let sortedNodes: Node[] = [];
+    let sortedNodes: ReactFlowNode[] = [];
     const visited = new Set<string>();
     const visiting = new Set<string>();
 
-    const visit = (node: Node) => {
+    const visit = (node: ReactFlowNode) => {
       if (visited.has(node.id)) {
         return;
       }
@@ -428,16 +481,18 @@ const FlowCanvasContent: React.FC<FlowCanvasProps> = (props) => {
       return {
         ...node,
         position: {
-          x: nodeWithPosition.x - (node.measured?.width || 0) / 2,
-          y: nodeWithPosition.y - (node.measured?.height || 0) / 2,
+          x: nodeWithPosition.x - (node.width || 0) / 2,
+          y: nodeWithPosition.y - (node.height || 0) / 2,
         },
       };
     });
   };
 
   const handleLayout = useCallback(() => {
-    const layoutedNodes = getLayoutedNodes(nodes, edges);
-    dispatch(setNodes({ nodes: layoutedNodes }));
+    const reactFlowNodes = nodes.map(workflowToReactFlowNode);
+    const layoutedNodes = getLayoutedNodes(reactFlowNodes, edges);
+    const workflowNodes = layoutedNodes.map(reactFlowToWorkflowNode) as WritableDraft<WorkflowNode>[];
+    dispatch(setNodes(workflowNodes));
   }, [nodes, edges, dispatch]);
 
   useEffect(() => {
@@ -447,7 +502,11 @@ const FlowCanvasContent: React.FC<FlowCanvasProps> = (props) => {
     };
   }, [handleKeyDown]);
 
-  useKeyboardShortcuts(selectedNodeID, nodes, dispatch);
+  useKeyboardShortcuts(
+    selectedNodeID,
+    nodes.map(workflowToReactFlowNode) as WorkflowNode[],
+    dispatch
+  );
 
   const { cut, copy, paste, bufferedNodes } = useCopyPaste();
   useCopyPaste();
@@ -461,19 +520,22 @@ const FlowCanvasContent: React.FC<FlowCanvasProps> = (props) => {
   const nodesWithMode = useMemo(() => {
     return nodes
       .filter(Boolean)
-      .map(node => ({
-        ...node,
-        draggable: true,
-        selectable: mode === 'pointer',
-        position: node?.position,
-        type: node?.type,
-        data: node?.data,
-      }));
+      .map((node: WorkflowNode) => {
+        const reactFlowNode = workflowToReactFlowNode(node);
+        return {
+          ...reactFlowNode,
+          draggable: true,
+          selectable: mode === 'select',
+        };
+      });
   }, [nodes, mode]);
 
-  const onNodeMouseEnter = useCallback((_: React.MouseEvent, node: Node) => {
-    setHoveredNode(node.id);
-  }, []);
+  const onNodeMouseEnter: NodeMouseHandler<ReactFlowNode> = useCallback(
+    (_: React.MouseEvent, node: ReactFlowNode) => {
+      setHoveredNode(node.id);
+    },
+    []
+  );
 
   const onNodeMouseLeave = useCallback(() => {
     setHoveredNode(null);
@@ -495,31 +557,35 @@ const FlowCanvasContent: React.FC<FlowCanvasProps> = (props) => {
             zIndex: 1000,
           }}
         >
-          <Dropdown
-            isOpen={isPopoverContentVisible}
-            onOpenChange={setPopoverContentVisible}
-            placement="bottom"
-          >
-            <DropdownMenu>
-              {nodeTypesConfig && Object.keys(nodeTypesConfig).map((category) => (
+          <Dropdown>
+            <DropdownTrigger>
+              <Button>Add Node</Button>
+            </DropdownTrigger>
+            <DropdownMenu aria-label="Add node between nodes">
+              {nodeTypesConfig && Object.entries(nodeTypesConfig).map(([category, nodes]) => (
                 <DropdownSection key={category} title={category} showDivider>
-                  {nodeTypesConfig[category].map((node) => (
+                  {nodes.map((node) => (
                     <DropdownItem
                       key={node.name}
-                      onClick={() =>
-                        addNodeBetweenNodes(
-                          nodeTypesConfig,
-                          node.name,
-                          selectedEdge.sourceNode,
-                          selectedEdge.targetNode,
-                          selectedEdge.edgeId,
-                          reactFlowInstance,
-                          dispatch,
-                          setPopoverContentVisible
-                        )
-                      }
+                      onClick={() => {
+                        const nodeTypeConfig = nodeTypesConfig[node.name]?.[0];
+                        if (nodeTypeConfig) {
+                          addNodeBetweenNodes(
+                            nodeTypesConfig as NodeTypesByCategory,
+                            nodeTypeConfig.name,
+                            selectedEdge.sourceNode,
+                            selectedEdge.targetNode,
+                            selectedEdge.edgeId,
+                            reactFlowInstance as unknown as ReactFlowInstance,
+                            dispatch,
+                            setPopoverContentVisible
+                          );
+                        }
+                      }}
                     >
-                      {node.config.title}
+                      <div className="text-sm">
+                        {String(node.config?.title || node.name)}
+                      </div>
                     </DropdownItem>
                   ))}
                 </DropdownSection>
@@ -557,14 +623,14 @@ const FlowCanvasContent: React.FC<FlowCanvasProps> = (props) => {
             zoomOnScroll={true}
             minZoom={0.1}
             maxZoom={2}
-            selectionMode={mode === 'pointer' ? 1 : 0}
+            selectionMode={mode === 'pointer' ? SelectionMode.Partial : SelectionMode.Full}
             selectNodesOnDrag={mode === 'pointer'}
             selectionOnDrag={mode === 'pointer'}
-            selectionKeyCode={mode === 'pointer' ? null : false}
-            multiSelectionKeyCode={mode === 'pointer' ? null : false}
+            selectionKeyCode={mode === 'pointer' ? 'Shift' : null}
+            multiSelectionKeyCode={mode === 'pointer' ? 'Control' : null}
             deleteKeyCode="Delete"
             nodesConnectable={true}
-            connectionMode="loose"
+            connectionMode={ConnectionMode.Loose}
             onNodeMouseEnter={onNodeMouseEnter}
             onNodeMouseLeave={onNodeMouseLeave}
             onEdgeMouseEnter={onEdgeMouseEnter}
@@ -580,6 +646,7 @@ const FlowCanvasContent: React.FC<FlowCanvasProps> = (props) => {
               />
             )}
             <Operator handleLayout={handleLayout} />
+            <AddNodePopoverFooter />
           </ReactFlow>
         </div>
         {selectedNodeID && (

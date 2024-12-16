@@ -5,7 +5,7 @@ import { Input, Card, Divider, Button, Select, SelectItem, RadioGroup, Radio } f
 import { useDispatch } from 'react-redux';
 import { updateNodeData } from '../../../store/flowSlice';
 import { Icon } from "@iconify/react";
-import { BaseNodeData, BaseNodeProps, BaseNodeConfig } from '../../../types/nodes/base';
+import { NodeData, BaseNodeProps, BaseNodeConfig } from '../../../types/nodes/base';
 
 interface Condition {
   logicalOperator?: 'AND' | 'OR';
@@ -22,11 +22,11 @@ interface IfElseNodeConfig extends BaseNodeConfig {
   branches: Branch[];
 }
 
-interface IfElseNodeData extends Omit<BaseNodeData, 'config'> {
+interface IfElseNodeData extends NodeData<IfElseNodeConfig> {
   config: IfElseNodeConfig;
 }
 
-interface IfElseNodeProps extends Omit<BaseNodeProps, 'data'> {
+interface IfElseNodeProps extends Omit<BaseNodeProps<IfElseNodeConfig>, 'isCollapsed' | 'setIsCollapsed'> {
   data: IfElseNodeData;
 }
 
@@ -52,10 +52,21 @@ const DEFAULT_BRANCH: Branch = {
   conditions: [{ ...DEFAULT_CONDITION }]
 };
 
-export const IfElseNode: React.FC<IfElseNodeProps> = ({ id, data, isCollapsed, setIsCollapsed, ...props }) => {
+export const IfElseNode: React.FC<IfElseNodeProps> = ({
+  id,
+  data,
+  type,
+  dragging,
+  zIndex,
+  isConnectable = true,
+  positionAbsoluteX,
+  positionAbsoluteY,
+  ...props
+}) => {
   const [nodeWidth, setNodeWidth] = useState<string>('auto');
   const nodeRef = useRef<HTMLDivElement | null>(null);
   const dispatch = useDispatch();
+  const [isCollapsed, setIsCollapsed] = useState(false);
 
   const inputVariables = Object.entries(data.config?.input_schema || {}).map(([key, type]) => ({
     value: key,
@@ -141,7 +152,7 @@ export const IfElseNode: React.FC<IfElseNodeProps> = ({ id, data, isCollapsed, s
             ...(branch.conditions || []),
             { ...DEFAULT_CONDITION, logicalOperator: 'AND' }
           ]
-        };
+        } satisfies Branch;
       }
       return branch;
     });
@@ -183,8 +194,6 @@ export const IfElseNode: React.FC<IfElseNodeProps> = ({ id, data, isCollapsed, s
   return (
     <BaseNode
       id={id}
-      isCollapsed={isCollapsed}
-      setIsCollapsed={setIsCollapsed}
       data={{
         ...data,
         title: data.config?.title || 'Conditional Router',
@@ -195,6 +204,14 @@ export const IfElseNode: React.FC<IfElseNodeProps> = ({ id, data, isCollapsed, s
           title: data.config?.title || 'Conditional Router'
         }
       }}
+      type={type}
+      dragging={dragging}
+      zIndex={zIndex}
+      isConnectable={isConnectable}
+      positionAbsoluteX={positionAbsoluteX}
+      positionAbsoluteY={positionAbsoluteY}
+      isCollapsed={isCollapsed}
+      setIsCollapsed={setIsCollapsed}
       style={{ width: nodeWidth }}
       className="hover:!bg-background"
       {...props}

@@ -22,6 +22,7 @@ import {
 import { Icon } from "@iconify/react";
 import { listApiKeys, setApiKey, getApiKey } from "../../utils/api";
 import { useTheme } from "next-themes";
+import { ApiKey } from "../../types/workflow";
 
 // CellWrapper Component
 const CellWrapper = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>(
@@ -91,17 +92,20 @@ SwitchCell.displayName = "SwitchCell";
 
 // APIKeys Component
 function APIKeys(props: CardProps) {
-  const [keys, setKeys] = useState<{ name: string; value: string }[]>([]);
-  const [originalKeys, setOriginalKeys] = useState<{ name: string; value: string }[]>([]);
+  const [keys, setKeys] = useState<ApiKey[]>([]);
+  const [originalKeys, setOriginalKeys] = useState<ApiKey[]>([]);
 
   useEffect(() => {
     const fetchApiKeys = async () => {
       try {
         const keys = await listApiKeys();
         const keyValues = await Promise.all(
-          keys.map(async (key: string) => {
-            const value = await getApiKey(key);
-            return { name: value.name, value: value.value };
+          keys.map(async (apiKey) => {
+            const value = await getApiKey(apiKey.name);
+            return {
+              name: apiKey.name,
+              value: value?.value || ''
+            } as ApiKey;
           })
         );
 

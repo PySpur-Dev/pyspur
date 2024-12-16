@@ -11,20 +11,17 @@ import { Input, Button } from '@nextui-org/react';
 import { Icon } from '@iconify/react';
 import { useSaveWorkflow } from '../../hooks/useSaveWorkflow';
 import { RootState } from '../../store/store';
-import { BaseNodeData, BaseNodeProps, BaseNodeConfig, WorkflowNode } from '../../types/nodes/base';
+import { NodeData, BaseNodeProps, WorkflowNode, DynamicNodeConfig } from '../../types/nodes/base';
 
-interface InputNodeConfig extends BaseNodeConfig {
-  input_schema?: Record<string, string>;
-  output_schema?: Record<string, string>;
+interface InputNodeConfig extends DynamicNodeConfig {
+  input_schema: Record<string, unknown>;
+  output_schema: Record<string, unknown>;
+  few_shot_examples?: Array<Record<string, string>>;
 }
 
-interface InputNodeData extends Omit<BaseNodeData, 'config'> {
-  config: InputNodeConfig;
-}
+type InputNodeData = NodeData<InputNodeConfig>;
 
-interface InputNodeProps extends Omit<BaseNodeProps, 'data'> {
-  data: InputNodeData;
-}
+type InputNodeProps = BaseNodeProps<InputNodeConfig>;
 
 const InputNode: React.FC<InputNodeProps> = ({ id, data, isCollapsed, setIsCollapsed, ...props }) => {
   const dispatch = useDispatch();
@@ -48,12 +45,14 @@ const InputNode: React.FC<InputNodeProps> = ({ id, data, isCollapsed, setIsColla
     }
   }, [workflowInputKeys, data?.config]);
 
-  const saveWorkflow = useSaveWorkflow();
   const nodes = useSelector((state: RootState) => state.flow.nodes);
+  const [workflowTrigger, setWorkflowTrigger] = useState<number>(0);
+  const saveWorkflow = useSaveWorkflow(workflowTrigger);
 
   const syncAndSave = useCallback(() => {
     const inputNode = nodes.find((node: WorkflowNode) => node.id === id);
     if (!inputNode) return;
+    setWorkflowTrigger(prev => prev + 1);
     saveWorkflow();
   }, [id, nodes, saveWorkflow]);
 
@@ -212,20 +211,10 @@ const InputNode: React.FC<InputNodeProps> = ({ id, data, isCollapsed, setIsColla
     <div className="node-container">
       <BaseNode
         id={id}
-        type="input"
+        data={data}
         isInputNode={true}
         isCollapsed={isCollapsed}
         setIsCollapsed={setIsCollapsed}
-        data={{
-          ...data,
-          title: data.config?.title || 'Input Node',
-          color: data.color || '#2196F3',
-          acronym: 'IN',
-          config: {
-            ...data.config,
-            title: data.config?.title || 'Input Node'
-          }
-        }}
         style={{ width: nodeWidth }}
         className="hover:!bg-background"
         {...props}
