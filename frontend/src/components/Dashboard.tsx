@@ -20,12 +20,13 @@ import {
   AccordionItem
 } from '@nextui-org/react';
 import { Icon } from '@iconify/react';
-import { getWorkflows, createWorkflow, uploadDataset, startBatchRun, deleteWorkflow, getTemplates, instantiateTemplate, duplicateWorkflow } from '../utils/api';
+import { getWorkflows, getWorkflowRuns, createWorkflow, uploadDataset, startBatchRun, deleteWorkflow, getTemplates, instantiateTemplate, duplicateWorkflow } from '../utils/api';
 import { useRouter } from 'next/router';
 import TemplateCard from './cards/TemplateCard';
 import WorkflowBatchRunsTable from './WorkflowBatchRunsTable';
 import { Template } from '../types/workflow';
-import { WorkflowCreateRequest, WorkflowDefinition, WorkflowResponse } from '@/types/api_types/workflowSchemas';
+import { WorkflowResponse, WorkflowCreateRequest, WorkflowDefinition } from '@/types/api_types/workflowSchemas';
+import { RunResponse } from '../types/api_types/runSchemas';
 
 const Dashboard: React.FC = () => {
   const { isOpen, onOpen, onOpenChange } = useDisclosure();
@@ -33,21 +34,30 @@ const Dashboard: React.FC = () => {
   const [file, setFile] = useState<File | null>(null);
   const [progress, setProgress] = useState<number>(0);
   const router = useRouter();
-
   const [workflows, setWorkflows] = useState<WorkflowResponse[]>([]);
+  const [workflowRuns, setWorkflowRuns] = useState<Record<string, RunResponse[]>>({});
+
   const [templates, setTemplates] = useState<Template[]>([]);
 
   useEffect(() => {
-    const fetchWorkflows = async () => {
+    const fetchWorkflowsAndRuns = async () => {
       try {
         const workflows = await getWorkflows();
-        setWorkflows(workflows as WorkflowResponse[]);
+        setWorkflows(workflows);
+
+        // Fetch runs for each workflow
+        const runsMap: Record<string, RunResponse[]> = {};
+        for (const workflow of workflows) {
+          const runs = await getWorkflowRuns(workflow.id);
+          runsMap[workflow.id] = runs.slice(0, 5); // Get only the 5 most recent runs
+        }
+        setWorkflowRuns(runsMap);
       } catch (error) {
-        console.error('Error fetching workflows:', error);
+        console.error('Error fetching workflows and runs:', error);
       }
     };
 
-    fetchWorkflows();
+    fetchWorkflowsAndRuns();
   }, []);
 
   useEffect(() => {
@@ -67,6 +77,7 @@ const Dashboard: React.FC = () => {
     { key: "id", label: "ID" },
     { key: "name", label: "Name" },
     { key: "description", label: "Description" },
+    { key: "recent_runs", label: "Recent Runs" },
     { key: "action", label: "Action" },
   ];
 
@@ -120,7 +131,12 @@ const Dashboard: React.FC = () => {
       const uniqueName = `New Spur ${new Date().toLocaleString()}`;
       const newWorkflow: WorkflowCreateRequest = {
         name: uniqueName,
-        description: ''
+        description: '',
+        definition: {
+          nodes: [],
+          links: [],
+          test_inputs: []
+        }
       };
 
       const createdWorkflow = await createWorkflow(newWorkflow);
@@ -150,13 +166,17 @@ const Dashboard: React.FC = () => {
             const result = e.target?.result;
             if (typeof result !== 'string') return;
 
-            const jsonContent: WorkflowCreateRequest = JSON.parse(result);
+            const jsonContent = JSON.parse(result);
             const uniqueName = `Imported Spur ${new Date().toLocaleString()}`;
 
             const newWorkflow: WorkflowCreateRequest = {
               name: uniqueName,
-              description: jsonContent.description,
-              definition: jsonContent.definition as WorkflowDefinition
+              description: jsonContent.description || '',
+              definition: {
+                nodes: jsonContent.definition?.nodes || [],
+                links: jsonContent.definition?.links || [],
+                test_inputs: jsonContent.definition?.test_inputs || []
+              }
             };
             const createdWorkflow = await createWorkflow(newWorkflow);
             router.push(`/workflows/${createdWorkflow.id}`);
@@ -282,7 +302,21 @@ const Dashboard: React.FC = () => {
                     <TableRow key={workflow.id}>
                       {(columnKey) => (
                         <TableCell>
-                          {columnKey === "action" ? (
+                          {columnKey === "recent_runs" ? (
+                            <div className="flex gap-2 items-center">
+                              {workflowRuns[workflow.id]?.map((run) => (
+                                <Button
+                                  key={run.id}
+                                  size="sm"
+                                  variant="flat"
+                                  onClick={() => window.open(`/trace/${run.id}`, '_blank')}
+                                  className="min-w-0"
+                                >
+                                  {run.id.slice(0, 8)}
+                                </Button>
+                              ))}
+                            </div>
+                          ) : columnKey === "action" ? (
                             <div className="flex items-center gap-2">
                               <Icon
                                 icon="solar:play-bold"
