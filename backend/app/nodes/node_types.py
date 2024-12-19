@@ -20,6 +20,11 @@ SUPPORTED_NODE_TYPES = {
             "module": ".nodes.primitives.static_value",
             "class_name": "StaticValueNode",
         },
+        {
+            "node_type_name": "GoogleSheetsNode",
+            "module": ".nodes.integrations.google_sheets",
+            "class_name": "GoogleSheetsNode",
+        },
     ],
     "Logic": [
         {
