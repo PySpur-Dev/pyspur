@@ -1,52 +1,19 @@
-import { FlowWorkflowNode, FlowWorkflowNodeConfig } from '@/store/flowSlice';
+import { FlowWorkflowNode, FlowWorkflowNodeConfig, Position } from '@/store/flowSlice';
 import cloneDeep from 'lodash/cloneDeep';
-
-// Define types for the node structure
-interface NodeType {
-  name: string;
-  visual_tag: {
-    acronym: string;
-    color: string;
-  };
-  config: Record<string, any>;
-  input?: {
-    properties: Record<string, any>;
-  };
-  output?: {
-    properties: Record<string, any>;
-  };
-}
-
-interface NodeTypes {
-  [category: string]: NodeType[];
-}
-
-interface Position {
-  x: number;
-  y: number;
-}
-
-interface AdditionalData {
-  input?: {
-    properties?: Record<string, any>;
-  };
-  output?: {
-    properties?: Record<string, any>;
-  };
-  [key: string]: any;
-}
+import {
+  FlowWorkflowNodeType, 
+  FlowWorkflowNodeTypesByCategory 
+} from '@/store/nodeTypesSlice';
 
 
 // Function to create a node based on its type
 export const createNode = (
-  nodeTypes: NodeTypes,
+  nodeTypes: FlowWorkflowNodeTypesByCategory,
   type: string,
   id: string,
   position: Position,
-  additionalData: AdditionalData = {}
 ): { node: FlowWorkflowNode, config: FlowWorkflowNodeConfig } | null => {
-  let nodeType: NodeType | null = null;
-
+  let nodeType: FlowWorkflowNodeType | null = null;
   for (const category in nodeTypes) {
     const found = nodeTypes[category].find((node) => node.name === type);
     if (found) {
@@ -58,7 +25,7 @@ export const createNode = (
     return null;
   }
 
-  let processedAdditionalData = cloneDeep(additionalData);
+
   let config = cloneDeep(nodeType.config);
   config = {
     ...config,
@@ -73,7 +40,6 @@ export const createNode = (
       title: id,
       acronym: nodeType.visual_tag.acronym,
       color: nodeType.visual_tag.color,
-
     },
   };
   return { node, config };

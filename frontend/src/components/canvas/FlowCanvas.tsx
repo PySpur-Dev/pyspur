@@ -3,7 +3,6 @@ import {
   ReactFlow,
   Background,
   ReactFlowProvider,
-  Node,
   Edge,
   EdgeTypes,
   ReactFlowInstance,
@@ -37,7 +36,7 @@ import { getLayoutedNodes } from '@/utils/nodeLayoutUtils';
 import { WorkflowCreateRequest } from '@/types/api_types/workflowSchemas';
 import { RootState } from '../../store/store';
 import { useNodeTypes, useStyledEdges, useNodesWithMode, useFlowEventHandlers } from '../../utils/flowUtils';
-
+import isEqual from 'lodash/isEqual';
 
 // Type definitions
 
@@ -68,9 +67,9 @@ const FlowCanvasContent: React.FC<FlowCanvasProps> = (props) => {
     includeCoalesceNode: true
   });
 
+
   useEffect(() => {
     if (workflowData) {
-      console.log('workflowData', workflowData);
       dispatch(initializeFlow({
         nodeTypes: nodeTypesConfig,
         definition: workflowData.definition,
@@ -80,8 +79,8 @@ const FlowCanvasContent: React.FC<FlowCanvasProps> = (props) => {
     }
   }, [dispatch, workflowData, workflowID, nodeTypesConfig]);
 
-  const nodes = useSelector((state: RootState) => state.flow.nodes);
-  const edges = useSelector((state: RootState) => state.flow.edges);
+  const nodes = useSelector((state: RootState) => state.flow.nodes, isEqual);
+  const edges = useSelector((state: RootState) => state.flow.edges, isEqual);
   const selectedNodeID = useSelector((state: RootState) => state.flow.selectedNode);
 
   const saveWorkflow = useSaveWorkflow();
@@ -97,14 +96,14 @@ const FlowCanvasContent: React.FC<FlowCanvasProps> = (props) => {
   const [hoveredNode, setHoveredNode] = useState<string | null>(null);
   const [hoveredEdge, setHoveredEdge] = useState<string | null>(null);
   const [isPopoverContentVisible, setPopoverContentVisible] = useState(false);
-  const [selectedEdge, setSelectedEdge] = useState<{ sourceNode: Node; targetNode: Node; edgeId: string } | null>(null);
+  const [selectedEdge, setSelectedEdge] = useState<{ sourceNode: FlowWorkflowNode; targetNode: FlowWorkflowNode; edgeId: string } | null>(null);
   const [popoverPosition, setPopoverPosition] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
 
   const showHelperLines = false;
 
   const mode = useModeStore((state) => state.mode);
 
-  const handlePopoverOpen = useCallback(({ sourceNode, targetNode, edgeId }: { sourceNode: Node; targetNode: Node; edgeId: string }) => {
+  const handlePopoverOpen = useCallback(({ sourceNode, targetNode, edgeId }: { sourceNode: FlowWorkflowNode; targetNode: FlowWorkflowNode; edgeId: string }) => {
     if (!reactFlowInstance) return;
 
     const centerX = (sourceNode.position.x + targetNode.position.x) / 2;
@@ -158,7 +157,7 @@ const FlowCanvasContent: React.FC<FlowCanvasProps> = (props) => {
   }, []);
 
   const onNodeClick = useCallback(
-    (_: React.MouseEvent, node: Node) => {
+    (_: React.MouseEvent, node: FlowWorkflowNode) => {
       dispatch(setSelectedNode({ nodeId: node.id }));
     },
     [dispatch]
@@ -172,7 +171,7 @@ const FlowCanvasContent: React.FC<FlowCanvasProps> = (props) => {
   }, [dispatch, selectedNodeID]);
 
   const onNodesDelete = useCallback(
-    (deletedNodes: Node[]) => {
+    (deletedNodes: FlowWorkflowNode[]) => {
       deletedNodes.forEach((node) => {
         dispatch(deleteNode({ nodeId: node.id }));
 
@@ -212,7 +211,7 @@ const FlowCanvasContent: React.FC<FlowCanvasProps> = (props) => {
     };
   }, [handleKeyDown]);
 
-  useKeyboardShortcuts(selectedNodeID, nodes, nodeTypes, dispatch);
+  useKeyboardShortcuts(selectedNodeID, nodes, nodeTypes, nodeTypesConfig, dispatch);
 
   const { cut, copy, paste, bufferedNodes } = useCopyPaste();
   useCopyPaste();
@@ -221,7 +220,7 @@ const FlowCanvasContent: React.FC<FlowCanvasProps> = (props) => {
     hideAttribution: true
   };
 
-  const onNodeMouseEnter = useCallback((_: React.MouseEvent, node: Node) => {
+  const onNodeMouseEnter = useCallback((_: React.MouseEvent, node: FlowWorkflowNode) => {
     setHoveredNode(node.id);
   }, [setHoveredNode]);
 
@@ -231,8 +230,8 @@ const FlowCanvasContent: React.FC<FlowCanvasProps> = (props) => {
 
   const handleAddNodeBetween = useCallback((
     nodeName: string,
-    sourceNode: Node,
-    targetNode: Node,
+    sourceNode: FlowWorkflowNode,
+    targetNode: FlowWorkflowNode,
     edgeId: string
   ) => {
     insertNodeBetweenNodes(
@@ -242,7 +241,6 @@ const FlowCanvasContent: React.FC<FlowCanvasProps> = (props) => {
       sourceNode,
       targetNode,
       edgeId,
-      reactFlowInstance,
       dispatch,
       () => setPopoverContentVisible(false)
     );

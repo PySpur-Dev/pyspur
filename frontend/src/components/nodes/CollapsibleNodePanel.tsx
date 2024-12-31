@@ -6,23 +6,20 @@ import { ReactFlowInstance, useReactFlow } from '@xyflow/react';
 import { useHotkeys } from 'react-hotkeys-hook';
 
 import { AppDispatch, RootState } from '../../store/store';
-import type { NodeType } from '../../store/nodeTypesSlice';
+import type { FlowWorkflowNodeType, FlowWorkflowNodeTypesByCategory } from '../../store/nodeTypesSlice';
 import { setNodePanelExpanded } from '../../store/panelSlice';
 import { createNodeAtCenter } from '../../utils/flowUtils';
 
-interface NodeTypesByCategory {
-  [category: string]: NodeType[];
-}
 
 const CollapsibleNodePanel: React.FC = () => {
   const isExpanded = useSelector((state: RootState) => state.panel.isNodePanelExpanded);
   const dispatch = useDispatch();
   const nodes = useSelector((state: RootState) => state.flow.nodes);
-  const nodeTypes = useSelector((state: RootState) => state.nodeTypes.data as NodeTypesByCategory);
+  const nodeTypes = useSelector((state: RootState) => state.nodeTypes.data as FlowWorkflowNodeTypesByCategory);
   const reactFlowInstance = useReactFlow();
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<Set<string>>(new Set());
-  const [filteredNodeTypes, setFilteredNodeTypes] = useState<NodeTypesByCategory>({});
+  const [filteredNodeTypes, setFilteredNodeTypes] = useState<FlowWorkflowNodeTypesByCategory>({});
   const searchInputRef = useRef<HTMLInputElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
 
@@ -55,7 +52,7 @@ const CollapsibleNodePanel: React.FC = () => {
       if (searchTerm.trim().length === 0) {
         return nodeTypes;
       }
-      const filteredNodes = nodeTypes[category].filter((node: NodeType) =>
+      const filteredNodes = nodeTypes[category].filter((node: FlowWorkflowNodeType) =>
         node.name.toLowerCase().includes(searchTerm.toLowerCase())
       );
       if (filteredNodes.length > 0) {
@@ -69,7 +66,7 @@ const CollapsibleNodePanel: React.FC = () => {
         });
       }
       return acc;
-    }, {} as NodeTypesByCategory));
+    }, {} as FlowWorkflowNodeTypesByCategory));
   }, [nodeTypes, searchTerm]);
 
   const handleToggleExpand = () => {
@@ -107,7 +104,7 @@ const CollapsibleNodePanel: React.FC = () => {
           >
               {Object.keys(filteredNodeTypes).filter(category => category !== "Input/Output").map((category) => (
                 <AccordionItem key={category} title={category}>
-                  {filteredNodeTypes[category].map((node: NodeType) => (
+                  {filteredNodeTypes[category].map((node: FlowWorkflowNodeType) => (
                     <div
                       key={node.name}
                       className="flex items-center cursor-pointer p-2 hover:bg-default-100"

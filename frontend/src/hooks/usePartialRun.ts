@@ -32,20 +32,13 @@ const usePartialRun = () => {
     partialOutputs,
     rerunPredecessors
   }: PartialRunParams): Promise<PartialRunResult | undefined> => {
-    console.log('Starting partial run with parameters:', {
-      workflowId,
-      nodeId,
-      initialInputs,
-      partialOutputs,
-      rerunPredecessors
-    });
+
 
     setLoading(true);
     setError(null);
 
     try {
       const data = await runPartialWorkflow(workflowId, nodeId, initialInputs, partialOutputs, rerunPredecessors);
-      console.log('Partial run successful, result:', data);
       setResult(data);
       return data;
     } catch (err) {
@@ -54,7 +47,7 @@ const usePartialRun = () => {
       setError(error);
     } finally {
       setLoading(false);
-      console.log('Partial run completed');
+
     }
   };
 

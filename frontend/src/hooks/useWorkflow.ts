@@ -21,7 +21,6 @@ const useWorkflow = () => {
             try {
                 const statusResponse: RunStatusResponse = await getRunStatus(runID);
                 const outputs = statusResponse.outputs;
-                console.log('Status Response:', statusResponse);
 
                 if (outputs) {
                     Object.entries(outputs).forEach(([nodeId, data]) => {
@@ -51,8 +50,6 @@ const useWorkflow = () => {
 
     const handleRunWorkflow = async (): Promise<void> => {
         try {
-            console.log('Input Node Values:', inputNodeValues);
-
             // Set all nodes' status to 'pending'
             nodes.forEach((node: Node) => {
                 dispatch(updateNodeDataOnly({

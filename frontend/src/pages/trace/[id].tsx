@@ -30,26 +30,25 @@ const TracePage: React.FC = () => {
       try {
         if (typeof id !== 'string') return;
         const data = await getRunStatus(id);
-        console.log('Run Data:', data);
         setWorkflowId(data.workflow_id);
         setRunData(data);
 
         if (data.workflow_version?.definition) {
           dispatch(setTestInputs(data.workflow_version.definition.test_inputs));
-          
+
           // Roll out the workflow definition if tasks are available
-          const {rolledOutDefinition, outputs} = data.tasks ? 
+          const {rolledOutDefinition, outputs} = data.tasks ?
             rolloutWorkflowDefinition({
               workflowDefinition: data.workflow_version.definition,
               tasks: data.tasks
             }) :
             {rolledOutDefinition: data.workflow_version.definition, outputs: data.outputs};
-          
+
           setWorkflowData({
             name: data.workflow_version.name,
             definition: rolledOutDefinition,
           });
-          
+
           if (outputs) {
             setNodeOutputs(outputs);
           }

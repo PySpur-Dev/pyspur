@@ -42,15 +42,11 @@ export const getNodeTypes = async (): Promise<{
 }> => {
   try {
     const response = await axios.get(`${API_BASE_URL}/node/supported_types/`);
-    console.log('Raw Node Types Response:', response.data);
     const model = new JSPydanticModel(response.data);
 
     // Get both the processed schema and metadata
     const schema = model.createObjectFromSchema();
     const metadata = model.getAllMetadata();
-
-    console.log('Processed Schema:', schema);
-    console.log('Schema Metadata:', metadata);
 
     // Return both schema and metadata
     return {
@@ -76,8 +72,6 @@ export const runWorkflow = async (workflowData: WorkflowDefinition): Promise<any
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
-    console.log('New Data:', testInput);
-
     const response = await axios.post(`${API_BASE_URL}/run_workflow/`, workflowData);
     return response.data;
   } catch (error) {
@@ -99,7 +93,6 @@ export const getRunStatus = async (runID: string): Promise<RunResponse> => {
 export const getRun = async (runID) => {
   try {
     const response = await axios.get(`${API_BASE_URL}/run/${runID}/`);
-    console.log('Run Data:', response.data);
     return response.data;
   } catch (error) {
     console.error('Error getting run:', error);
@@ -155,7 +148,6 @@ export const startRun = async (
   parentRunId: string | null = null,
   runType: string = 'interactive'
 ): Promise<any> => {
-  console.log('workflowID', workflowID, 'runType', runType, 'initialInputs', initialInputs, 'parentRunId', parentRunId);
   try {
     const requestBody = {
       initial_inputs: initialInputs,
@@ -370,7 +362,6 @@ export const deleteWorkflow = async (workflowId: string): Promise<number> => {
 export const getTemplates = async (): Promise<any> => {
   try {
     const response = await axios.get(`${API_BASE_URL}/templates/`);
-    console.log('Templates:', response.data);
     return response.data;
   } catch (error) {
     console.error('Error getting templates:', error);

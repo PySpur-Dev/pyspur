@@ -3,7 +3,6 @@ import { useDispatch, useSelector } from 'react-redux';
 import { RootState } from '../../../store/store';
 import {
   updateNodeConfigOnly,
-  updateTitleInEdges,
   selectNodeById,
   setSidebarWidth,
   setSelectedNode,
@@ -11,7 +10,7 @@ import {
   FlowWorkflowNodeConfig,
   updateNodeTitle,
 } from '../../../store/flowSlice';
-import { NodeType, NodeTypes, FieldMetadata } from '../../../store/nodeTypesSlice';
+import { FlowWorkflowNodeType, FlowWorkflowNodeTypesByCategory, FieldMetadata } from '../../../store/nodeTypesSlice';
 import NumberInput from '../../NumberInput';
 import CodeEditor from '../../CodeEditor';
 import { jsonOptions } from '../../../constants/jsonOptions';
@@ -43,11 +42,11 @@ interface NodeSidebarProps {
 }
 
 // Update findNodeSchema to use imported types
-const findNodeSchema = (nodeType: string, nodeTypes: NodeTypes): NodeType | null => {
+const findNodeSchema = (nodeType: string, nodeTypes: FlowWorkflowNodeTypesByCategory): FlowWorkflowNodeType | null => {
   if (!nodeTypes) return null;
 
   for (const category in nodeTypes) {
-    const nodeSchema = nodeTypes[category]?.find((n: NodeType) => n.name === nodeType);
+    const nodeSchema = nodeTypes[category]?.find((n: FlowWorkflowNodeType) => n.name === nodeType);
     if (nodeSchema) {
       return nodeSchema;
     }
@@ -90,7 +89,7 @@ const NodeSidebar: React.FC<NodeSidebarProps> = ({ nodeID }) => {
   const nodes = useSelector((state: RootState) => state.flow.nodes, nodesComparator);
   const edges = useSelector((state: RootState) => state.flow.edges, isEqual);
   const nodeTypes = useSelector((state: RootState) => state.nodeTypes.data);
-  const nodeTypesMetadata = useSelector((state: RootState) => state.nodeTypes as NodeType).metadata;
+  const nodeTypesMetadata = useSelector((state: RootState) => state.nodeTypes).metadata;
   const node = useSelector((state: RootState) => selectNodeById(state, nodeID));
   const storedWidth = useSelector((state: RootState) => state.flow.sidebarWidth);
   const nodeConfig = useSelector((state: RootState) => state.flow.nodeConfigs[nodeID]);
@@ -102,10 +101,10 @@ const NodeSidebar: React.FC<NodeSidebarProps> = ({ nodeID }) => {
   const [isResizing, setIsResizing] = useState<boolean>(false);
 
   const [nodeType, setNodeType] = useState<string>(node?.type || 'ExampleNode');
-  const [nodeSchema, setNodeSchema] = useState<NodeType | null>(
+  const [nodeSchema, setNodeSchema] = useState<FlowWorkflowNodeType | null>(
     findNodeSchema(node?.type || 'ExampleNode', nodeTypes)
   );
-  const [dynamicModel, setDynamicModel] = useState<FlowWorkflowNodeConfig>(nodeConfig || {});
+  const [currentNodeConfig, setCurrentNodeConfig] = useState<FlowWorkflowNodeConfig>(nodeConfig || {});
   const [fewShotIndex, setFewShotIndex] = useState<number | null>(null);
   const [showTitleError, setShowTitleError] = useState(false);
   const [titleInputValue, setTitleInputValue] = useState<string>('');
@@ -170,7 +169,7 @@ const NodeSidebar: React.FC<NodeSidebarProps> = ({ nodeID }) => {
         };
       }
 
-      setDynamicModel(initialConfig);
+      setCurrentNodeConfig(initialConfig);
     }
   }, [nodeID, node, nodeTypes, nodeConfig]);
 
@@ -186,12 +185,12 @@ const NodeSidebar: React.FC<NodeSidebarProps> = ({ nodeID }) => {
     let updatedModel: FlowWorkflowNodeConfig;
 
     if (key.includes('.')) {
-      updatedModel = updateNestedModel(dynamicModel, key, value) as FlowWorkflowNodeConfig;
+      updatedModel = updateNestedModel(currentNodeConfig, key, value) as FlowWorkflowNodeConfig;
     } else {
-      updatedModel = { ...dynamicModel, [key]: value } as FlowWorkflowNodeConfig;
+      updatedModel = { ...currentNodeConfig, [key]: value } as FlowWorkflowNodeConfig;
     }
 
-    setDynamicModel(updatedModel);
+    setCurrentNodeConfig(updatedModel);
 
     // Always update Redux store with the full updated model
     if (isSlider) {
@@ -241,16 +240,17 @@ const NodeSidebar: React.FC<NodeSidebarProps> = ({ nodeID }) => {
       });
 
       // Ensure we have a valid default value
-      const currentValue = dynamicModel?.llm_info?.model || defaultSelected || 'gpt-4o';
+      const currentValue = currentNodeConfig?.llm_info?.model || defaultSelected || 'gpt-4o';
 
       return (
         <div key={key}>
           <Select
+            key={`select-${nodeID}-${key}`}
             label={label}
             selectedKeys={[currentValue]}
             onChange={(e) => {
-              const updatedModel = updateNestedModel(dynamicModel, 'llm_info.model', e.target.value);
-              setDynamicModel(updatedModel);
+              const updatedModel = updateNestedModel(currentNodeConfig, 'llm_info.model', e.target.value);
+              setCurrentNodeConfig(updatedModel);
               dispatch(updateNodeConfigOnly({ id: nodeID, data: updatedModel }));
             }}
             fullWidth
@@ -258,7 +258,7 @@ const NodeSidebar: React.FC<NodeSidebarProps> = ({ nodeID }) => {
             {Object.entries(modelsByProvider).map(([provider, models], index) => (
               models.length > 0 && (
                 <SelectSection
-                  key={provider}
+                  key={`provider-${provider}`}
                   title={provider}
                   showDivider={index < Object.keys(modelsByProvider).length - 1}
                 >
@@ -276,10 +276,11 @@ const NodeSidebar: React.FC<NodeSidebarProps> = ({ nodeID }) => {
     }
 
     // Default rendering for other enum fields
-    const currentValue = defaultSelected || dynamicModel[key] || enumValues[0];
+    const currentValue = defaultSelected || currentNodeConfig[key] || enumValues[0];
     return (
       <div key={key}>
         <Select
+          key={`select-${nodeID}-${key}`}
           label={label}
           selectedKeys={[currentValue]}
           onChange={(e) => handleInputChange(lastTwoDots, e.target.value)}
@@ -296,13 +297,13 @@ const NodeSidebar: React.FC<NodeSidebarProps> = ({ nodeID }) => {
   };
 
   const handleAddNewExample = () => {
-    const updatedExamples = [...(dynamicModel?.few_shot_examples || []), { input: '', output: '' }];
+    const updatedExamples = [...(currentNodeConfig?.few_shot_examples || []), { input: '', output: '' }];
     handleInputChange('few_shot_examples', updatedExamples);
     setFewShotIndex(updatedExamples.length - 1);
   };
 
   const handleDeleteExample = (index: number) => {
-    const updatedExamples = [...(dynamicModel?.few_shot_examples || [])];
+    const updatedExamples = [...(currentNodeConfig?.few_shot_examples || [])];
     updatedExamples.splice(index, 1);
     handleInputChange('few_shot_examples', updatedExamples);
   };
@@ -325,7 +326,7 @@ const NodeSidebar: React.FC<NodeSidebarProps> = ({ nodeID }) => {
 
     // Skip api_base field if the selected model is not an Ollama model
     if (key === 'api_base') {
-      const modelValue = dynamicModel?.llm_info?.model;
+      const modelValue = currentNodeConfig?.llm_info?.model;
       if (!modelValue || !modelValue.toString().startsWith('ollama/')) {
         return null;
       }
@@ -333,6 +334,7 @@ const NodeSidebar: React.FC<NodeSidebarProps> = ({ nodeID }) => {
       return (
         <div key={key} className="my-4">
           <Input
+            key={`input-${nodeID}-${key}`}
             fullWidth
             label={fieldMetadata?.title || key}
             value={value || "http://localhost:11434"}
@@ -353,10 +355,11 @@ const NodeSidebar: React.FC<NodeSidebarProps> = ({ nodeID }) => {
     // Handle specific cases for input_schema, output_schema, and system_prompt
     if (key === 'input_schema') {
       return (
-        <div key={key} className="my-2">
+        <div key={`schema-editor-input-${nodeID}`} className="my-2">
           <label className="font-semibold mb-1 block">Input Schema</label>
           <SchemaEditor
-            jsonValue={dynamicModel.input_schema || {}}
+            key={`schema-editor-input-${nodeID}`}
+            jsonValue={currentNodeConfig.input_schema || {}}
             onChange={(newValue) => {
               handleInputChange('input_schema', newValue);
             }}
@@ -369,14 +372,13 @@ const NodeSidebar: React.FC<NodeSidebarProps> = ({ nodeID }) => {
       );
     }
 
-
-
     if (key === 'output_schema') {
       return (
         <div key={key} className="my-2">
           <label className="font-semibold mb-1 block">Output Schema</label>
           <SchemaEditor
-            jsonValue={dynamicModel.output_schema || {}}
+            key={`schema-editor-output-${nodeID}`}
+            jsonValue={currentNodeConfig.output_schema || {}}
             onChange={(newValue) => {
               handleInputChange('output_schema', newValue);
             }}
@@ -393,12 +395,12 @@ const NodeSidebar: React.FC<NodeSidebarProps> = ({ nodeID }) => {
       return (
         <div key={key}>
           <TextEditor
-            key={key}
+            key={`text-editor-system-${nodeID}`}
             nodeID={nodeID}
             fieldName={key}
             inputSchema={incomingSchema}
             fieldTitle="System Message"
-            content={dynamicModel[key] || ''}
+            content={currentNodeConfig[key] || ''}
             setContent={(value: string) => handleInputChange(key, value)}
           />
           {!isLast && <hr className="my-2" />}
@@ -410,12 +412,12 @@ const NodeSidebar: React.FC<NodeSidebarProps> = ({ nodeID }) => {
       return (
         <div key={key}>
           <TextEditor
-            key={key}
+            key={`text-editor-user-${nodeID}`}
             nodeID={nodeID}
             fieldName={key}
             inputSchema={incomingSchema}
             fieldTitle="User Message"
-            content={dynamicModel[key] || ''}
+            content={currentNodeConfig[key] || ''}
             setContent={(value) => handleInputChange(key, value)}
           />
           {renderFewShotExamples()}
@@ -428,12 +430,12 @@ const NodeSidebar: React.FC<NodeSidebarProps> = ({ nodeID }) => {
       return (
         <div key={key}>
           <TextEditor
-            key={key}
+            key={`text-editor-${nodeID}-${key}`}
             nodeID={nodeID}
             fieldName={key}
             inputSchema={incomingSchema}
             fieldTitle={key}
-            content={dynamicModel[key] || ''}
+            content={currentNodeConfig[key] || ''}
             setContent={(value) => handleInputChange(key, value)}
           />
           {!isLast && <hr className="my-2" />}
@@ -444,7 +446,7 @@ const NodeSidebar: React.FC<NodeSidebarProps> = ({ nodeID }) => {
     if (key === 'code') {
       return (
         <CodeEditor
-          key={key}
+          key={`code-editor-${nodeID}-${key}`}
           code={value}
           onChange={(newValue: string) => handleInputChange(key, newValue)}
         />
@@ -457,6 +459,7 @@ const NodeSidebar: React.FC<NodeSidebarProps> = ({ nodeID }) => {
         return (
           <div key={key} className="my-4">
             <Textarea
+              key={`textarea-${nodeID}-${key}`}
               fullWidth
               label={fieldMetadata?.title || key}
               value={value}
@@ -478,6 +481,7 @@ const NodeSidebar: React.FC<NodeSidebarProps> = ({ nodeID }) => {
                 <span className="text-sm">{value}</span>
               </div>
               <Slider
+                key={`slider-${nodeID}-${key}`}
                 aria-label={fieldMetadata.title || key}
                 value={value}
                 minValue={min}
@@ -497,7 +501,7 @@ const NodeSidebar: React.FC<NodeSidebarProps> = ({ nodeID }) => {
         }
         return (
           <NumberInput
-            key={key}
+            key={`number-input-${nodeID}-${key}`}
             label={key}
             value={value}
             onChange={(e) => {
@@ -512,6 +516,7 @@ const NodeSidebar: React.FC<NodeSidebarProps> = ({ nodeID }) => {
             <div className="flex justify-between items-center">
               <label className="font-semibold">{fieldMetadata?.title || key}</label>
               <Switch
+                key={`switch-${nodeID}-${key}`}
                 checked={value}
                 onChange={(e) => handleInputChange(key, e.target.checked)}
               />
@@ -536,7 +541,7 @@ const NodeSidebar: React.FC<NodeSidebarProps> = ({ nodeID }) => {
 
   // Update the `renderConfigFields` function to include missing logic
   const renderConfigFields = () => {
-    if (!nodeSchema || !nodeSchema.config || !dynamicModel) return null;
+    if (!nodeSchema || !nodeSchema.config || !currentNodeConfig) return null;
     const properties = nodeSchema.config;
     const keys = Object.keys(properties).filter((key) => key !== 'title' && key !== 'type');
 
@@ -547,7 +552,7 @@ const NodeSidebar: React.FC<NodeSidebarProps> = ({ nodeID }) => {
 
     return orderedKeys.map((key, index) => {
       const field = properties[key];
-      const value = dynamicModel[key];
+      const value = currentNodeConfig[key];
       const isLast = index === orderedKeys.length - 1;
       return renderField(key, field, value, `${nodeType}.config`, isLast);
     });
@@ -561,6 +566,7 @@ const NodeSidebar: React.FC<NodeSidebarProps> = ({ nodeID }) => {
       <div>
         {fewShotIndex !== null ? (
           <FewShotEditor
+            key={`few-shot-editor-${nodeID}-${fewShotIndex}`}
             nodeID={nodeID}
             exampleIndex={fewShotIndex}
             onSave={() => setFewShotIndex(null)}
@@ -593,6 +599,7 @@ const NodeSidebar: React.FC<NodeSidebarProps> = ({ nodeID }) => {
               ))}
 
               <Button
+                key={`add-example-${nodeID}`}
                 isIconOnly
                 radius="full"
                 variant="light"
@@ -645,6 +652,7 @@ const NodeSidebar: React.FC<NodeSidebarProps> = ({ nodeID }) => {
     >
       {showTitleError && (
         <Alert
+          key={`alert-${nodeID}`}
           className="absolute top-4 left-4 right-4 z-50"
           color="danger"
           onClose={() => setShowTitleError(false)}
@@ -678,12 +686,14 @@ const NodeSidebar: React.FC<NodeSidebarProps> = ({ nodeID }) => {
               <h2 className="text-xs font-semibold">{nodeType}</h2>
             </div>
             <Button
+              key={`close-btn-${nodeID}`}
               isIconOnly
               radius="full"
               variant="light"
               onClick={() => dispatch(setSelectedNode({ nodeId: null }))}
             >
               <Icon
+                key={`close-icon-${nodeID}`}
                 className="text-default-500"
                 icon="solar:close-circle-linear"
                 width={24}
@@ -692,17 +702,19 @@ const NodeSidebar: React.FC<NodeSidebarProps> = ({ nodeID }) => {
           </div>
 
           <Accordion
+            key={`accordion-${nodeID}`}
             selectionMode="multiple"
             defaultExpandedKeys={hasRunOutput ? ['output'] : ['title', 'config']}
           >
             {nodeType !== 'InputNode' && (
               <AccordionItem key="output" aria-label="Output" title="Outputs">
-                <NodeOutput output={node?.data?.run} />
+                <NodeOutput key={`node-output-${nodeID}`} output={node?.data?.run} />
               </AccordionItem>
             )}
 
             <AccordionItem key="title" aria-label="Node Title" title="Node Title">
               <Input
+                key={`title-input-${nodeID}`}
                 value={titleInputValue}
                 onChange={handleNodeTitleChange}
                 placeholder="Enter node title"

@@ -134,8 +134,6 @@ const Header: React.FC<HeaderProps> = ({ activePage }) => {
               const isOutputDifferent = JSON.stringify(output_values) !== JSON.stringify(node.data?.run);
               const isStatusDifferent = nodeTaskStatus !== node.data?.taskStatus;
 
-              console.log('Node:', node.id, 'Output:', output_values, 'Status:', nodeTaskStatus, 'isOutputDifferent:', isOutputDifferent, 'isStatusDifferent:', isStatusDifferent);
-
               if (isOutputDifferent || isStatusDifferent) {
                 dispatch(updateNodeDataOnly({
                   id: node.id,
@@ -248,7 +246,6 @@ const Header: React.FC<HeaderProps> = ({ activePage }) => {
     ['mod+enter', 'ctrl+enter'],
     (e) => {
       e.preventDefault();
-      console.log('Run workflow');
 
       if (testInputs.length === 0) {
         setIsDebugModalOpen(true);
@@ -266,7 +263,6 @@ const Header: React.FC<HeaderProps> = ({ activePage }) => {
           const initialInputs = {
             [inputNodeId]: inputValues
           };
-          console.log('Initial inputs:', initialInputs);
           executeWorkflow(initialInputs);
         }
       }

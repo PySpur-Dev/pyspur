@@ -7,4 +7,6 @@ export default function Home() {
   React.useEffect(() => {
     router.push('/dashboard');
   }, []);
+
+  return null;
 }

@@ -106,7 +106,6 @@ export const useSaveWorkflow = () => {
           }
         };
 
-        console.log('send to b/e workflow:', updatedWorkflow);
         await updateWorkflow(workflowID, updatedWorkflow);
       } catch (error) {
         console.error('Error saving workflow:', error);

@@ -62,7 +62,6 @@ const RunViewFlowCanvasContent: React.FC<RunViewFlowCanvasProps> = ({ workflowDa
 
   useEffect(() => {
     if (workflowData) {
-      console.log('workflowData', workflowData);
       if (workflowData.definition.nodes) {
         const inputNode = workflowData.definition.nodes.filter(node => node.node_type === 'InputNode');
         if (inputNode.length > 0) {
@@ -83,7 +82,6 @@ const RunViewFlowCanvasContent: React.FC<RunViewFlowCanvasProps> = ({ workflowDa
         workflowID: workflowID,
         name: workflowData.name
       }));
-      console.log('Node Outputs:', nodeOutputs);
       dispatch(setNodeOutputs(nodeOutputs));
     }
   }, [dispatch, workflowData, workflowID]);
@@ -217,6 +215,7 @@ const RunViewFlowCanvasContent: React.FC<RunViewFlowCanvasProps> = ({ workflowDa
           }}
         >
           <ReactFlow
+            key={`flow-${workflowID}`}
             nodes={nodesWithMode}
             edges={styledEdges}
             onNodesChange={onNodesChange}
@@ -249,14 +248,15 @@ const RunViewFlowCanvasContent: React.FC<RunViewFlowCanvasProps> = ({ workflowDa
             onEdgeMouseLeave={onEdgeMouseLeave}
             snapToGrid={false}
           >
-            <Background />
+            <Background key="background" />
             {showHelperLines && (
               <HelperLinesRenderer
+                key="helper-lines"
                 horizontal={helperLines.horizontal}
                 vertical={helperLines.vertical}
               />
             )}
-            <Operator handleLayout={handleLayout} />
+            <Operator key="operator" handleLayout={handleLayout} />
           </ReactFlow>
         </div>
         {selectedNodeID && (
@@ -264,7 +264,7 @@ const RunViewFlowCanvasContent: React.FC<RunViewFlowCanvasProps> = ({ workflowDa
             className="absolute top-0 right-0 h-full bg-white border-l border-gray-200"
             style={{ zIndex: 2 }}
           >
-            <NodeSidebar nodeID={selectedNodeID} />
+            <NodeSidebar nodeID={selectedNodeID} key={`node-sidebar-${selectedNodeID}`} />
           </div>
         )}
       </div>
@@ -276,6 +276,7 @@ const RunViewFlowCanvas: React.FC<RunViewFlowCanvasProps> = ({ workflowData, wor
   return (
     <ReactFlowProvider>
       <RunViewFlowCanvasContent
+        key={`flow-content-${workflowID}`}
         workflowData={workflowData}
         workflowID={workflowID}
         nodeOutputs={nodeOutputs}

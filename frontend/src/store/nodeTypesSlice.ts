@@ -69,12 +69,12 @@ export interface FieldMetadata {
   type?: string;
 }
 
-export interface NodeType {
+export interface FlowWorkflowNodeType {
   name: string;
   config: {
     routes?: RouteCondition[];
-    input_schema?: Record<string, any>;
-    output_schema?: Record<string, any>;
+    input_schema?: Record<string, string>;
+    output_schema?: Record<string, string>;
     title?: string;
     system_message?: string;
     user_message?: string;
@@ -93,8 +93,8 @@ export interface NodeType {
   data?: Record<string, any>;
 }
 
-export interface NodeTypes {
-  [category: string]: NodeType[];
+export interface FlowWorkflowNodeTypesByCategory {
+  [category: string]: FlowWorkflowNodeType[];
 }
 
 const initialState: NodeTypesState = {

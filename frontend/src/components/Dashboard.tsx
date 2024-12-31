@@ -241,7 +241,6 @@ const Dashboard: React.FC = () => {
       try {
         await deleteWorkflow(workflow.id);
         setWorkflows((prevWorkflows) => prevWorkflows.filter((w) => w.id !== workflow.id));
-        console.log(`Workflow "${workflow.name}" deleted successfully.`);
       } catch (error) {
         console.error('Error deleting workflow:', error);
         alert('Failed to delete workflow. Please try again.');
@@ -253,7 +252,6 @@ const Dashboard: React.FC = () => {
     try {
       const duplicatedWorkflow = await duplicateWorkflow(workflow.id);
       setWorkflows((prevWorkflows) => [...prevWorkflows, duplicatedWorkflow]);
-      console.log(`Workflow "${workflow.name}" duplicated successfully.`);
     } catch (error) {
       console.error('Error duplicating workflow:', error);
       alert('Failed to duplicate workflow. Please try again.');

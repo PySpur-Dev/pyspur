@@ -348,91 +348,6 @@ const flowSlice = createSlice({
       }
     },
 
-    updateTitleInEdges: (state, action: PayloadAction<{ nodeId: string; newTitle: string }>) => {
-      const { nodeId, newTitle } = action.payload;
-
-      // First, update edges
-      state.edges = state.edges.map((edge) => {
-        if (edge.source === nodeId) {
-          // Only update sourceHandle when the renamed node is the source
-          return { ...edge, sourceHandle: newTitle };
-        }
-        if (edge.target === nodeId) {
-          // Update targetHandle when the renamed node is the target
-          return { ...edge, targetHandle: newTitle };
-        }
-        return edge;
-      });
-
-      // Find all nodes that are downstream from the renamed node
-      const findDownstreamNodes = (startNodeId: string): Set<string> => {
-        const visited = new Set<string>();
-        const queue = [startNodeId];
-
-        while (queue.length > 0) {
-          const currentId = queue.shift()!;
-          if (!visited.has(currentId)) {
-            visited.add(currentId);
-            // Find all edges where current node is the source
-            state.edges
-              .filter(edge => edge.source === currentId)
-              .forEach(edge => {
-                queue.push(edge.target);
-              });
-          }
-        }
-        return visited;
-      };
-
-      const downstreamNodes = findDownstreamNodes(nodeId);
-
-      // Update only the downstream nodes' content
-      state.nodes = state.nodes.map((node) => {
-        // Skip nodes that aren't downstream from the renamed node
-        if (!downstreamNodes.has(node.id)) {
-          return node;
-        }
-
-        if (node.data?.config) {
-          const config = { ...node.data.config };
-          let hasChanges = false;
-
-          // Update references in system_message, user_message, and any field ending with _prompt or _message
-          Object.keys(config).forEach((key) => {
-            if (
-              key === 'system_message' ||
-              key === 'user_message' ||
-              key.endsWith('_prompt') ||
-              key.endsWith('_message')
-            ) {
-              const content = config[key];
-              if (typeof content === 'string') {
-                // Replace old node references with new ones
-                const oldPattern = new RegExp(`{{${nodeId}\\.`, 'g');
-                const newContent = content.replace(oldPattern, `{{${newTitle}.`);
-                if (newContent !== content) {
-                  config[key] = newContent;
-                  hasChanges = true;
-                }
-              }
-            }
-          });
-
-          // Only create a new node object if there were actual changes
-          if (hasChanges) {
-            return {
-              ...node,
-              data: {
-                ...node.data,
-                config
-              }
-            };
-          }
-        }
-        return node;
-      });
-    },
-
     setSelectedNode: (state, action: PayloadAction<{ nodeId: string | null }>) => {
       state.selectedNode = action.payload.nodeId;
     },
@@ -548,13 +463,12 @@ const flowSlice = createSlice({
 
       // Set the output schema for the input node
       const inputNode = state.nodes.find((node) => node.type === 'InputNode');
-      if (inputNode && inputNode.data) {
-        const currentConfig = inputNode.data.config || {};
-        const currentSchema = currentConfig.output_schema || {};
-        inputNode.data.config = {
+      if (inputNode) {
+        const currentConfig = state.nodeConfigs[inputNode.id] || {};
+        state.nodeConfigs[inputNode.id] = {
           ...currentConfig,
           output_schema: {
-            ...currentSchema,
+            ...(currentConfig.output_schema || {}),
             [key]: value,
           },
         };
@@ -588,11 +502,11 @@ const flowSlice = createSlice({
 
       // Remove from input node output schema
       const inputNode = state.nodes.find((node) => node.type === 'InputNode');
-      if (inputNode && inputNode.data) {
-        const currentConfig = inputNode.data.config || {};
-        const currentSchema = currentConfig.output_schema || {};
+      if (inputNode) {
+        const currentConfig = state.nodeConfigs[inputNode.id] || {};
+        const currentSchema = { ...(currentConfig.output_schema || {}) };
         delete currentSchema[key];
-        inputNode.data.config = {
+        state.nodeConfigs[inputNode.id] = {
           ...currentConfig,
           output_schema: currentSchema,
         };
@@ -639,16 +553,16 @@ const flowSlice = createSlice({
       state.workflowInputVariables[newKey] = state.workflowInputVariables[oldKey];
       delete state.workflowInputVariables[oldKey];
 
-      // 2. Rename in the input node’s output_schema
+      // 2. Rename in the input node's output_schema
       const inputNode = state.nodes.find((node) => node.type === 'InputNode');
-      if (inputNode && inputNode.data) {
-        const currentConfig = inputNode.data.config || {};
-        const currentSchema = currentConfig.output_schema || {};
+      if (inputNode) {
+        const currentConfig = state.nodeConfigs[inputNode.id] || {};
+        const currentSchema = { ...(currentConfig.output_schema || {}) };
         if (currentSchema.hasOwnProperty(oldKey)) {
           currentSchema[newKey] = currentSchema[oldKey];
           delete currentSchema[oldKey];
         }
-        inputNode.data.config = {
+        state.nodeConfigs[inputNode.id] = {
           ...currentConfig,
           output_schema: currentSchema,
         };
@@ -825,6 +739,7 @@ const flowSlice = createSlice({
 
     updateNodeTitle: (state, action: PayloadAction<{ nodeId: string; newTitle: string }>) => {
       const { nodeId, newTitle } = action.payload;
+      const oldTitle = state.nodes.find(node => node.id === nodeId)?.data?.title;
 
       // Update the node title
       const node = state.nodes.find(node => node.id === nodeId);
@@ -845,68 +760,67 @@ const flowSlice = createSlice({
 
       // Update edges where this node is source or target
       state.edges = state.edges.map(edge => {
-        if (edge.source === nodeId) {
-          return { ...edge, sourceHandle: newTitle, targetHandle: newTitle };
+        let updatedEdge = { ...edge };
+
+        // Update source handle if this is the source node
+        if (edge.source === nodeId && edge.sourceHandle === oldTitle) {
+          updatedEdge.sourceHandle = newTitle;
         }
-        return edge;
-      });
 
-      // Update references in downstream nodes
-      const findDownstreamNodes = (startNodeId: string): Set<string> => {
-        const visited = new Set<string>();
-        const queue = [startNodeId];
+        // Update references in downstream nodes
+        const findDownstreamNodes = (startNodeId: string): Set<string> => {
+          const visited = new Set<string>();
+          const queue = [startNodeId];
 
-        while (queue.length > 0) {
-          const currentId = queue.shift()!;
-          if (!visited.has(currentId)) {
-            visited.add(currentId);
-            state.edges
-              .filter(edge => edge.source === currentId)
-              .forEach(edge => queue.push(edge.target));
+          while (queue.length > 0) {
+            const currentId = queue.shift()!;
+            if (!visited.has(currentId)) {
+              visited.add(currentId);
+              state.edges
+                .filter(edge => edge.source === currentId)
+                .forEach(edge => queue.push(edge.target));
+            }
           }
-        }
-        return visited;
-      };
+          return visited;
+        };
 
-      const downstreamNodes = findDownstreamNodes(nodeId);
+        const downstreamNodes = findDownstreamNodes(nodeId);
 
-      state.nodes = state.nodes.map(node => {
-        if (!downstreamNodes.has(node.id)) return node;
+        state.nodes = state.nodes.map(node => {
+          if (!downstreamNodes.has(node.id)) return node;
 
-        if (node.data?.config) {
-          const config = { ...node.data.config };
-          let hasChanges = false;
+          const nodeConfig = state.nodeConfigs[node.id];
+          if (nodeConfig) {
+            const config = { ...nodeConfig };
+            let hasChanges = false;
 
-          Object.keys(config).forEach(key => {
-            if (
-              key === 'system_message' ||
-              key === 'user_message' ||
-              key.endsWith('_prompt') ||
-              key.endsWith('_message')
-            ) {
-              const content = config[key];
-              if (typeof content === 'string') {
-                const oldPattern = new RegExp(`{{${nodeId}\\.`, 'g');
-                const newContent = content.replace(oldPattern, `{{${newTitle}.`);
-                if (newContent !== content) {
-                  config[key] = newContent;
-                  hasChanges = true;
+            Object.keys(config).forEach(key => {
+              if (
+                key === 'system_message' ||
+                key === 'user_message' ||
+                key.endsWith('_prompt') ||
+                key.endsWith('_message')
+              ) {
+                const content = config[key];
+                if (typeof content === 'string') {
+                  const oldPattern = new RegExp(`{{${nodeId}\\.`, 'g');
+                  const newContent = content.replace(oldPattern, `{{${newTitle}.`);
+                  if (newContent !== content) {
+                    config[key] = newContent;
+                    hasChanges = true;
+                  }
                 }
               }
-            }
-          });
+            });
 
-          if (hasChanges) {
-            return {
-              ...node,
-              data: {
-                ...node.data,
-                config
-              }
-            };
+            if (hasChanges) {
+              state.nodeConfigs[node.id] = config;
+            }
           }
-        }
-        return node;
+          return node;
+        });
+
+        return updatedEdge;  // Return the updated edge
       });
     },
 
@@ -930,7 +844,6 @@ export const {
   setEdges,
   updateNodeDataOnly,
   updateNodeConfigOnly,
-  updateTitleInEdges,
   setSelectedNode,
   deleteNode,
   deleteEdge,

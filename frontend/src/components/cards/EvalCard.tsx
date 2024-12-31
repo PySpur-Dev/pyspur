@@ -44,7 +44,6 @@ export default function EvalCard({ title, description, type, numSamples, paperLi
 
   useEffect(() => {
     if (isModalOpen) {
-      console.log("eval information", title, description, type, numSamples, paperLink);
       const fetchWorkflows = async () => {
         try {
           const workflowsData = await getWorkflows();
