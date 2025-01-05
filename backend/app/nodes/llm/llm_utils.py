@@ -2,6 +2,7 @@
 import asyncio
 import base64
 import logging
+import os
 
 from typing import Any, Callable, Dict, List, Optional, cast
 
@@ -139,6 +140,10 @@ def async_retry(*dargs, **dkwargs):
 @async_retry(wait=wait_random_exponential(min=30, max=120), stop=stop_after_attempt(20))
 async def completion_with_backoff(**kwargs) -> str:
     try:
+        # Add base_url from environment if available
+        base_url = os.getenv("OPENAI_BASE_URL")
+        if base_url:
+            kwargs["base_url"] = base_url
         response = await acompletion(**kwargs)
         return response.choices[0].message.content
     except Exception as e:
