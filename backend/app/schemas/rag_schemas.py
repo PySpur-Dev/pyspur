@@ -16,9 +16,9 @@ class TextProcessingConfigSchema(BaseModel):
     min_chunk_length_to_embed: int = 5  # Default value from original chunker
     embeddings_batch_size: int = 128  # Default value from original chunker
     max_num_chunks: int = 10000  # Default value from original chunker
-    use_vision_model: bool = False  # Whether to use vision model for PDF parsing
-    vision_model: Optional[str] = None  # Model to use for vision-based parsing
-    vision_provider: Optional[str] = None  # Provider for vision model
+    use_vision_model: bool = True  # Enable by default for PDFs
+    vision_model: Optional[str] = "gpt-4o-mini"  # Default model
+    vision_provider: Optional[str] = "openai"  # Default provider
     template: Optional[TemplateSchema] = TemplateSchema()
 
     def get_vision_config(self) -> Optional[Dict[str, Any]]:
@@ -32,6 +32,10 @@ class TextProcessingConfigSchema(BaseModel):
             api_key = os.getenv("OPENAI_API_KEY")
         elif self.vision_provider == "anthropic":
             api_key = os.getenv("ANTHROPIC_API_KEY")
+        elif self.vision_provider == "gemini":
+            api_key = os.getenv("GEMINI_API_KEY")
+        elif self.vision_provider == "azure":
+            api_key = os.getenv("AZURE_API_KEY")
 
         if not api_key:
             raise HTTPException(

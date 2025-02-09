@@ -47,7 +47,7 @@ def extract_text_from_filepath(filepath: str, mimetype: Optional[str] = None) ->
     return extracted_text
 
 
-def extract_text_from_file(file: BufferedReader, mimetype: str, vision_config: Optional[Dict[str, Any]] = None) -> str:
+async def extract_text_from_file(file: BufferedReader, mimetype: str, vision_config: Optional[Dict[str, Any]] = None) -> str:
     if vision_config and mimetype == "application/pdf":
         # Save to temporary file for vision model processing
         temp_file_path = "/tmp/temp_vision_file.pdf"
@@ -56,13 +56,13 @@ def extract_text_from_file(file: BufferedReader, mimetype: str, vision_config: O
 
         try:
             # Process with vision model
-            extracted_text = asyncio.run(extract_text_with_vision_model(
+            extracted_text = await extract_text_with_vision_model(
                 file_path=temp_file_path,
                 model=vision_config.get("model", "gpt-4o-mini"),
                 api_key=vision_config.get("api_key"),
                 provider=vision_config.get("provider"),
                 system_prompt=vision_config.get("system_prompt")
-            ))
+            )
         finally:
             # Clean up temporary file
             if os.path.exists(temp_file_path):

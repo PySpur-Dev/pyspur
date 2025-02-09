@@ -88,7 +88,9 @@ export const DocumentCollectionWizard = () => {
         description: '',
         chunk_token_size: 1000,
         min_chunk_size_chars: 100,
-        use_vision_model: false,
+        use_vision_model: true,
+        vision_model: 'gpt-4o-mini',
+        vision_provider: 'openai',
         chunkingMode: 'automatic',
         template: {
             enabled: false,
@@ -617,7 +619,7 @@ export const DocumentCollectionWizard = () => {
                     <div className="space-y-6">
                         <div className="flex items-center gap-2">
                             <h3 className="text-lg font-semibold">PDF Processing</h3>
-                            <Tooltip content="Configure how PDF documents will be processed">
+                            <Tooltip content="PDFs will be processed using AI vision models for better text extraction">
                                 <Info className="w-4 h-4 text-default-400" />
                             </Tooltip>
                         </div>
@@ -625,22 +627,43 @@ export const DocumentCollectionWizard = () => {
                         <div className="space-y-4">
                             <div className="flex items-center gap-2">
                                 <Switch
-                                    isDisabled
                                     isSelected={config.use_vision_model}
                                     onValueChange={(checked) =>
                                         setConfig((prev) => ({ ...prev, use_vision_model: checked }))
                                     }
                                     size="sm"
                                 >
-                                    Enable Vision Model for PDF Processing (Coming Soon)
+                                    Use AI Vision for Enhanced PDF Processing
                                 </Switch>
-                                <Tooltip content="Use AI vision models to better understand document layout and extract text. This feature is coming soon!">
+                                <Tooltip content="AI vision models provide superior text extraction from PDFs, especially for complex layouts, tables, and images with text">
                                     <Info className="w-4 h-4 text-default-400" />
                                 </Tooltip>
                             </div>
 
                             {config.use_vision_model && (
                                 <div className="space-y-4">
+                                    <div className="p-4 bg-primary-100/10 dark:bg-slate-800/80 border border-primary-200/20 dark:border-blue-500/20 rounded-lg">
+                                        <div className="text-sm">
+                                            <p className="flex items-center gap-2 mb-3">
+                                                <span className="text-primary-500 dark:text-blue-400">✨</span>
+                                                <span className="font-medium text-default-800 dark:text-white">Using AI vision models for enhanced PDF processing:</span>
+                                            </p>
+                                            <ul className="list-none space-y-2.5 ml-1">
+                                                <li className="flex items-start gap-2">
+                                                    <span className="text-primary-500 dark:text-blue-400 mt-1">•</span>
+                                                    <span className="text-default-600 dark:text-blue-200">Better handling of complex layouts</span>
+                                                </li>
+                                                <li className="flex items-start gap-2">
+                                                    <span className="text-primary-500 dark:text-blue-400 mt-1">•</span>
+                                                    <span className="text-default-600 dark:text-blue-200">Improved table and image text extraction</span>
+                                                </li>
+                                                <li className="flex items-start gap-2">
+                                                    <span className="text-primary-500 dark:text-blue-400 mt-1">•</span>
+                                                    <span className="text-default-600 dark:text-blue-200">More accurate preservation of document structure</span>
+                                                </li>
+                                            </ul>
+                                        </div>
+                                    </div>
                                     <Select
                                         label="Vision Model"
                                         placeholder="Select vision model"
@@ -649,6 +672,7 @@ export const DocumentCollectionWizard = () => {
                                                 ? [`${config.vision_model}|${config.vision_provider}`]
                                                 : []
                                         }
+                                        defaultSelectedKeys={['gpt-4o-mini|openai']}
                                         onSelectionChange={(keys) => {
                                             const value = Array.from(keys)[0]?.toString() || ''
                                             const [model, provider] = value.split('|')
@@ -659,6 +683,7 @@ export const DocumentCollectionWizard = () => {
                                             }))
                                         }}
                                     >
+                                        <SelectItem key="gpt-4o-mini|openai">GPT-4 Optimized (OpenAI)</SelectItem>
                                         <SelectItem key="gpt-4-vision|openai">GPT-4 Vision (OpenAI)</SelectItem>
                                         <SelectItem key="claude-3|anthropic">Claude 3 (Anthropic)</SelectItem>
                                     </Select>

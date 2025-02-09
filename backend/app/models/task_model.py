@@ -14,6 +14,12 @@ from typing import Optional, Any
 from .base_model import BaseModel
 
 
+class TaskType(PyEnum):
+    NODE = "NODE"
+    WORKFLOW = "WORKFLOW"
+    DOCUMENT_PARSING = "DOCUMENT_PARSING"
+
+
 class TaskStatus(PyEnum):
     PENDING = "PENDING"
     RUNNING = "RUNNING"
@@ -31,6 +37,9 @@ class TaskModel(BaseModel):
     )
     run_id: Mapped[str] = mapped_column(String, ForeignKey("runs.id"), nullable=False)
     node_id: Mapped[str] = mapped_column(String, nullable=False)
+    task_type: Mapped[TaskType] = mapped_column(
+        Enum(TaskType), default=TaskType.NODE, nullable=False
+    )
     parent_task_id: Mapped[Optional[str]] = mapped_column(
         String, ForeignKey("tasks.id"), nullable=True
     )
@@ -46,6 +55,8 @@ class TaskModel(BaseModel):
     end_time: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
     subworkflow: Mapped[Optional[Any]] = mapped_column(JSON, nullable=True)
     subworkflow_output: Mapped[Optional[Any]] = mapped_column(JSON, nullable=True)
+    progress: Mapped[Optional[float]] = mapped_column(Integer, nullable=True)  # 0-100
+    current_step: Mapped[Optional[str]] = mapped_column(String, nullable=True)
 
     # Relationships
     parent_task = relationship("TaskModel", remote_side=[id], back_populates="subtasks")

@@ -1,20 +1,19 @@
 from pathlib import Path
 import json
 import uuid
-from typing import List, Dict, Any, Optional, Callable, Coroutine
-import arrow
+from typing import List, Dict, Any, Optional, Callable, Awaitable
+from datetime import datetime, timezone
 
 from loguru import logger
+from sqlalchemy.orm import Session
 
 from .parser import extract_text_from_file
 from .chunker import ChunkingConfigSchema, create_document_chunks
 from .schemas.document_schemas import (
-    DocumentSchema,
     DocumentWithChunksSchema,
-    DocumentMetadataSchema,
     DocumentChunkSchema,
-    Source
 )
+from ..models.task_model import TaskModel, TaskStatus, TaskType
 
 class DocumentStore:
     """Manages document storage, parsing and chunking."""
@@ -31,122 +30,123 @@ class DocumentStore:
         self.raw_dir.mkdir(exist_ok=True)
         self.chunks_dir.mkdir(exist_ok=True)
 
+    def store_document(self, doc: DocumentWithChunksSchema) -> None:
+        """Store a document and its chunks."""
+        # Save raw text
+        raw_path = self.raw_dir / f"{doc.id}.txt"
+        raw_path.write_text(doc.text)
+
+        # Save chunks
+        if doc.chunks:
+            chunks_path = self.chunks_dir / f"{doc.id}.json"
+            with open(chunks_path, "w") as f:
+                json.dump([chunk.model_dump() for chunk in doc.chunks], f, indent=2)
+
     async def process_documents(
         self,
-        files: List[Dict[str, Any]],
+        file_infos: List[Dict[str, Any]],
         config: Dict[str, Any],
-        on_progress: Optional[Callable[[float, str, int, int], Coroutine[Any, Any, None]]] = None,
-    ) -> List[DocumentWithChunksSchema]:
-        """
-        Process documents through parsing and chunking.
-
-        Args:
-            files: List of file information (path, type, etc.)
-            config: Configuration for processing
-            on_progress: Async callback for progress updates
-
-        Returns:
-            List[DocumentWithChunks]: Processed documents with their chunks
-        """
+        task_id: str,
+        db: Session,
+    ) -> None:
+        """Process documents and store them in the document store"""
+        task = None  # Initialize task to None
         try:
-            # Initialize progress
-            if on_progress:
-                await on_progress(0.0, "parsing", 0, len(files))
+            # Get task from database
+            task = db.query(TaskModel).filter(TaskModel.id == task_id).first()
+            if not task:
+                raise ValueError(f"Task {task_id} not found")
 
-            # Get vision configuration if enabled
+            # Update task status
+            task.status = TaskStatus.RUNNING
+            task.start_time = datetime.now(timezone.utc)
+            db.commit()
+
+            # Get vision model config if enabled
             vision_config = None
-            if config.get("use_vision_model", False):
+            if config.get("use_vision_model"):
                 vision_config = {
-                    "model": config.get("vision_model"),
-                    "provider": config.get("vision_provider"),
+                    "model": config.get("vision_model", "gpt-4o-mini"),
+                    "provider": config.get("vision_provider", "openai"),
                     "api_key": config.get("api_key"),
+                    "system_prompt": config.get("system_prompt"),
                 }
 
-            # 1. Parse documents
-            documents: List[DocumentSchema] = []
-            for i, file_info in enumerate(files):
-                logger.debug(f"Parsing file {i+1}/{len(files)}: {file_info.get('path')}")
-                file_path = Path(file_info["path"])
+            # Process each file
+            total_files = len(file_infos)
+            processed_chunks = 0
+            total_chunks = 0
 
-                # Create document metadata
-                metadata = DocumentMetadataSchema(
-                    source=Source.file,
-                    source_id=file_path.name,
-                    created_at=arrow.utcnow().isoformat(),
-                    author=file_info.get("author"),
-                )
+            for i, file_info in enumerate(file_infos, 1):
+                logger.debug(f"Parsing file {i}/{total_files}: {file_info['path']}")
 
-                # Extract text with vision model if enabled and file is PDF
-                with open(file_path, "rb") as f:
-                    text = extract_text_from_file(
-                        f,
-                        file_info["mime_type"],
-                        vision_config if file_info["mime_type"] == "application/pdf" else None
-                    )
+                # Update task progress for parsing
+                task.progress = int((i - 1) / total_files * 50)  # First 50% for parsing
+                task.current_step = f"Parsing file {i}/{total_files}"
+                db.commit()
 
-                # Save raw text
-                doc_id = str(uuid.uuid4())
-                raw_path = self.raw_dir / f"{doc_id}.txt"
-                raw_path.write_text(text)
+                # Extract text from file
+                with open(file_info["path"], "rb") as file:
+                    try:
+                        text = await extract_text_from_file(file, file_info["mime_type"], vision_config)
+                    except Exception as e:
+                        logger.error(f"Error extracting text from file: {e}")
+                        task.status = TaskStatus.FAILED
+                        task.error = str(e)
+                        task.end_time = datetime.now(timezone.utc)
+                        db.commit()
+                        raise
 
                 # Create document
-                doc = DocumentSchema(id=doc_id, text=text, metadata=metadata)
-                documents.append(doc)
-
-                if on_progress:
-                    await on_progress(
-                        (i + 1) / len(files) * 0.5,  # First 50% for parsing
-                        "parsing",
-                        i + 1,
-                        len(files)
-                    )
-
-            # 2. Create chunks
-            chunking_config = ChunkingConfigSchema(
-                chunk_token_size=config.get("chunk_token_size", 200),
-                min_chunk_size_chars=config.get("min_chunk_size_chars", 350),
-                min_chunk_length_to_embed=config.get("min_chunk_length_to_embed", 5),
-                embeddings_batch_size=config.get("embeddings_batch_size", 128),
-                max_num_chunks=config.get("max_num_chunks", 10000),
-                template=config.get("template", {}),
-            )
-
-            docs_with_chunks: List[DocumentWithChunksSchema] = []
-
-            for i, doc in enumerate(documents):
-                # Create chunks
-                doc_chunks, doc_id = create_document_chunks(doc, chunking_config)
-
-                # Save chunks
-                chunks_path = self.chunks_dir / f"{doc_id}.json"
-                with open(chunks_path, "w") as f:
-                    json.dump(
-                        [chunk.model_dump() for chunk in doc_chunks],
-                        f,
-                        indent=2
-                    )
-
-                # Create DocumentWithChunks
-                doc_with_chunks = DocumentWithChunksSchema(
-                    id=doc_id,
-                    text=doc.text,
-                    metadata=doc.metadata,
-                    chunks=doc_chunks
+                doc = DocumentWithChunksSchema(
+                    id=str(uuid.uuid4()),
+                    text=text,
+                    chunks=[],
+                    metadata={
+                        "mime_type": file_info["mime_type"],
+                        "filename": file_info["name"],
+                    },
                 )
-                docs_with_chunks.append(doc_with_chunks)
 
-                if on_progress:
-                    await on_progress(
-                        0.5 + (i + 1) / len(documents) * 0.5,  # Last 50% for chunking
-                        "chunking",
-                        i + 1,
-                        len(documents)
-                    )
+                # Chunk document
+                chunking_config = ChunkingConfigSchema(
+                    chunk_token_size=config.get("chunk_token_size", 1000),
+                    min_chunk_size_chars=config.get("min_chunk_size_chars", 100),
+                    template=config.get("template", None),
+                )
 
-            return docs_with_chunks
+                doc_chunks, _ = await create_document_chunks(doc, chunking_config)
+                doc.chunks = doc_chunks
+                processed_chunks += len(doc_chunks)
+                total_chunks = processed_chunks  # For single-pass processing
+
+                # Store document
+                self.store_document(doc)
+
+                # Update task progress for chunking
+                task.progress = int(50 + (i / total_files * 50))  # Last 50% for chunking
+                task.current_step = f"Processing chunks ({processed_chunks} chunks created)"
+                db.commit()
+
+            # Mark task as completed
+            task.status = TaskStatus.COMPLETED
+            task.progress = 100
+            task.current_step = f"Completed processing {total_files} files ({total_chunks} chunks created)"
+            task.end_time = datetime.now(timezone.utc)
+            task.outputs = {
+                "total_files": total_files,
+                "total_chunks": total_chunks,
+                "files_processed": [f["name"] for f in file_infos]
+            }
+            db.commit()
 
         except Exception as e:
             logger.error(f"Error processing documents: {e}")
+            if task and not task.status == TaskStatus.FAILED:  # Check if not already marked as failed
+                task.status = TaskStatus.FAILED
+                task.error = str(e)
+                task.end_time = datetime.now(timezone.utc)
+                db.commit()
             raise
 
     def get_document(self, doc_id: str) -> Optional[DocumentWithChunksSchema]:

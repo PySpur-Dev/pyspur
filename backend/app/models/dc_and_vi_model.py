@@ -33,6 +33,9 @@ class DocumentCollectionModel(BaseModel):
     document_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     chunk_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     error_message: Mapped[Optional[str]] = mapped_column(String)
+    current_task_id: Mapped[Optional[str]] = mapped_column(
+        String, ForeignKey("tasks.id"), nullable=True
+    )
 
     # Store configuration
     text_processing_config: Mapped[Dict[str, Any]] = mapped_column(
@@ -47,6 +50,7 @@ class DocumentCollectionModel(BaseModel):
         back_populates="document_collection",
         cascade="all, delete-orphan",
     )
+    current_task: Mapped[Optional["TaskModel"]] = relationship("TaskModel")
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime, default=datetime.now(timezone.utc)
@@ -56,6 +60,16 @@ class DocumentCollectionModel(BaseModel):
         default=datetime.now(timezone.utc),
         onupdate=datetime.now(timezone.utc),
     )
+
+    @property
+    def processing_progress(self) -> Optional[float]:
+        """Get current processing progress from associated task."""
+        return self.current_task.progress if self.current_task else None
+
+    @property
+    def current_step(self) -> Optional[str]:
+        """Get current processing step from associated task."""
+        return self.current_task.current_step if self.current_task else None
 
 
 class VectorIndexModel(BaseModel):

@@ -39,6 +39,7 @@ from ..schemas.rag_schemas import (
     RetrievalResultSchema,
 )
 from ..rag.chunker import preview_document_chunk
+from ..models.task_model import TaskModel, TaskType, TaskStatus
 
 # In-memory progress tracking (replace with database in production)
 collection_progress: Dict[str, ProcessingProgressSchema] = {}
@@ -225,9 +226,7 @@ async def update_collection_status(collection_id: str, status: str, db: Session)
             .first()
         )
         if collection:
-            # Convert string status to DocumentStatus enum
-            new_status = cast(DocumentStatus, "ready" if status == "ready" else "failed" if status == "failed" else "processing")
-            collection.status = new_status
+            collection.status = cast(DocumentStatus, status)
             collection.updated_at = datetime.now(timezone.utc)
             db.commit()
     except Exception as e:
@@ -238,33 +237,26 @@ async def process_document_collection(
     collection_id: str,
     file_infos: List[Dict[str, Any]],
     config: Dict[str, Any],
+    task_id: str,
     db: Session,
 ) -> None:
     """Process document collection in background"""
     try:
         doc_store = DocumentStore(collection_id)
-
-        # Create progress callback
-        async def progress_callback(
-            progress: float, step: str, processed: int, total: int
-        ) -> None:
-            await update_collection_progress(
-                collection_id,
-                progress=progress,
-                current_step=step,
-                processed_files=processed if step == "parsing" else None,
-                processed_chunks=processed if step == "chunking" else None,
-                total_chunks=total if step == "chunking" else None,
-                db=db,
-            )
-
-        await doc_store.process_documents(
-            file_infos,
-            config,
-            progress_callback,
-        )
-        # Update collection status to ready on successful completion
-        await update_collection_status(collection_id, "ready", db)
+        await doc_store.process_documents(file_infos, config, task_id, db)
+        # Update collection status based on task status
+        task = db.query(TaskModel).filter(TaskModel.id == task_id).first()
+        if task and task.status == TaskStatus.COMPLETED:
+            await update_collection_status(collection_id, "ready", db)
+        elif task and task.status == TaskStatus.FAILED:
+            await update_collection_status(collection_id, "failed", db)
+            if task.error:
+                await update_collection_progress(
+                    collection_id,
+                    status="failed",
+                    error_message=task.error,
+                    db=db
+                )
     except Exception as e:
         logger.error(f"Error processing document collection: {e}")
         await update_collection_status(collection_id, "failed", db)
@@ -320,6 +312,23 @@ async def create_document_collection(
 
         # Process files if present
         if files:
+            # Create processing task
+            task = TaskModel(
+                run_id="system",  # System-generated task
+                node_id=collection.id,  # Use collection ID as node ID
+                task_type=TaskType.DOCUMENT_PARSING,
+                status=TaskStatus.PENDING,
+                inputs={
+                    "collection_id": collection.id,
+                    "file_count": len(files),
+                    "config": collection_config.text_processing.model_dump(),
+                },
+                start_time=now,
+            )
+            db.add(task)
+            db.commit()
+            db.refresh(task)
+
             # Read files and prepare file info
             file_infos: List[Dict[str, Any]] = []
             collection_dir = Path(f"data/knowledge_bases/{collection.id}")
@@ -339,12 +348,13 @@ async def create_document_collection(
                         }
                     )
 
-            # Start background processing with new function
+            # Start background processing with task
             background_tasks.add_task(
                 process_document_collection,
                 collection.id,
                 file_infos,
                 collection_config.text_processing.model_dump(),
+                task.id,
                 db,
             )
 
@@ -358,6 +368,7 @@ async def create_document_collection(
             updated_at=collection.updated_at.isoformat(),
             document_count=collection.document_count,
             chunk_count=collection.chunk_count,
+            task_id=task.id if files else None,
         )
 
     except Exception as e:
@@ -624,15 +635,37 @@ async def get_vector_index(index_id: str, db: Session = Depends(get_db)):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-# Add progress tracking endpoints
-@router.get(
-    "/collections/{collection_id}/progress/", response_model=ProcessingProgressSchema
-)
-async def get_collection_progress(collection_id: str):
+@router.get("/collections/{collection_id}/progress/", response_model=ProcessingProgressSchema)
+async def get_collection_progress(collection_id: str, db: Session = Depends(get_db)):
     """Get document collection processing progress"""
-    if collection_id not in collection_progress:
-        raise HTTPException(status_code=404, detail="No progress information found")
-    return collection_progress[collection_id]
+    collection = (
+        db.query(DocumentCollectionModel)
+        .filter(DocumentCollectionModel.id == collection_id)
+        .first()
+    )
+    if not collection:
+        raise HTTPException(status_code=404, detail="Collection not found")
+
+    if not collection.current_task_id:
+        raise HTTPException(status_code=404, detail="No active processing task")
+
+    task = db.query(TaskModel).filter(TaskModel.id == collection.current_task_id).first()
+    if not task:
+        raise HTTPException(status_code=404, detail="Processing task not found")
+
+    return ProcessingProgressSchema(
+        id=task.id,
+        status=task.status.value,
+        progress=float(task.progress or 0.0),
+        current_step=task.current_step or "",
+        total_files=task.inputs.get("file_count", 0) if task.inputs else 0,
+        processed_files=task.outputs.get("processed_files", 0) if task.outputs else 0,
+        total_chunks=task.outputs.get("total_chunks", 0) if task.outputs else 0,
+        processed_chunks=task.outputs.get("processed_chunks", 0) if task.outputs else 0,
+        error_message=task.error,
+        created_at=task.start_time.isoformat() if task.start_time else "",
+        updated_at=task.end_time.isoformat() if task.end_time else "",
+    )
 
 
 @router.get("/indices/{index_id}/progress/", response_model=ProcessingProgressSchema)
