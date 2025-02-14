@@ -17,7 +17,7 @@ from .evals_management import router as evals_management_router
 from ..integrations.google.auth import router as google_auth_router
 from .rag_management import router as rag_management_router
 from .file_management import router as file_management_router
-
+from .library_management import router as library_management_router
 
 load_dotenv()
 
@@ -47,3 +47,4 @@ app.include_router(evals_management_router, prefix="/evals")
 app.include_router(google_auth_router, prefix="/google")
 app.include_router(rag_management_router, prefix="/rag")
 app.include_router(file_management_router, prefix="/files")
+app.include_router(library_management_router, prefix="/library")

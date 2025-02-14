@@ -995,3 +995,140 @@ export const uploadTestFiles = async (
         throw error
     }
 }
+
+// Library Types
+export interface LibraryItem {
+    id: string;
+    name: string;
+    description?: string;
+    type: 'prompt' | 'schema';
+    content: any;
+    collection_id?: string;
+    library_id: string;
+    created_at: string;
+    updated_at: string;
+    tags: Array<{
+        id: number;
+        name: string;
+    }>;
+    versions: Array<{
+        id: number;
+        version: number;
+        content: any;
+        created_at: string;
+    }>;
+}
+
+export interface LibraryCollection {
+    id: string;
+    name: string;
+    description?: string;
+    parent_id?: string;
+    library_id: string;
+    created_at: string;
+    updated_at: string;
+}
+
+export interface LibraryTag {
+    id: number;
+    name: string;
+}
+
+export interface LibrarySearchParams {
+    query?: string;
+    type?: 'prompt' | 'schema';
+    collection_id?: string;
+    tag_ids?: number[];
+    page?: number;
+    page_size?: number;
+}
+
+// Library Management Functions
+export const createLibraryItem = async (item: Omit<LibraryItem, 'id' | 'created_at' | 'updated_at' | 'versions'>): Promise<LibraryItem> => {
+    try {
+        const response = await axios.post(`${API_BASE_URL}/library/items/`, item);
+        return response.data;
+    } catch (error) {
+        console.error('Error creating library item:', error);
+        throw error;
+    }
+};
+
+export const updateLibraryItem = async (id: string, item: Partial<LibraryItem>): Promise<LibraryItem> => {
+    try {
+        const response = await axios.put(`${API_BASE_URL}/library/items/${id}/`, item);
+        return response.data;
+    } catch (error) {
+        console.error('Error updating library item:', error);
+        throw error;
+    }
+};
+
+export const deleteLibraryItem = async (id: string): Promise<void> => {
+    try {
+        await axios.delete(`${API_BASE_URL}/library/items/${id}/`);
+    } catch (error) {
+        console.error('Error deleting library item:', error);
+        throw error;
+    }
+};
+
+export const searchLibraryItems = async (params: LibrarySearchParams): Promise<LibraryItem[]> => {
+    try {
+        const response = await axios.get(`${API_BASE_URL}/library/items/`, { params });
+        return response.data;
+    } catch (error) {
+        console.error('Error searching library items:', error);
+        throw error;
+    }
+};
+
+export const getLibraryItem = async (id: string): Promise<LibraryItem> => {
+    try {
+        const response = await axios.get(`${API_BASE_URL}/library/items/${id}/`);
+        return response.data;
+    } catch (error) {
+        console.error('Error getting library item:', error);
+        throw error;
+    }
+};
+
+export const createCollection = async (collection: Omit<LibraryCollection, 'id' | 'created_at' | 'updated_at'>): Promise<LibraryCollection> => {
+    try {
+        const response = await axios.post(`${API_BASE_URL}/library/collections/`, collection);
+        return response.data;
+    } catch (error) {
+        console.error('Error creating collection:', error);
+        throw error;
+    }
+};
+
+export const listCollections = async (): Promise<LibraryCollection[]> => {
+    try {
+        const response = await axios.get(`${API_BASE_URL}/library/collections/`);
+        return response.data;
+    } catch (error) {
+        console.error('Error listing collections:', error);
+        throw error;
+    }
+};
+
+export const createTag = async (name: string): Promise<LibraryTag> => {
+    try {
+        const response = await axios.post(`${API_BASE_URL}/library/tags/`, { name });
+        return response.data;
+    } catch (error) {
+        console.error('Error creating tag:', error);
+        throw error;
+    }
+};
+
+export const listTags = async (): Promise<LibraryTag[]> => {
+    try {
+        const response = await axios.get(`${API_BASE_URL}/library/tags/`);
+        return response.data;
+    } catch (error) {
+        console.error('Error listing tags:', error);
+        throw error;
+    }
+};
