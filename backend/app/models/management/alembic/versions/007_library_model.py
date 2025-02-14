@@ -1,8 +1,8 @@
-"""library
+"""library_model
 
 Revision ID: 007
 Revises: 006
-Create Date: 2025-02-14 05:52:24.072229
+Create Date: 2025-02-14 15:06:52.412674
 
 """
 from typing import Sequence, Union
