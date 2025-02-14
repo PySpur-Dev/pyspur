@@ -42,7 +42,7 @@ import { useRouter } from 'next/router'
 import { DndProvider } from 'react-dnd'
 import { HTML5Backend } from 'react-dnd-html5-backend'
 import LibraryItemCard from './library/LibraryItemCard'
-import LibraryItemModal from './library/LibraryItemModal'
+import LibraryItemEditor from './library/LibraryItemEditor'
 
 interface AlertState {
     message: string;
@@ -129,9 +129,12 @@ const Library: React.FC = () => {
 
     const handleDuplicateItem = async (item: LibraryItem) => {
         try {
-            const { id, created_at, updated_at, versions, ...duplicateData } = item
-            duplicateData.name = `${duplicateData.name} (Copy)`
-            await createLibraryItem(duplicateData)
+            const { id, created_at, updated_at, versions, ...itemData } = item
+            const duplicatedItem = {
+                ...itemData,
+                name: `${itemData.name} (Copy)`,
+            }
+            await createLibraryItem(duplicatedItem)
             showAlert('Item duplicated successfully', 'success')
             fetchLibraryData()
         } catch (error) {
@@ -140,17 +143,18 @@ const Library: React.FC = () => {
         }
     }
 
-    const handleSaveItem = async (itemData: Partial<LibraryItem>) => {
+    const handleSaveItem = async (formData: Partial<LibraryItem>) => {
         try {
             if (modalMode === 'create') {
-                await createLibraryItem(itemData)
+                await createLibraryItem(formData)
                 showAlert('Item created successfully', 'success')
             } else {
                 if (!selectedItem) return
-                await updateLibraryItem(selectedItem.id, itemData)
+                await updateLibraryItem(selectedItem.id, formData)
                 showAlert('Item updated successfully', 'success')
             }
             fetchLibraryData()
+            onClose()
         } catch (error) {
             console.error('Error saving item:', error)
             showAlert(`Failed to ${modalMode} item`, 'danger')
@@ -266,7 +270,7 @@ const Library: React.FC = () => {
                 {renderContent()}
             </div>
 
-            <LibraryItemModal
+            <LibraryItemEditor
                 isOpen={isOpen}
                 onClose={onClose}
                 onSave={handleSaveItem}
