@@ -18,6 +18,7 @@ import styles from './BaseNode.module.css'
 import { isTargetAncestorOfSource } from '@/utils/cyclicEdgeUtils'
 import NodeErrorDisplay from './NodeErrorDisplay'
 import NodeOutputDisplay from './NodeOutputDisplay'
+import { debounce } from 'lodash'
 
 const PUBLIC_URL = typeof window !== 'undefined' ? `http://${window.location.host}/` : 'http://localhost:6080/'
 
@@ -367,7 +368,7 @@ const BaseNode: React.FC<BaseNodeProps> = ({
         id: string
         keyName: string
     }
-    
+
     const InputHandleRow: React.FC<HandleRowProps> = ({ id, keyName }) => {
         const connections = useNodeConnections({ id: id, handleType: 'target', handleId: keyName })
         const isConnectable = !isCollapsed && (connections.length === 0 || String(keyName).startsWith('branch'))
@@ -387,7 +388,7 @@ const BaseNode: React.FC<BaseNodeProps> = ({
                     <div
                         className="align-center flex flex-grow flex-shrink ml-[0.5rem] max-w-full overflow-hidden"
                         id={`input-${keyName}-label`}
-                    >    
+                    >
                         <span
                             className={`${styles.handleLabel} text-sm font-medium cursor-pointer hover:text-primary
                                 mr-auto overflow-hidden text-ellipsis whitespace-nowrap`}
@@ -514,6 +515,20 @@ const BaseNode: React.FC<BaseNodeProps> = ({
 
     const nodeRef = useRef<HTMLDivElement | null>(null)
 
+    const debouncedTitleChange = useMemo(
+        () => debounce((newTitle: string) => {
+            handleTitleChange(newTitle)
+        }, 300),
+        []
+    )
+
+    // Cleanup debounced function
+    useEffect(() => {
+        return () => {
+            debouncedTitleChange.cancel()
+        }
+    }, [debouncedTitleChange])
+
     return (
         <>
             {alert.isVisible && (
@@ -567,13 +582,14 @@ const BaseNode: React.FC<BaseNodeProps> = ({
                                             onChange={(e) => {
                                                 const validValue = convertToPythonVariableName(e.target.value)
                                                 setTitleInputValue(validValue)
-                                                handleTitleChange(validValue)
+                                                debouncedTitleChange(validValue)
                                             }}
                                             onBlur={() => setEditingTitle(false)}
                                             onKeyDown={(e: React.KeyboardEvent<HTMLInputElement>) => {
                                                 if (e.key === 'Enter' || e.key === 'Escape') {
                                                     e.stopPropagation()
                                                     e.preventDefault()
+                                                    debouncedTitleChange.flush()
                                                     setEditingTitle(false)
                                                 }
                                             }}
@@ -641,7 +657,7 @@ const BaseNode: React.FC<BaseNodeProps> = ({
                                     </div>
                                 {children}
                                 {nodeData?.error && <NodeErrorDisplay error={nodeData?.error} />}
-                                <NodeOutputDisplay key={`output-display-${id}`} output={nodeData?.run} />   
+                                <NodeOutputDisplay key={`output-display-${id}`} output={nodeData?.run} />
                             </CardBody>
                         </Card>
                     </div>
