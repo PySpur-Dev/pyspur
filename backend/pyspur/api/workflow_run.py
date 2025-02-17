@@ -33,9 +33,6 @@ from ..utils.workflow_version_utils import fetch_workflow_version
 
 router = APIRouter()
 
-# Define EVALS_DIR (same as in evals_management.py)
-EVALS_DIR = Path(__file__).parent.parent / "evals" / "tasks"
-
 
 async def create_run_model(
     workflow_id: str,

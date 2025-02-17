@@ -1,0 +1,61 @@
+services:
+  nginx:
+    image: nginx:latest
+    ports:
+      - "${PYSPUR_PORT:-6080}:80"
+    volumes:
+      - ./nginx/conf.d:/etc/nginx/conf.d
+    depends_on:
+      - backend
+      - frontend
+    restart: on-failure
+
+  backend:
+    build: 
+      context: .
+      dockerfile: Dockerfile.backend
+      target: ${ENVIRONMENT:-development}
+    env_file:
+      - ./.env.example
+      - ./.env
+    command: bash /pyspur/backend/entrypoint.sh
+    volumes:
+      - .:/pyspur
+      - ./.env:/pyspur/backend/.env
+      - pyspur_data:/pyspur/backend/data
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      db:
+        condition: service_healthy
+
+  frontend:
+    build: 
+      context: .
+      dockerfile: Dockerfile.frontend
+      target: ${ENVIRONMENT:-development}
+    env_file:
+      - ./.env.example
+      - ./.env
+    command: npm run dev
+    volumes:
+      - .:/pyspur
+      - /pyspur/frontend/node_modules
+    depends_on:
+      - backend
+
+  db:
+    image: postgres:17-alpine
+    restart: on-failure
+    env_file:
+      - ./.env.example
+      - ./.env
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+        test: ['CMD-SHELL', 'pg_isready -U pyspur']
+        interval: 5s
+        timeout: 5s
+volumes:
+  postgres_data:
+  pyspur_data:  # Used to persist data like uploaded files, eval outputs, datasets
