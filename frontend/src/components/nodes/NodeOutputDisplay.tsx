@@ -365,7 +365,34 @@ const NodeOutputDisplay: React.FC<NodeOutputDisplayProps> = ({ output }) => {
             )
         }
 
-        return <Markdown>{JSON.stringify(value, null, 1)}</Markdown>
+        // Process value for markdown rendering
+        const processValue = (val: any): string => {
+            if (typeof val === 'string') {
+                // Preserve existing heading markers (#, ##, ###)
+                if (val.match(/^#+\s/m)) {
+                    return val;
+                }
+                // For object keys that should be headings, use appropriate heading level
+                if (val.match(/^[A-Z][^a-z:]+(?:\s[A-Z][^a-z:]+)*:?$/)) {
+                    return `### ${val}`;
+                }
+                return val;
+            }
+            if (typeof val === 'object' && val !== null) {
+                return Object.entries(val)
+                    .map(([k, v]) => {
+                        // Make top-level keys larger headings
+                        if (k.match(/^[A-Z][^a-z:]+(?:\s[A-Z][^a-z:]+)*:?$/)) {
+                            return `## ${k}\n\n${processValue(v)}`;
+                        }
+                        return `**${k}**: ${processValue(v)}`;
+                    })
+                    .join('\n\n');
+            }
+            return String(val);
+        };
+
+        return <Markdown>{processValue(value)}</Markdown>;
     }
 
     return (
@@ -376,6 +403,7 @@ const NodeOutputDisplay: React.FC<NodeOutputDisplayProps> = ({ output }) => {
                     style={{
                         overflowY: 'auto',
                         touchAction: 'none',
+                        maxHeight: '500px'
                     }}
                     onWheelCapture={(e) => {
                         e.stopPropagation()

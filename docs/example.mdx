@@ -1,0 +1,79 @@
+---
+title: Example
+description: 'A walkthrough of a simple spur we use internally'
+---
+
+
+
+# The spur in action
+
+<img className="block dark:hidden" src="/images/example_walkthrough/0_light.png" />
+<img className="hidden dark:block" src="/images/example_walkthrough/0_dark.png" />
+
+
+Let's explore a practical example: a spur we use to summarize technical content and share it in Slack. Click the image above to view a spur run in full size or click [here](/images/SlackSummarizer.json) to download the spur.
+
+1) A router splits the flow based on the input - either a blog post URL or research paper PDF.
+2) Blog posts are scraped via FireCrawl and summarized using an LLM (Claude 3.5 Sonnet).
+3) Research papers are converted to markdown with Gemini 2.0 and summarized by Claude 3.5 Sonnet for a more conversational style.
+4) The routes merge, selecting whichever branch produced output.
+5) Finally, the summary is posted to Slack.
+
+# Step by Step Tutorial
+
+Now, let's recreate that spur step by step.
+
+## Input Node
+
+Each new spur includes a default, non-deletable input node. Its variables define the data used within the spur.
+
+<img className="block dark:hidden" src="/images/example_walkthrough/2_light.png" />
+<img className="hidden dark:block" src="/images/example_walkthrough/2_dark.png" />
+
+When deployed as an API, these variables define the endpoint's input schema.
+
+<img className="block dark:hidden" src="/images/example_walkthrough/3_light.png" />
+<img className="hidden dark:block" src="/images/example_walkthrough/3_dark.png" />
+
+## Router Node
+
+The router node splits the pipeline based on input type:
+
+1) Extract information via web scraping or PDF-to-markdown conversion.
+2) Summarize content according to different preferences.
+
+The router directs data to routes based on defined conditions, evaluating each route in order until a match is found.
+
+<img className="block dark:hidden" src="/images/example_walkthrough/4_light.png" />
+<img className="hidden dark:block" src="/images/example_walkthrough/4_dark.png" />
+
+## Route 1: Summarizing blog post
+
+First, we want to scrape the post's URL and turn it into markdown. For this, we use the [Firecrawl](https://www.firecrawl.dev/) tool.
+
+<img className="block dark:hidden" src="/images/example_walkthrough/5_light.gif" />
+<img className="hidden dark:block" src="/images/example_walkthrough/5_dark.gif" />
+
+Now, we want to pass that markdown to an LLM and write a prompt that captures our taste of summaries.
+
+<video 
+  muted
+  loop
+  playsInline
+  className="" className="block dark:hidden w-full aspect-video" src="/images/example_walkthrough/6_light.mp4" />
+<video
+  muted
+  loop
+  playsInline className="hidden dark:block w-full aspect-video" src="/images/example_walkthrough/6_dark.mp4" />
+
+Interesingly, we can now define test cases (blog posts), run them, review outputs at each node, and iterate until the results meet expectations.
+
+<video
+  muted
+  loop
+  playsInline
+  className="" className="block dark:hidden w-full aspect-video" src="/images/example_walkthrough/7_light.mp4" />
+<video
+  muted
+  loop
+  playsInline className="hidden dark:block w-full aspect-video" src="/images/example_walkthrough/7_dark.mp4" />

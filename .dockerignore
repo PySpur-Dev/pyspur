@@ -1,0 +1,88 @@
+# Version control
+.git
+.gitignore
+
+# Dependencies
+**/node_modules
+**/__pycache__
+**/*.pyc
+**/*.pyo
+**/*.pyd
+**/*.so
+**/.Python
+**/env
+**/venv
+**/.env
+**/.env.local
+**/.env.development.local
+**/.env.test.local
+**/.env.production.local
+
+# Python specific
+**/develop-eggs
+**/eggs
+**/.eggs
+**/parts
+**/sdist
+**/var
+**/wheels
+**/*.egg-info
+**/.installed.cfg
+**/*.egg
+
+# Build outputs
+**/dist
+**/build
+**/.next
+**/out
+**/*.egg-info
+
+# Development/IDE files
+**/.idea
+**/.vscode
+**/.DS_Store
+**/*.swp
+**/*.swo
+
+# Docker files
+**/Dockerfile*
+**/.dockerignore
+docker-compose*.yml
+
+# Test files
+**/__tests__
+**/test
+**/*.test.js
+**/*.spec.js
+**/*.test.py
+**/*.spec.py
+**/coverage
+**/htmlcov
+
+# Documentation
+**/*.md
+**/docs
+
+# Logs
+**/logs
+**/*.log
+**/npm-debug.log*
+**/yarn-debug.log*
+**/yarn-error.log*
+
+# Cache
+**/.cache
+**/.npm
+**/.eslintcache
+**/.pytest_cache
+**/__pycache__
+**/.coverage
+
+# Data directories
+**/data
+**/uploads
+**/downloads
+
+# Databases
+**/*.db
+**/sqlite/*.db 

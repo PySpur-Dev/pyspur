@@ -1,0 +1,41 @@
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+      target: production
+    command: bash /pyspur/backend/entrypoint.sh
+    ports:
+      - "${PYSPUR_PORT:-6080}:8000"
+    env_file:
+      - ./.env.example
+      - ./.env
+    environment:
+      - ENVIRONMENT=staging
+    volumes:
+      - .:/pyspur:ro
+      - /pyspur/backend/pyspur/static/
+      - ./.env:/pyspur/backend/.env
+      - pyspur_data:/pyspur/backend/data
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      db:
+        condition: service_healthy
+
+  db:
+    image: postgres:17-alpine
+    restart: on-failure
+    env_file:
+      - ./.env.example
+      - ./.env
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+        test: ['CMD-SHELL', 'pg_isready -U pyspur']
+        interval: 5s
+        timeout: 5s
+
+volumes:
+  postgres_data:
+  pyspur_data:  # Used to persist data like uploaded files, eval outputs, datasets 

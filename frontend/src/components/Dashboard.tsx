@@ -499,10 +499,7 @@ const Dashboard: React.FC = () => {
                             <div className="flex flex-col items-center justify-center p-12 my-8 bg-background rounded-xl border-border border shadow-sm">
                                 <div className="max-w-2xl text-center mb-12">
                                     <h3 className="text-2xl font-semibold mb-4 text-foreground flex items-center justify-center gap-2">
-                                        Welcome to Your Spur Dashboard!{' '}
-                                        <span role="img" aria-label="rocket">
-                                            🚀
-                                        </span>
+                                        Welcome to PySpur!
                                     </h3>
                                     <p className="text-lg text-muted-foreground">
                                         Looks like you haven&apos;t created any spurs yet - let&apos;s get you started

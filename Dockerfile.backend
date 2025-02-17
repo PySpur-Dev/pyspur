@@ -1,0 +1,33 @@
+FROM python:3.12-slim AS base
+RUN apt-get update && apt-get install -y \
+    libpq-dev \
+    gcc \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /pyspur/backend
+COPY backend/pyproject.toml .
+RUN pip install .
+
+# Development stage
+FROM base AS development
+ENV PYTHONPATH=/pyspur/backend
+# Development-specific instructions here
+
+# Frontend build stage
+FROM node:23-alpine AS frontend-builder
+WORKDIR /pyspur/frontend
+COPY frontend/package*.json ./
+RUN npm ci
+COPY frontend/ .
+RUN npm run build
+
+# Production stage
+FROM base AS production
+ENV PYTHONPATH=/pyspur/backend
+COPY backend/ .
+# Copy frontend static files from frontend build stage
+RUN mkdir -p /pyspur/backend/pyspur/static
+RUN rm -rf /pyspur/backend/pyspur/static/*
+COPY --from=frontend-builder /pyspur/frontend/out/ /pyspur/backend/pyspur/static/
+# Production-specific instructions here 

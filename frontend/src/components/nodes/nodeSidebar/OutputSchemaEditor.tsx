@@ -50,7 +50,11 @@ const OutputSchemaEditor: React.FC<OutputSchemaEditorProps> = ({
                     </div>
                 </Alert>
             )}
-            <Tabs aria-label="Schema Editor Options" disabledKeys={error ? ['simple'] : []}>
+            <Tabs
+                aria-label="Schema Editor Options"
+                disabledKeys={readOnly ? ['simple', 'json'] : error ? ['simple'] : []}
+                selectedKey={error ? 'json' : 'simple'}
+            >
                 <Tab key="simple" title="Simple Editor">
                     {parsedSchema && (
                         <Card>

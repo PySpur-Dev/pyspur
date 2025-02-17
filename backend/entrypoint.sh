@@ -7,9 +7,10 @@ if [ -f "test_ollama.sh" ]; then
 fi
 
 set -e 
-mkdir -p /pyspur/backend/app/models/management/alembic/versions/
+mkdir -p /pyspur/backend/pyspur/models/management/alembic/versions/
 start_server() {
-    uvicorn app.api.main:app --reload --reload-include ./log_conf.yaml --reload-include **/*.py --log-config=log_conf.yaml  --host 0.0.0.0 --port 8000
+    cd /pyspur/backend
+    uvicorn "pyspur.api.main:app" --reload --reload-include ./log_conf.yaml --reload-include "**/*.py" --log-config=log_conf.yaml --host 0.0.0.0 --port 8000
 }
 
 main() {

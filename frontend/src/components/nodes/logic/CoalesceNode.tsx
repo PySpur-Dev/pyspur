@@ -238,20 +238,29 @@ export const CoalesceNode: React.FC<CoalesceNodeProps> = ({ id, data }) => {
             isCollapsed={isCollapsed}
             setIsCollapsed={setIsCollapsed}
             data={nodeData}
-            // Use the computed nodeWidth
-            style={{ width: nodeWidth }}
+            // Update style to include max-height and flex properties
+            style={{ width: nodeWidth, maxHeight: '800px', display: 'flex', flexDirection: 'column' }}
             className="hover:!bg-background"
             renderOutputHandles={renderOutputHandles}
             handleOpenModal={setIsModalOpen}
         >
-            <div className="p-3" ref={nodeRef}>
+            <div className="flex flex-col flex-grow overflow-hidden" ref={nodeRef}>
                 {/* The main body, hidden if collapsed */}
                 {!isCollapsed && (
-                    <>
-                        <Divider className="my-2" />
-                        <div className="flex items-center gap-2 mb-4">
-                            <span className="text-sm font-medium text-foreground">Preferences</span>
-                            <Divider className="flex-grow" />
+                    <div
+                        className="p-3 overflow-y-auto"
+                        style={{ touchAction: 'none', maxHeight: '600px' }}
+                        onWheelCapture={(e) => {
+                            e.stopPropagation()
+                        }}
+                    >
+                        {/* Preferences Header - Now sticky */}
+                        <div className="sticky top-0 bg-background/95 backdrop-blur-sm z-10 pb-4">
+                            <Divider className="my-2" />
+                            <div className="flex items-center gap-2 mb-4">
+                                <span className="text-sm font-medium text-foreground">Preferences</span>
+                                <Divider className="flex-grow" />
+                            </div>
                         </div>
 
                         <div className="flex flex-col gap-4">
@@ -287,7 +296,7 @@ export const CoalesceNode: React.FC<CoalesceNodeProps> = ({ id, data }) => {
                                 </Card>
                             ))}
                         </div>
-                    </>
+                    </div>
                 )}
             </div>
             <NodeOutputModal

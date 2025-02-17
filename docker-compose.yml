@@ -12,7 +12,8 @@ services:
 
   backend:
     build: 
-      context: ./backend
+      context: .
+      dockerfile: Dockerfile.backend
       target: ${ENVIRONMENT:-development}
     env_file:
       - ./.env.example
@@ -30,7 +31,8 @@ services:
 
   frontend:
     build: 
-      context: ./frontend
+      context: .
+      dockerfile: Dockerfile.frontend
       target: ${ENVIRONMENT:-development}
     env_file:
       - ./.env.example

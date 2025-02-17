@@ -1,0 +1,15 @@
+FROM node:23-alpine AS base
+WORKDIR /pyspur/frontend
+COPY frontend/package*.json ./
+
+# Development stage
+FROM base AS development
+RUN npm install
+# Development-specific instructions here
+
+# Production stage
+FROM base AS production
+RUN npm ci --only=production
+COPY frontend/ .
+RUN npm run build
+# Production-specific instructions here 

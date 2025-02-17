@@ -1,4 +1,4 @@
-name: Release Docker Images
+name: Release
 
 on:
   release:
@@ -7,18 +7,48 @@ on:
 env:
   REGISTRY: ghcr.io
   BACKEND_IMAGE_NAME: ${{ github.repository }}-backend
-  FRONTEND_IMAGE_NAME: ${{ github.repository }}-frontend
 
 jobs:
-  build-and-push:
+  update-version:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    outputs:
+      version: ${{ steps.get-version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Get version from tag
+        id: get-version
+        run: echo "version=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+
+      - name: Update pyproject.toml version
+        run: |
+          VERSION=${{ steps.get-version.outputs.version }}
+          sed -i "s/version = \".*\"/version = \"$VERSION\"/" backend/pyproject.toml
+          
+      - name: Commit and push version update
+        run: |
+          git config --global user.name "GitHub Actions"
+          git config --global user.email "actions@github.com"
+          git add backend/pyproject.toml
+          git commit -m "chore: update version to ${{ steps.get-version.outputs.version }}"
+          git push
+
+  build-and-push-docker:
+    needs: update-version
     runs-on: ubuntu-latest
     permissions:
       contents: read
       packages: write
+    outputs:
+      image_name: ${{ steps.meta-backend.outputs.tags }}
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.release.tag_name }}
 
       - name: Log in to the Container registry
         uses: docker/login-action@v3
@@ -36,31 +66,56 @@ jobs:
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
 
-      - name: Extract metadata (tags, labels) for Frontend
-        id: meta-frontend
-        uses: docker/metadata-action@v5
-        with:
-          images: ${{ env.REGISTRY }}/${{ env.FRONTEND_IMAGE_NAME }}
-          tags: |
-            type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
-
       - name: Build and push Backend image
         uses: docker/build-push-action@v5
         with:
-          context: ./backend
-          file: ./backend/Dockerfile
+          context: .
+          file: ./Dockerfile.backend
           push: true
           target: production
           tags: ${{ steps.meta-backend.outputs.tags }}
           labels: ${{ steps.meta-backend.outputs.labels }}
 
-      - name: Build and push Frontend image
-        uses: docker/build-push-action@v5
+  publish-to-pypi:
+    needs: [update-version, build-and-push-docker]
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      packages: read
+    defaults:
+      run:
+        working-directory: ./backend
+
+    steps:
+      - name: Log in to the Container registry
+        uses: docker/login-action@v3
         with:
-          context: ./frontend
-          file: ./frontend/Dockerfile
-          push: true
-          target: production
-          tags: ${{ steps.meta-frontend.outputs.tags }}
-          labels: ${{ steps.meta-frontend.outputs.labels }} 
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build package in Docker
+        run: |
+          # Create a temporary container from the production image
+          CONTAINER_ID=$(docker create ${{ needs.build-and-push-docker.outputs.image_name }})
+          
+          # Start the container
+          docker start $CONTAINER_ID
+          
+          # Create dist directory
+          mkdir -p dist
+          
+          # Build the package inside the container
+          docker exec $CONTAINER_ID pip install build
+          docker exec $CONTAINER_ID python -m build
+          
+          # Copy the built package from the container
+          docker cp $CONTAINER_ID:/pyspur/backend/dist/. dist/
+          
+          # Clean up
+          docker rm -f $CONTAINER_ID
+
+      - name: Publish package distributions to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: dist/ 

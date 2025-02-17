@@ -1,0 +1,296 @@
+{
+  "name": "Slack Summarizer",
+  "definition": {
+    "nodes": [
+      {
+        "id": "input_node",
+        "title": "input_node",
+        "parent_id": null,
+        "node_type": "InputNode",
+        "config": {
+          "output_schema": {
+            "blogpost_url": "string",
+            "paper_pdf_file": "string"
+          },
+          "output_json_schema": "{\n  \"type\": \"object\",\n  \"properties\": {\n    \"blogpost_url\": {\n      \"type\": \"string\"\n    },\n    \"paper_pdf_file\": {\n      \"type\": \"string\"\n    }\n  },\n  \"required\": [\n    \"blogpost_url\",\n    \"paper_pdf_file\"\n  ]\n}",
+          "has_fixed_output": false,
+          "enforce_schema": false
+        },
+        "coordinates": {
+          "x": 0,
+          "y": 432
+        },
+        "dimensions": null,
+        "subworkflow": null
+      },
+      {
+        "id": "RouterNode_1",
+        "title": "RouterNode_1",
+        "parent_id": null,
+        "node_type": "RouterNode",
+        "config": {
+          "title": "RouterNode_1",
+          "type": "object",
+          "output_schema": {
+            "output": "string"
+          },
+          "output_json_schema": "{\"type\":\"object\",\"properties\":{\"input_node\":{\"type\":\"object\",\"properties\":{\"blogpost_url\":{\"type\":\"string\"},\"paper_pdf_file\":{\"type\":\"string\"}},\"required\":[\"blogpost_url\",\"paper_pdf_file\"]}},\"required\":[\"input_node\"],\"additionalProperties\":false}",
+          "has_fixed_output": false,
+          "route_map": {
+            "route1": {
+              "conditions": [
+                {
+                  "logicalOperator": "AND",
+                  "operator": "is_not_empty",
+                  "value": "",
+                  "variable": "input_node.blogpost_url"
+                }
+              ]
+            },
+            "route2": {
+              "conditions": [
+                {
+                  "variable": "input_node.paper_pdf_file",
+                  "operator": "is_not_empty",
+                  "value": ""
+                }
+              ]
+            }
+          }
+        },
+        "coordinates": {
+          "x": 438,
+          "y": 0
+        },
+        "dimensions": {
+          "width": 428,
+          "height": 1077
+        },
+        "subworkflow": null
+      },
+      {
+        "id": "FirecrawlScrapeNode_1",
+        "title": "FirecrawlScrapeNode_1",
+        "parent_id": null,
+        "node_type": "FirecrawlScrapeNode",
+        "config": {
+          "title": "FirecrawlScrapeNode_1",
+          "type": "object",
+          "output_schema": {
+            "output": "string"
+          },
+          "output_json_schema": "{\"properties\": {\"markdown\": {\"description\": \"The scraped data in markdown format.\", \"title\": \"Markdown\", \"type\": \"string\"}}, \"required\": [\"markdown\"], \"title\": \"FirecrawlScrapeNodeOutput\", \"type\": \"object\"}",
+          "has_fixed_output": true,
+          "url_template": "{{RouterNode_1.input_node.blogpost_url}}"
+        },
+        "coordinates": {
+          "x": 1039,
+          "y": 463.5
+        },
+        "dimensions": null,
+        "subworkflow": null
+      },
+      {
+        "id": "SingleLLMCallNode_1",
+        "title": "KeyPointsSummarizer",
+        "parent_id": null,
+        "node_type": "SingleLLMCallNode",
+        "config": {
+          "title": "KeyPointsSummarizer",
+          "type": "object",
+          "output_schema": {
+            "output": "string"
+          },
+          "output_json_schema": "{\"type\": \"object\", \"properties\": {\"output\": {\"type\": \"string\"} } }",
+          "has_fixed_output": false,
+          "llm_info": {
+            "model": "openai/chatgpt-4o-latest",
+            "max_tokens": 4096,
+            "temperature": 0.7,
+            "top_p": 0.9
+          },
+          "system_message": "You are a software engineer who breaks down a technical article for colleagues to read.\n\n- Use bullet points to summarize key concepts\n- If appropriate, add some humour sparingly but never force it\n- Your audience are technical software engineers or researchers. You do not need to explain basic SWE concepts to them, you can assume familiarity.\n- Your colleagues work on an AI workflow builder. If appropriate, you can draw a connection between the provided article and how it may inform opportunities, technical decisions or the product roadmap of the AI workflow builder.",
+          "user_message": "{{FirecrawlScrapeNode_1.markdown}}",
+          "few_shot_examples": null,
+          "url_variables": null
+        },
+        "coordinates": {
+          "x": 1714,
+          "y": 463.5
+        },
+        "dimensions": null,
+        "subworkflow": null
+      },
+      {
+        "id": "SingleLLMCallNode_2",
+        "title": "MarkdownExtractor_Gemini_2_0",
+        "parent_id": null,
+        "node_type": "SingleLLMCallNode",
+        "config": {
+          "title": "MarkdownExtractor_Gemini_2_0",
+          "type": "object",
+          "output_schema": {
+            "output": "string"
+          },
+          "output_json_schema": "{\"type\": \"object\", \"properties\": {\"output\": {\"type\": \"string\"} } }",
+          "has_fixed_output": false,
+          "llm_info": {
+            "model": "gemini/gemini-2.0-flash",
+            "max_tokens": 8192,
+            "temperature": 0.4,
+            "top_p": 0.9
+          },
+          "system_message": "You are an AI / ML researcher who converts a recent arxiv ML paper pdf into markdown.\n\n- Translate any math equations into mathjax\n- You can skip references and appendix, they are not relevant",
+          "user_message": "",
+          "few_shot_examples": null,
+          "url_variables": {
+            "file": "RouterNode_1.input_node.paper_pdf_file"
+          }
+        },
+        "coordinates": {
+          "x": 1004,
+          "y": 741.5
+        },
+        "dimensions": null,
+        "subworkflow": null
+      },
+      {
+        "id": "CoalesceNode_1",
+        "title": "CoalesceNode_1",
+        "parent_id": null,
+        "node_type": "CoalesceNode",
+        "config": {
+          "title": "CoalesceNode_1",
+          "type": "object",
+          "output_schema": {
+            "output": "string"
+          },
+          "output_json_schema": "{\"type\":\"object\",\"properties\":{\"output\":{\"type\":\"string\"}},\"required\":[\"output\"],\"additionalProperties\":false}",
+          "has_fixed_output": false,
+          "preferences": [
+            "SingleLLMCallNode_1|KeyPointsSummarizer",
+            "SingleLLMCallNode_3|KeyPointsSummarizerClaude_3_5_Sonnet"
+          ]
+        },
+        "coordinates": {
+          "x": 2362,
+          "y": 373.5
+        },
+        "dimensions": null,
+        "subworkflow": null
+      },
+      {
+        "id": "SlackNotifyNode_1",
+        "title": "SlackNotifyNode_1",
+        "parent_id": null,
+        "node_type": "SlackNotifyNode",
+        "config": {
+          "title": "SlackNotifyNode_1",
+          "type": "object",
+          "output_schema": {
+            "output": "string"
+          },
+          "output_json_schema": "{\"properties\": {\"status\": {\"description\": \"Error message if the message was not sent successfully.\", \"title\": \"Status\", \"type\": \"string\"}}, \"required\": [\"status\"], \"title\": \"SlackNotifyNodeOutput\", \"type\": \"object\"}",
+          "has_fixed_output": true,
+          "channel": "learning",
+          "mode": "bot",
+          "message": "Here is your awesome summary:\n\n{{CoalesceNode_1.KeyPointsSummarizer.output}}\n\nNow back to work!"
+        },
+        "coordinates": {
+          "x": 3050,
+          "y": 463.5
+        },
+        "dimensions": null,
+        "subworkflow": null
+      },
+      {
+        "id": "SingleLLMCallNode_3",
+        "title": "KeyPointsSummarizerClaude_3_5_Sonnet",
+        "parent_id": null,
+        "node_type": "SingleLLMCallNode",
+        "config": {
+          "title": "KeyPointsSummarizerClaude_3_5_Sonnet",
+          "type": "object",
+          "output_schema": {
+            "output": "string"
+          },
+          "output_json_schema": "{\"type\": \"object\", \"properties\": {\"output\": {\"type\": \"string\"} } }",
+          "has_fixed_output": false,
+          "llm_info": {
+            "model": "anthropic/claude-3-5-sonnet-latest",
+            "max_tokens": 8192,
+            "temperature": 0.7,
+            "top_p": 0.9
+          },
+          "system_message": "You are provided with markdown that summarizes a paper. I want you to summarize in the following way:\n\n- Extract exactly three main ideas and for each idea, explain the what, why, and so what\n- Focus on the key concepts and not on insignificant details\n- If the paper introduces novel methodology, put it into context to what previous methods tried and why this new method is superior\n- If the paper includes surprising experimental observations, explain why they are surprising\n- Add a little humour but only in places where it's appropriate, never forced",
+          "user_message": "{{KeyConceptExtractor_Gemini_2_0.output}}",
+          "few_shot_examples": null,
+          "url_variables": null
+        },
+        "coordinates": {
+          "x": 1624,
+          "y": 741.5
+        },
+        "dimensions": null,
+        "subworkflow": null
+      }
+    ],
+    "links": [
+      {
+        "source_id": "input_node",
+        "target_id": "RouterNode_1",
+        "source_handle": null,
+        "target_handle": null
+      },
+      {
+        "source_id": "RouterNode_1",
+        "target_id": "FirecrawlScrapeNode_1",
+        "source_handle": "route1",
+        "target_handle": "RouterNode_1.route1"
+      },
+      {
+        "source_id": "FirecrawlScrapeNode_1",
+        "target_id": "SingleLLMCallNode_1",
+        "source_handle": null,
+        "target_handle": null
+      },
+      {
+        "source_id": "RouterNode_1",
+        "target_id": "SingleLLMCallNode_2",
+        "source_handle": "route2",
+        "target_handle": "RouterNode_1.route2"
+      },
+      {
+        "source_id": "SingleLLMCallNode_1",
+        "target_id": "CoalesceNode_1",
+        "source_handle": null,
+        "target_handle": null
+      },
+      {
+        "source_id": "CoalesceNode_1",
+        "target_id": "SlackNotifyNode_1",
+        "source_handle": null,
+        "target_handle": null
+      },
+      {
+        "source_id": "SingleLLMCallNode_2",
+        "target_id": "SingleLLMCallNode_3",
+        "source_handle": null,
+        "target_handle": null
+      },
+      {
+        "source_id": "SingleLLMCallNode_3",
+        "target_id": "CoalesceNode_1",
+        "source_handle": null,
+        "target_handle": null
+      }
+    ],
+    "test_inputs": [
+      {
+        "id": 1,
+        "url": "https://blog.samaltman.com/three-observations"
+      }
+    ]
+  },
+  "description": ""
+}
