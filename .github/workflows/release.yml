@@ -2,7 +2,7 @@ name: Release
 
 on:
   release:
-    types: [published]
+    types: [created]
 
 env:
   REGISTRY: ghcr.io
@@ -34,6 +34,11 @@ jobs:
           git add backend/pyproject.toml
           git commit -m "chore: update version to ${{ steps.get-version.outputs.version }}"
           git push
+
+      - name: Update release tag
+        run: |
+          git tag -f ${{ github.event.release.tag_name }}
+          git push --force origin ${{ github.event.release.tag_name }}
 
   build-and-push-docker:
     needs: update-version

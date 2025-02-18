@@ -4,7 +4,7 @@ from alembic import context
 from sqlalchemy import engine_from_config, pool
 
 # Import database URL
-from pyspur.database import DATABASE_URL
+from pyspur.database import database_url
 from pyspur.models.base_model import BaseModel
 from pyspur.models.dataset_model import DatasetModel  # type: ignore
 from pyspur.models.dc_and_vi_model import (
@@ -30,7 +30,7 @@ if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
 # Set the database URL in the config
-config.set_main_option("sqlalchemy.url", DATABASE_URL)
+config.set_main_option("sqlalchemy.url", database_url)
 
 # add your model's MetaData object here
 target_metadata = BaseModel.metadata

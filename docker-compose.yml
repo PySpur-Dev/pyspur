@@ -1,26 +1,13 @@
 services:
-  nginx:
-    image: nginx:latest
-    ports:
-      - "${NGINX_PORT:-6080}:80"
-    volumes:
-      - ./nginx/conf.d:/etc/nginx/conf.d
-    depends_on:
-      - backend
-      - frontend
-    restart: on-failure
-
   backend:
-    build: 
-      context: .
-      dockerfile: Dockerfile.backend
-      target: ${ENVIRONMENT:-development}
+    image: ghcr.io/${GITHUB_REPOSITORY:-pyspur-dev/pyspur}-backend:${VERSION:-latest}
+    command: bash /pyspur/backend/entrypoint.sh
+    ports:
+      - "${PYSPUR_PORT:-6080}:8000"
     env_file:
       - ./.env.example
       - ./.env
-    command: bash /pyspur/backend/entrypoint.sh
     volumes:
-      - .:/pyspur
       - ./.env:/pyspur/backend/.env
       - pyspur_data:/pyspur/backend/data
     extra_hosts:
@@ -28,21 +15,6 @@ services:
     depends_on:
       db:
         condition: service_healthy
-
-  frontend:
-    build: 
-      context: .
-      dockerfile: Dockerfile.frontend
-      target: ${ENVIRONMENT:-development}
-    env_file:
-      - ./.env.example
-      - ./.env
-    command: npm run dev
-    volumes:
-      - .:/pyspur
-      - /pyspur/frontend/node_modules
-    depends_on:
-      - backend
 
   db:
     image: postgres:17-alpine

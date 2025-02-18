@@ -66,11 +66,15 @@ dependencies = [
     "httpx[http2]==0.27.2",
     "sendgrid==6.11.0",
     "resend==2.6.0",
+    "typer[all]==0.9.0",
 ]
 
 [project.urls]
 Repository = "https://github.com/pyspur-dev/pyspur"
 Documentation = "https://docs.pyspur.dev"
+
+[project.scripts]
+pyspur = "pyspur.cli:main"
 
 [project.optional-dependencies]
 dev = [
@@ -85,6 +89,11 @@ dev = [
 [tool.hatch.build.targets.wheel]
 universal = false
 packages = ["pyspur"]
+zip-safe = false
+
+[tool.hatch.build.targets.wheel.force-include]
+"pyspur/templates" = "pyspur/templates/"
+"pyspur/static" = "pyspur/static/"
 
 [tool.ruff]
 line-length = 100
@@ -94,10 +103,14 @@ target-version = "py312"
 select = ["E", "F", "I", "N", "W", "B", "C", "D"]
 ignore = [
     "D100",  # Missing docstring in public module
+    "D101",  # Missing docstring in public class
+    "D102",  # Missing docstring in public method
+    "D103",  # Missing docstring in public function
     "D104",  # Missing docstring in public package
+    "D105",  # Missing docstring in magic method
     "D107",  # Missing docstring in __init__
-    "D203",  # Ignore 'incorrect-blank-line-before-class' in favor of D211
-    "D213",  # Ignore 'multi-line-summary-second-line' in favor of D212
+    "I001",  # Import block is un-sorted or un-formatted
+    "E402",  # Module level import not at top of file
 ]
 
 [tool.black]
