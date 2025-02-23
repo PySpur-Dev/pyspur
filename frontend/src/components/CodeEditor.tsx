@@ -24,6 +24,7 @@ interface CodeEditorProps {
     disabled?: boolean
     mode?: 'json' | 'python' | 'javascript' // Add mode prop to determine which language to use
     readOnly?: boolean
+    height?: string
 }
 
 const CodeEditor: React.FC<CodeEditorProps> = ({
@@ -33,6 +34,7 @@ const CodeEditor: React.FC<CodeEditorProps> = ({
     mode = 'javascript',
     label = 'Code Editor',
     readOnly = false,
+    height = '200px',
 }) => {
     const [value, setValue] = useState<string>('')
     const { isOpen, onOpen, onOpenChange } = useDisclosure()
@@ -148,7 +150,7 @@ const CodeEditor: React.FC<CodeEditorProps> = ({
             </Button>
             <CodeMirror
                 value={value}
-                height="200px"
+                height={height}
                 theme={oneDark}
                 extensions={getExtensions()}
                 onChange={handleEditorChange}

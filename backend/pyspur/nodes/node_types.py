@@ -16,6 +16,11 @@ LOGIC = [
         "module": ".nodes.logic.coalesce",
         "class_name": "CoalesceNode",
     },
+    {
+        "node_type_name": "MergeNode",
+        "module": ".nodes.logic.merge",
+        "class_name": "MergeNode",
+    },
 ]
 
 SUPPORTED_NODE_TYPES = {

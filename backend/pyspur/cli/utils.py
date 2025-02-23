@@ -1,17 +1,17 @@
 """Utility functions for the PySpur CLI."""
 
-from pathlib import Path
 import shutil
-from importlib import resources
 import tempfile
+from importlib import resources
+from pathlib import Path
 
-from rich import print
 import typer
-from dotenv import load_dotenv
-from sqlalchemy import text
 from alembic import command
 from alembic.config import Config
 from alembic.runtime.migration import MigrationContext
+from dotenv import load_dotenv
+from rich import print
+from sqlalchemy import text
 
 
 def copy_template_file(template_name: str, dest_path: Path) -> None:
@@ -39,8 +39,23 @@ def load_environment() -> None:
 def run_migrations() -> None:
     """Run database migrations using SQLAlchemy."""
     try:
-        from ..database import engine, database_url
+        # ruff: noqa: F401
+        from ..database import database_url, engine
         from ..models.base_model import BaseModel
+
+        # Import models
+        from ..models.dataset_model import DatasetModel  # type: ignore
+        from ..models.dc_and_vi_model import (
+            DocumentCollectionModel,  # type: ignore
+            VectorIndexModel,  # type: ignore
+        )
+        from ..models.eval_run_model import EvalRunModel  # type: ignore
+        from ..models.output_file_model import OutputFileModel  # type: ignore
+        from ..models.run_model import RunModel  # type: ignore
+        from ..models.task_model import TaskModel  # type: ignore
+        from ..models.workflow_model import WorkflowModel  # type: ignore
+        from ..models.workflow_version_model import WorkflowVersionModel  # type: ignore
+        # Import all models to ensure they're registered with SQLAlchemy
 
         # Test connection
         with engine.connect() as conn:
@@ -51,10 +66,19 @@ def run_migrations() -> None:
             if database_url.startswith("sqlite"):
                 try:
                     BaseModel.metadata.create_all(engine)
+                    print("[green]✓[/green] Created SQLite database")
+                    print(f"[green]✓[/green] Database URL: {database_url}")
+                    # Print all tables in the database
+                    tables = BaseModel.metadata.tables
+                    if tables:
+                        print("\n[green]✓[/green] Successfully initialized SQLite database")
+                    else:
+                        print("[red]![/red] SQLite database is empty")
+                        raise typer.Exit(1)
                     print("[yellow]![/yellow] SQLite database is not recommended for production")
                     print("[yellow]![/yellow] Please use a postgres instance instead")
                     return
-                except Exception as e:
+                except Exception:
                     print("[yellow]![/yellow] SQLite database out of sync, recreating from scratch")
                     # Ask for confirmation before dropping all tables
                     confirm = input(

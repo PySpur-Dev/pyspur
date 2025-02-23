@@ -228,7 +228,7 @@ async def generate_text(
     model_name: str,
     temperature: float = 0.5,
     json_mode: bool = False,
-    max_tokens: int = 100000,
+    max_tokens: int = 16384,
     api_base: Optional[str] = None,
     url_variables: Optional[Dict[str, str]] = None,
     output_json_schema: Optional[str] = None,
@@ -262,13 +262,13 @@ async def generate_text(
     # Only process JSON schema if the model supports it
     if supports_json:
         if output_json_schema is None:
-            output_json_schema = json.dumps(
-                {
-                    "type": "object",
-                    "properties": {"output": {"type": "string"}},
-                    "required": ["output"],
-                }
-            )
+            output_json_schema = {
+                "type": "object",
+                "properties": {
+                    "output": {"type": "string"}
+                },
+                "required": ["output"],
+            }
         elif output_json_schema.strip() != "":
             output_json_schema = json.loads(output_json_schema)
             output_json_schema = sanitize_json_schema(output_json_schema)

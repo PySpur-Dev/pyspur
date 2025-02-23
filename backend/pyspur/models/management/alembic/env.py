@@ -1,3 +1,4 @@
+# ruff: noqa: F401
 from logging.config import fileConfig
 
 from alembic import context
@@ -8,9 +9,9 @@ from pyspur.database import database_url
 from pyspur.models.base_model import BaseModel
 from pyspur.models.dataset_model import DatasetModel  # type: ignore
 from pyspur.models.dc_and_vi_model import (
-    DocumentCollectionModel,
-    VectorIndexModel,
-)  # type: ignore
+    DocumentCollectionModel,  # type: ignore
+    VectorIndexModel,  # type: ignore
+)
 from pyspur.models.eval_run_model import EvalRunModel  # type: ignore
 from pyspur.models.output_file_model import OutputFileModel  # type: ignore
 from pyspur.models.run_model import RunModel  # type: ignore

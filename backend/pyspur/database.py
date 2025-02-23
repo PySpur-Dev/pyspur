@@ -1,8 +1,8 @@
 import os
 from typing import Iterator
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker, Session
 
+from sqlalchemy import create_engine
+from sqlalchemy.orm import Session, sessionmaker
 
 # Get the database URL from the environment
 POSTGRES_USER = os.getenv("POSTGRES_USER")

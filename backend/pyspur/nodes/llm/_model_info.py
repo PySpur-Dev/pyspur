@@ -126,7 +126,6 @@ class LLMModels(str, Enum):
     @classmethod
     def get_model_info(cls, model_id: str) -> LLMModel | None:
         model_registry = {
-            # OpenAI Models - all have temperature up to 2.0
             cls.O3_MINI.value: LLMModel(
                 id=cls.O3_MINI.value,
                 provider=LLMProvider.OPENAI,

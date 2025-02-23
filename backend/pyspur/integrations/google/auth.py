@@ -29,6 +29,7 @@ class TokenInput(BaseModel):
 @router.post("/store_token/")
 async def store_token(token: TokenInput):
     try:
+        TOKEN_FILE_PATH.parent.mkdir(parents=True, exist_ok=True)
         with open(TOKEN_FILE_PATH, "w") as token_file:
             current_time = time.time()
             token_data = {

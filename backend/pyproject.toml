@@ -4,10 +4,19 @@ build-backend = "hatchling.build"
 
 [project]
 name = "pyspur"
-version = "0.1.4"
+version = "0.1.5"
 description = "PySpur is a Graph UI for building AI Agents in Python"
-requires-python = ">=3.12"
+requires-python = ">=3.11"
 license = "Apache-2.0"
+classifiers = [
+    "Operating System :: MacOS :: MacOS X",
+    "Operating System :: POSIX :: Linux",
+    "Operating System :: Unix",
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+]
 maintainers = [
     {name = "Srijan Patel", email = "srijan@pyspur.dev"},
     {name = "Jean Kaddour", email = "jean@pyspur.dev"},

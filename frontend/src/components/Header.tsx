@@ -134,6 +134,21 @@ const Header: React.FC<HeaderProps> = ({ activePage, associatedWorkflowId, runId
         }
     }, [isHistoryOpen])
 
+    useEffect(() => {
+        if (activePage === 'workflow' || activePage === 'trace') {
+            document.title = `${projectName} - PySpur`
+        }
+        if (activePage === 'dashboard') {
+            document.title = `Dashboard - PySpur`
+        }
+        if (activePage === 'evals') {
+            document.title = `Evals - PySpur`
+        }
+        if (activePage === 'rag') {
+            document.title = `RAG - PySpur`
+        }
+    }, [projectName, activePage])
+
     useHotkeys(
         ['mod+enter'],
         (e) => {

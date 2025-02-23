@@ -57,9 +57,14 @@ def init(
             print("[green]✓[/green] Created .env from template")
 
         # add PROJECT_ROOT to .env
-        with open(env_path, "a") as f:
-            f.write("""\nDO NOT CHANGE THIS VALUE\n""")
-            f.write("\nPROJECT_ROOT=" + str(target_dir) + "\n")
+        # Check if PROJECT_ROOT is already defined in .env
+        with open(env_path, "r") as f:
+            if "PROJECT_ROOT=" not in f.read():
+                with open(env_path, "a") as f:
+                    f.write("\n# ================================")
+                    f.write("\n# PROJECT_ROOT: DO NOT CHANGE THIS VALUE")
+                    f.write("\n# ================================")
+                    f.write("\nPROJECT_ROOT=" + str(target_dir) + "\n")
 
         # Create a data directory
         data_dir = target_dir / "data"
