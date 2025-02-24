@@ -1,13 +1,68 @@
 import json
-from abc import ABC, abstractmethod
+from abc import ABC, ABCMeta, abstractmethod
 from hashlib import md5
-from typing import Any, Dict, List, Optional, Type
+from typing import Any, Callable, Dict, ForwardRef, List, Optional, Tuple, Type, cast
 
 from pydantic import BaseModel, Field, create_model
 
 from ..execution.workflow_execution_context import WorkflowExecutionContext
 from ..schemas.workflow_schemas import WorkflowDefinitionSchema
 from ..utils import pydantic_utils
+
+BaseNodeType = ForwardRef('BaseNode')
+
+
+class NodeMetaclass(ABCMeta):
+    """Metaclass that automatically adds config initialization to BaseNode subclasses."""
+
+    def __new__(cls, name: str,
+                bases: Tuple[Type[Any], ...],
+                namespace: Dict[str, Any]
+                ) -> Type[Any]:
+        created_cls = super().__new__(cls, name, bases, namespace)
+
+        if name != 'BaseNode' and hasattr(created_cls, 'config_model'):
+            # Get config model type with explicit cast
+            config_model = cast(Type[BaseModel], created_cls.config_model) # type: ignore
+            original_init = created_cls.__init__  # type: ignore # Known to match BaseNode.__init__ signature
+
+            def new_init(self: BaseNode,
+                         name: str,
+                         context: Optional[WorkflowExecutionContext] = None,
+                         config: Optional[BaseNodeConfig] = None,
+                         **kwargs: Any
+                         ) -> None:
+                # Extract config fields from the config model
+                config_fields = config_model.model_fields
+
+                # Split kwargs into config kwargs and other kwargs
+                if config is None:
+                    # Only process config from kwargs if no config was passed directly
+                    config_kwargs = {k: v for k, v in kwargs.items() if k in config_fields}
+                    other_kwargs = {k: v for k, v in kwargs.items() if k not in config_fields}
+
+                    # Create config instance
+                    config_instance = config_model(**config_kwargs)
+                    # Convert to BaseNodeConfig if needed
+                    if isinstance(config_instance, BaseNodeConfig):
+                        config = config_instance
+                    else:
+                        config = BaseNodeConfig(**config_instance.model_dump()) if config_kwargs else None
+                else:
+                    # If config was passed, don't process any config kwargs
+                    other_kwargs = kwargs
+
+                # Call original init with the config
+                cast(
+                    Callable[..., None],  # type that matches any function signature returning None
+                    original_init
+                )(self, name=name, config=config, context=context, **other_kwargs)
+
+            # Replace the original __init__ using object's __setattr__ to bypass type checking
+            new_init.__wrapped__ = original_init  # type: ignore
+            object.__setattr__(cls, '__init__', new_init)
+
+        return cls
 
 
 class VisualTag(BaseModel):
@@ -39,7 +94,6 @@ class BaseNodeConfig(BaseModel):
         default=False,
         description="Whether the node has a fixed output schema defined in config",
     )
-    pass
 
 
 class BaseNodeOutput(BaseModel):
@@ -61,12 +115,19 @@ class BaseNodeInput(BaseModel):
     pass
 
 
-class BaseNode(ABC):
+class BaseNode(ABC, metaclass=NodeMetaclass):
     """Base class for all nodes.
 
     Each node receives inputs as a Pydantic model where:
     - Field names are predecessor node IDs
     - Field types are the corresponding NodeOutputModels
+    
+    Configuration parameters defined in the node's config_model can be passed directly to __init__:
+    >>> node = MyNode(name="my_node", my_config_param=42)
+    
+    Or using a config instance:
+    >>> config = MyNodeConfig(my_config_param=42)
+    >>> node = MyNode(name="my_node", config=config)
     """
 
     name: str
