@@ -1,5 +1,5 @@
 import importlib
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional, cast
 
 from ..schemas.node_type_schemas import NodeTypeSchema
 from .base import BaseNode
@@ -12,13 +12,11 @@ from .registry import NodeRegistry
 
 
 class NodeFactory:
-    """
-    Factory for creating node instances from a configuration.
+    """Factory for creating node instances from a configuration.
     Supports both decorator-based registration and legacy configured registration.
 
     Conventions:
     - The node class should be named <NodeTypeName>Node
-    - The config model should be named <NodeTypeName>NodeConfig
     - The input model should be named <NodeTypeName>NodeInput
     - The output model should be named <NodeTypeName>NodeOutput
     - There should be only one node type class per module
@@ -30,8 +28,7 @@ class NodeFactory:
 
     @staticmethod
     def get_all_node_types() -> Dict[str, List[NodeTypeSchema]]:
-        """
-        Returns a dictionary of all available node types grouped by category.
+        """Returns a dictionary of all available node types grouped by category.
         Combines both decorator-registered and configured nodes.
         """
         # Get nodes from both sources
@@ -45,9 +42,9 @@ class NodeFactory:
                 converted_nodes[category] = []
             for node in nodes:
                 schema = NodeTypeSchema(
-                    node_type_name=node["node_type_name"],
-                    module=node["module"],
-                    class_name=node["class_name"],
+                    node_type_name=cast(str, node["node_type_name"]),
+                    module=cast(str, node["module"]),
+                    class_name=cast(str, node["class_name"]),
                 )
                 converted_nodes[category].append(schema)
 
@@ -64,16 +61,15 @@ class NodeFactory:
         return result
 
     @staticmethod
-    def create_node(node_name: str, node_type_name: str, config: Any) -> BaseNode:
-        """
-        Creates a node instance from a configuration.
+    def create_node(node_name: str, node_type_name: str, config: Dict[str, Any]) -> BaseNode:
+        """Creates a node instance from a configuration.
         Checks both registration methods for the node type.
         """
         if not is_valid_node_type(node_type_name):
             raise ValueError(f"Node type '{node_type_name}' is not valid.")
 
-        module_name = None
-        class_name = None
+        module_name: Optional[str] = None
+        class_name: Optional[str] = None
 
         # First check configured nodes
         for node_group in SUPPORTED_NODE_TYPES.values():
@@ -100,6 +96,12 @@ class NodeFactory:
         if not module_name or not class_name:
             raise ValueError(f"Node type '{node_type_name}' not found.")
 
+        # At this point, we know module_name and class_name are not None
+        assert module_name is not None, "Module name should not be None at this point"
+        assert class_name is not None, "Class name should not be None at this point"
+
         module = importlib.import_module(module_name, package="pyspur")
         node_class = getattr(module, class_name)
-        return node_class(name=node_name, config=node_class.config_model(**config))
+
+        # Create the node with config parameters passed directly
+        return node_class(name=node_name, **config)
