@@ -86,12 +86,26 @@ class BaseNode(ABC):
     def __init__(
         self,
         name: str,
-        config: BaseNodeConfig,
+        config: Optional[BaseNodeConfig] = None,
         context: Optional[WorkflowExecutionContext] = None,
+        **kwargs: Any,
     ) -> None:
         self.name = name
-        self._config = config
         self.context = context
+
+        # Handle config initialization
+        if config is not None:
+            self._config = config
+        else:
+            # Filter out name and context from kwargs if present
+            config_kwargs = {k: v for k, v in kwargs.items() if k not in ['name', 'context']}
+            # Create config instance from remaining kwargs if any, otherwise use default
+            if config_kwargs:
+                config_data = self.config_model(**config_kwargs).model_dump()
+                self._config = BaseNodeConfig(**config_data)
+            else:
+                self._config = BaseNodeConfig()
+
         self.subworkflow = None
         self.subworkflow_output = None
         if not hasattr(self, "visual_tag"):
