@@ -1,7 +1,8 @@
+import inspect
 import json
-from abc import ABC, ABCMeta, abstractmethod
+from abc import ABC, abstractmethod
 from hashlib import md5
-from typing import Any, Callable, Dict, ForwardRef, List, Optional, Tuple, Type, cast
+from typing import Any, Dict, List, Optional, Type, TypeVar
 
 from pydantic import BaseModel, Field, create_model
 
@@ -9,60 +10,7 @@ from ..execution.workflow_execution_context import WorkflowExecutionContext
 from ..schemas.workflow_schemas import WorkflowDefinitionSchema
 from ..utils import pydantic_utils
 
-BaseNodeType = ForwardRef('BaseNode')
-
-
-class NodeMetaclass(ABCMeta):
-    """Metaclass that automatically adds config initialization to BaseNode subclasses."""
-
-    def __new__(cls, name: str,
-                bases: Tuple[Type[Any], ...],
-                namespace: Dict[str, Any]
-                ) -> Type[Any]:
-        created_cls = super().__new__(cls, name, bases, namespace)
-
-        if name != 'BaseNode' and hasattr(created_cls, 'config_model'):
-            # Get config model type with explicit cast
-            config_model = cast(Type[BaseModel], created_cls.config_model) # type: ignore
-            original_init = created_cls.__init__  # type: ignore # Known to match BaseNode.__init__ signature
-
-            def new_init(self: BaseNode,
-                         name: str,
-                         context: Optional[WorkflowExecutionContext] = None,
-                         config: Optional[BaseNodeConfig] = None,
-                         **kwargs: Any
-                         ) -> None:
-                # Extract config fields from the config model
-                config_fields = config_model.model_fields
-
-                # Split kwargs into config kwargs and other kwargs
-                if config is None:
-                    # Only process config from kwargs if no config was passed directly
-                    config_kwargs = {k: v for k, v in kwargs.items() if k in config_fields}
-                    other_kwargs = {k: v for k, v in kwargs.items() if k not in config_fields}
-
-                    # Create config instance
-                    config_instance = config_model(**config_kwargs)
-                    # Convert to BaseNodeConfig if needed
-                    if isinstance(config_instance, BaseNodeConfig):
-                        config = config_instance
-                    else:
-                        config = BaseNodeConfig(**config_instance.model_dump()) if config_kwargs else None
-                else:
-                    # If config was passed, don't process any config kwargs
-                    other_kwargs = kwargs
-
-                # Call original init with the config
-                cast(
-                    Callable[..., None],  # type that matches any function signature returning None
-                    original_init
-                )(self, name=name, config=config, context=context, **other_kwargs)
-
-            # Replace the original __init__ using object's __setattr__ to bypass type checking
-            new_init.__wrapped__ = original_init  # type: ignore
-            object.__setattr__(cls, '__init__', new_init)
-
-        return cls
+T = TypeVar('T', bound='BaseNode')
 
 
 class VisualTag(BaseModel):
@@ -115,26 +63,21 @@ class BaseNodeInput(BaseModel):
     pass
 
 
-class BaseNode(ABC, metaclass=NodeMetaclass):
+class BaseNode(ABC):
     """Base class for all nodes.
 
     Each node receives inputs as a Pydantic model where:
     - Field names are predecessor node IDs
     - Field types are the corresponding NodeOutputModels
     
-    Configuration parameters defined in the node's config_model can be passed directly to __init__:
+    Configuration parameters can be passed directly to __init__:
     >>> node = MyNode(name="my_node", my_config_param=42)
-    
-    Or using a config instance:
-    >>> config = MyNodeConfig(my_config_param=42)
-    >>> node = MyNode(name="my_node", config=config)
     """
 
     name: str
     display_name: str = ""  # Will be used for config title, defaults to class name if not set
     logo: Optional[str] = None
     category: Optional[str] = None
-    config_model: Type[BaseModel]
     output_model: Type[BaseNodeOutput]
     input_model: Type[BaseNodeInput]
     _config: BaseNodeConfig
@@ -147,31 +90,61 @@ class BaseNode(ABC, metaclass=NodeMetaclass):
     def __init__(
         self,
         name: str,
-        config: Optional[BaseNodeConfig] = None,
         context: Optional[WorkflowExecutionContext] = None,
         **kwargs: Any,
     ) -> None:
         self.name = name
         self.context = context
 
-        # Handle config initialization
-        if config is not None:
-            self._config = config
-        else:
-            # Filter out name and context from kwargs if present
-            config_kwargs = {k: v for k, v in kwargs.items() if k not in ['name', 'context']}
-            # Create config instance from remaining kwargs if any, otherwise use default
-            if config_kwargs:
-                config_data = self.config_model(**config_kwargs).model_dump()
-                self._config = BaseNodeConfig(**config_data)
-            else:
-                self._config = BaseNodeConfig()
+        # Create config model programmatically based on __init__ parameters
+        self._create_config_from_kwargs(**kwargs)
 
         self.subworkflow = None
         self.subworkflow_output = None
         if not hasattr(self, "visual_tag"):
             self.visual_tag = self.get_default_visual_tag()
         self.setup()
+
+    def _create_config_from_kwargs(self, **kwargs: Any) -> None:
+        """Create a config model from kwargs passed to __init__."""
+        # Get the signature of the class's __init__ method
+        init_signature = inspect.signature(self.__class__.__init__)
+
+        # Extract parameter names and annotations from the signature
+        config_fields = {}
+        for param_name, param in init_signature.parameters.items():
+            # Skip self, name, context, and kwargs parameters
+            if param_name in ['self', 'name', 'context', 'kwargs']:
+                continue
+
+            # Get annotation if available, otherwise use Any
+            annotation = param.annotation if param.annotation != inspect.Parameter.empty else Any
+
+            # Get default value if available
+            default = param.default if param.default != inspect.Parameter.empty else ...
+
+            # Add to config fields
+            config_fields[param_name] = (annotation, default)
+
+        # Create dynamic config model
+        config_model_name = f"{self.__class__.__name__}Config"
+        dynamic_config_model = create_model(
+            config_model_name,
+            __base__=BaseNodeConfig,
+            __module__=self.__module__,
+            __doc__=f"Config model for {self.__class__.__name__}",
+            __validators__=None,
+            __cls_kwargs__=None,
+            __config__=None,
+            **config_fields
+        )
+
+        # Extract config kwargs from all kwargs
+        config_kwargs = {k: v for k, v in kwargs.items() if k in config_fields}
+
+        # Create config instance
+        config_instance = dynamic_config_model(**config_kwargs)
+        self._config = config_instance
 
     def setup(self) -> None:
         """Define output_model and any other initialization.
@@ -201,22 +174,23 @@ class BaseNode(ABC, metaclass=NodeMetaclass):
             "array": list,
             "object": dict,
         }
+
+        fields = {}
+        for field_name, field_type in output_schema.items():
+            if field_type in field_type_to_python_type:
+                fields[field_name] = (field_type_to_python_type[field_type], ...)
+            else:
+                fields[field_name] = (field_type, ...)  # try as is
+
         return create_model(
             f"{self.name}",
-            **{
-                field_name: (
-                    (field_type_to_python_type[field_type], ...)
-                    if field_type in field_type_to_python_type
-                    else (field_type, ...)  # try as is
-                )
-                for field_name, field_type in output_schema.items()
-            },
             __base__=BaseNodeOutput,
             __config__=None,
-            __doc__=f"Output model for {self.name} node",
             __module__=self.__module__,
+            __doc__=f"Output model for {self.name} node",
             __validators__=None,
             __cls_kwargs__=None,
+            **fields
         )
 
     def create_composite_model_instance(
@@ -310,7 +284,7 @@ class BaseNode(ABC, metaclass=NodeMetaclass):
     @property
     def config(self) -> Any:
         """Return the node's configuration."""
-        return self.config_model.model_validate(self._config.model_dump())
+        return self._config
 
     def update_config(self, config: BaseNodeConfig) -> None:
         """Update the node's configuration."""
@@ -330,7 +304,7 @@ class BaseNode(ABC, metaclass=NodeMetaclass):
     def get_default_visual_tag(cls) -> VisualTag:
         """Set a default visual tag for the node."""
         # default acronym is the first letter of each word in the node name
-        acronym = "".join([word[0] for word in cls.name.split("_")]).upper()
+        acronym = "".join([word[0] for word in cls.__name__.split("_")]).upper()
 
         # default color is randomly picked from a list of pastel colors
         colors = [
