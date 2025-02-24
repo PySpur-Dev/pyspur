@@ -71,7 +71,7 @@ cp .env.example .env
 
 # Start the services
 print_message "Launching PySpur services..." "$GREEN"
-if docker compose up -d; then
+if docker-compose up -d; then
     print_message "\n🎉 PySpur is now running!" "$GREEN"
     print_message "\nProject created in: $(pwd)" "$GREEN"
     print_message "Access PySpur at: http://localhost:6080" "$GREEN"
