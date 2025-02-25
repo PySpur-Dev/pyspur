@@ -1,5 +1,4 @@
-
-from pydantic import Field
+from pydantic import BaseModel, Field
 
 from .base import BaseNode, BaseNodeInput, BaseNodeOutput
 
@@ -7,30 +6,28 @@ from .base import BaseNode, BaseNodeInput, BaseNodeOutput
 class ExampleNodeInput(BaseNodeInput):
     """Input model for ExampleNode."""
 
-    pass
+    message: str = Field(description="The message to be repeated")
 
 
 class ExampleNodeOutput(BaseNodeOutput):
     """Output model for ExampleNode."""
 
-    output: str = Field(description="The processed message")
+    output: str = Field(description="The output message")
 
 
 class ExampleNode(BaseNode):
     """Example node that demonstrates the simplified BaseNode usage.
 
     This node can be initialized with config parameters directly:
-    >>> node = ExampleNode(name="my_node", message="Hi!", repeat_count=3)
+    >>> node = ExampleNode(name="my_node", repeat_count=3)
     """
 
     # Node configuration parameters
-    message: str = Field(description="The message to be repeated", default="Hello World!")
     repeat_count: int = Field(
         description="Number of times to repeat the message", default=1
     )
-    _output_model = ExampleNodeOutput
 
-    async def run(self, input: BaseNodeInput) -> BaseNodeOutput:
+    async def run(self, input: BaseModel) -> BaseModel:
         """Process the input and return the output.
 
         Args:
@@ -40,11 +37,15 @@ class ExampleNode(BaseNode):
             The output data with the message repeated
 
         """
+        # Cast the input to the expected type for internal use
+        typed_input = ExampleNodeInput.model_validate(input.model_dump())
+
         # Access configuration parameters directly from self
-        message = self.message
         repeat_count = self.repeat_count
-        output = message * repeat_count
-        return self.output_model.model_validate({"output": output})
+        output = typed_input.message * repeat_count
+
+        # Return the output as the expected type
+        return ExampleNodeOutput(output=output)
 
 
 if __name__ == "__main__":
@@ -53,10 +54,10 @@ if __name__ == "__main__":
     # Create a node instance with configuration parameters
     example_node = ExampleNode(
         name="example_node",
-        message="Hello, World!",
         repeat_count=3
     )
 
-    # Call the node with an empty input
-    output = asyncio.run(example_node({}))
+    # Call the node with input data
+    input_data = {"message": "Hello, World!"}
+    output = asyncio.run(example_node(input_data))
     print(output)
