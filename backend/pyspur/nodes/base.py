@@ -1,9 +1,9 @@
 import json
 from abc import ABC, abstractmethod
 from hashlib import md5
-from typing import Any, Dict, List, Optional, Sequence, Type, TypeVar, Union
+from typing import Any, Dict, Optional, Type, TypeVar, Union
 
-from pydantic import BaseModel, Field, PrivateAttr, create_model
+from pydantic import BaseModel, Field, PrivateAttr
 
 from ..execution.workflow_execution_context import WorkflowExecutionContext
 from ..schemas.workflow_schemas import WorkflowDefinitionSchema
@@ -42,7 +42,7 @@ class BaseNodeInput(BaseModel):
 
 # Define a type for the input parameter of __call__
 NodeInputType = Union[
-    Dict[str, Union[str, int, bool, float, Dict[str, Any], List[Any]]],
+    Dict[str, Any],
     Dict[str, BaseNodeOutput],
     Dict[str, BaseNodeInput],
     BaseNodeInput
@@ -62,18 +62,25 @@ class BaseNode(BaseModel, ABC):
 
     Required parameters for all nodes:
     - name: Unique identifier for the node
-    - output_json_schema: Defines the structure of node's output in JSON Schema format 
+    - output_json_schema: Defines the structure of node's output in JSON Schema format
     - has_fixed_output: If True, output schema cannot be modified at runtime
     """
 
-    # User-configurable fields (exposed as part of the model)
-    name: str
-    output_json_schema: str = '{"type": "object", "properties": {"output": {"type": "string"} } }'
-    has_fixed_output: bool = False
+    # Node configuration parameters
+    name: str = Field(description="Unique identifier for the node")
+    output_json_schema: str = Field(
+        default='{"type": "object", "properties": {"output": {"type": "string"} } }',
+        description="Defines the structure of node's output in JSON Schema format"
+    )
+    has_fixed_output: bool = Field(
+        default=False,
+        description="If True, output schema cannot be modified at runtime"
+    )
 
     # Internal properties (not exposed to users)
     _context: Optional[WorkflowExecutionContext] = PrivateAttr(default=None)
-    _display_name: str = PrivateAttr(default="")  # Will be used for config title, defaults to class name if not set
+    # Will be used for config title, defaults to class name if not set
+    _display_name: str = PrivateAttr(default="")
     _logo: Optional[str] = PrivateAttr(default=None)
     _category: Optional[str] = PrivateAttr(default=None)
     _output_model: Any = PrivateAttr(default=None)  # Will be set in setup()
@@ -84,26 +91,30 @@ class BaseNode(BaseModel, ABC):
     _subworkflow: Optional[WorkflowDefinitionSchema] = PrivateAttr(default=None)
     _subworkflow_output: Optional[Dict[str, Any]] = PrivateAttr(default=None)
 
-    class Config:
-        arbitrary_types_allowed = True
-        extra = "allow"  # Allow extra fields for flexibility
+    model_config = {
+        "arbitrary_types_allowed": True,
+        "extra": "allow",  # Allow extra fields for flexibility
+    }
 
-    def __init__(self, **data: Any) -> None:
-        """Initialize the node with the given data."""
-        # Extract internal properties if provided
-        context = data.pop('context', None)
-        display_name = data.pop('display_name', "")
-        logo = data.pop('logo', None)
-        category = data.pop('category', None)
+    def model_post_init(self, _: Any) -> None:
+        """Initialize internal properties after Pydantic model initialization.
 
-        super().__init__(**data)
+        This is called automatically by Pydantic after the model is initialized.
+        It extracts internal properties from the extra fields and sets them as private attributes.
 
-        # Set internal properties
-        self._context = context
-        self._display_name = display_name
-        self._logo = logo
-        self._category = category
+        Internal properties that can be set:
+        - context: The workflow execution context
+        - display_name: The display name for the node (used in UI)
+        - logo: Path to the node's logo
+        - category: The category the node belongs to
 
+        It also initializes default input and output models if not set by subclasses.
+        """
+        # Extract and set internal properties if provided in model_extra
+        # Get model_extra from Pydantic v2
+        model_extra = getattr(self, "model_extra", {}) or {}
+
+        self._context = model_extra.pop('context', None)
         # Initialize default input and output models if not set
         if self._input_model is None:
             self._input_model = BaseNodeInput
@@ -128,65 +139,6 @@ class BaseNode(BaseModel, ABC):
             )
             self._output_model = model
 
-    def create_output_model_class(self, output_schema: Dict[str, str]) -> Type[BaseNodeOutput]:
-        """Dynamically creates an output model based on the node's output schema."""
-        field_type_to_python_type = {
-            "string": str,
-            "str": str,
-            "integer": int,
-            "int": int,
-            "number": float,
-            "float": float,
-            "boolean": bool,
-            "bool": bool,
-            "list": list,
-            "dict": dict,
-            "array": list,
-            "object": dict,
-        }
-
-        fields = {}
-        for field_name, field_type in output_schema.items():
-            if field_type in field_type_to_python_type:
-                fields[field_name] = (field_type_to_python_type[field_type], ...)
-            else:
-                fields[field_name] = (field_type, ...)  # try as is
-
-        return create_model(
-            f"{self.name}",
-            __base__=BaseNodeOutput,
-            __config__=None,
-            __module__=self.__module__,
-            __doc__=f"Output model for {self.name} node",
-            __validators__=None,
-            __cls_kwargs__=None,
-            **fields
-        )
-
-    def create_composite_model_instance(
-        self, model_name: str, instances: Sequence[BaseModel]
-    ) -> Type[BaseNodeInput]:
-        """Create a new Pydantic model that combines all the given models based on their instances.
-
-        Args:
-            model_name: The name of the new model.
-            instances: A sequence of Pydantic model instances.
-
-        Returns:
-            A new Pydantic model with fields named after the class names of the instances.
-
-        """
-        # Create the new model class
-        return create_model(
-            model_name,
-            **{instance.__class__.__name__: (instance.__class__, ...) for instance in instances},
-            __base__=BaseNodeInput,
-            __config__=None,
-            __doc__=f"Input model for {self.name} node",
-            __module__=self.__module__,
-            __validators__=None,
-            __cls_kwargs__=None,
-        )
 
     async def __call__(
         self,
@@ -211,7 +163,7 @@ class BaseNode(BaseModel, ABC):
 
                 # Create a new input model based on these instances
                 input_model_name = getattr(self._input_model, "__name__", "DynamicInputModel")
-                new_input_model = self.create_composite_model_instance(
+                new_input_model = pydantic_utils.create_composite_model_instance(
                     model_name=input_model_name,
                     instances=model_instances
                 )
@@ -249,7 +201,7 @@ class BaseNode(BaseModel, ABC):
         return output_validated
 
     @abstractmethod
-    async def run(self, input: BaseNodeInput) -> BaseModel:
+    async def run(self, input: BaseNodeInput) -> BaseNodeOutput:
         """Abstract method where the node's core logic is implemented.
 
         Args:
@@ -298,24 +250,34 @@ class BaseNode(BaseModel, ABC):
         self._category = value
 
     @property
-    def input_model(self) -> Any:
+    def config_model(self) -> Type["BaseNode"]:
+        """Return the node's config model."""
+        return self.__class__
+
+    @property
+    def input_model(self) -> Type[BaseNodeInput]:
         """Return the node's input model."""
         return self._input_model
 
     @property
-    def output_model(self) -> Any:
+    def output_model(self) -> Type[BaseNodeOutput]:
         """Return the node's output model."""
         return self._output_model
 
     @property
-    def input(self) -> Any:
+    def config(self) -> "BaseNode":
+        """Return the node's config."""
+        return self
+
+    @property
+    def input(self) -> Optional[BaseNodeInput]:
         """Return the node's input."""
         if self._input_data is None:
             return None
         return self._input_model.model_validate(self._input_data.model_dump())
 
     @property
-    def output(self) -> Any:
+    def output(self) -> Optional[BaseNodeOutput]:
         """Return the node's output."""
         if self._output_data is None:
             return None
