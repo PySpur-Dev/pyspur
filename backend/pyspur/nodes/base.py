@@ -9,6 +9,7 @@ from ..execution.workflow_execution_context import WorkflowExecutionContext
 from ..schemas.workflow_schemas import WorkflowDefinitionSchema
 from ..utils import pydantic_utils
 
+# Define TypeVar for BaseNode reference
 T = TypeVar('T', bound='BaseNode')
 
 
@@ -43,22 +44,21 @@ class BaseNodeInput(BaseModel):
 # Define a type for the input parameter of __call__
 NodeInputType = Union[
     Dict[str, Any],
-    Dict[str, BaseNodeOutput],
-    Dict[str, BaseNodeInput],
-    BaseNodeInput
+    Dict[str, BaseModel],
+    BaseModel
 ]
 
 
 class BaseNode(BaseModel, ABC):
     """Base class for all nodes.
 
-    Each node receives inputs as a Pydantic model where:
-    - Field names are predecessor node IDs
-    - Field types are the corresponding NodeOutputModels
+    Each node receives inputs as a Pydantic model and produces outputs as a Pydantic model.
+    Subclasses can define their own input and output model types:
 
-    Configuration parameters are defined as fields in the model:
     >>> class MyNode(BaseNode):
     >>>     my_config_param: int = 42
+    >>>     async def run(self, input: BaseModel) -> BaseModel:
+    >>>         return MyOutputModel(...)
 
     Required parameters for all nodes:
     - name: Unique identifier for the node
@@ -84,13 +84,12 @@ class BaseNode(BaseModel, ABC):
     _logo: Optional[str] = PrivateAttr(default=None)
     _category: Optional[str] = PrivateAttr(default=None)
 
-    # input and output models can be defined in subclasses
-    # or set in setup()
-    _output_model: Type[BaseNodeOutput] = PrivateAttr(default=BaseNodeOutput)
-    _input_model: Type[BaseNodeInput] = PrivateAttr(default=BaseNodeInput)
+    # Default empty models that will be replaced in subclasses or setup()
+    _input_model: Type[BaseModel] = PrivateAttr(default=BaseModel)
+    _output_model: Type[BaseModel] = PrivateAttr(default=BaseModel)
 
-    _input_data: Optional[BaseNodeInput] = PrivateAttr(default=None)
-    _output_data: Optional[BaseNodeOutput] = PrivateAttr(default=None)
+    _input_data: Optional[BaseModel] = PrivateAttr(default=None)
+    _output_data: Optional[BaseModel] = PrivateAttr(default=None)
     _visual_tag: Optional[VisualTag] = PrivateAttr(default=None)
     _subworkflow: Optional[WorkflowDefinitionSchema] = PrivateAttr(default=None)
     _subworkflow_output: Optional[Dict[str, Any]] = PrivateAttr(default=None)
@@ -133,29 +132,28 @@ class BaseNode(BaseModel, ABC):
         if self.has_fixed_output:
             schema = json.loads(self.output_json_schema)
             model = pydantic_utils.json_schema_to_model(
-                schema, model_class_name=self.name, base_class=self._output_model
+                schema, model_class_name=self.name
             )
             self._output_model = model
 
     async def __call__(
         self,
         input: NodeInputType,
-    ) -> BaseNodeOutput:
+    ) -> BaseModel:
         """Validate inputs and runs the node's logic.
 
         Args:
-            input: Pydantic model containing predecessor outputs
-            or a dictionary of node_id : NodeOutputModels
+            input: Pydantic model or dictionary containing inputs
 
         Returns:
             The node's output model
 
         """
-        validated_input: BaseNodeInput
+        validated_input: BaseModel
 
         if isinstance(input, dict):
-            if all(isinstance(value, (BaseNodeOutput, BaseNodeInput)) for value in input.values()):
-                # Input is a dictionary of BaseNodeOutput/BaseNodeInput instances
+            if all(isinstance(value, BaseModel) for value in input.values()):
+                # Input is a dictionary of BaseModel instances
                 model_instances = [v for v in input.values() if isinstance(v, BaseModel)]
 
                 # Create a new input model based on these instances
@@ -163,7 +161,7 @@ class BaseNode(BaseModel, ABC):
                 new_input_model = pydantic_utils.create_composite_model_instance(
                     model_name=input_model_name,
                     instances=model_instances,
-                    base_class=self._input_model,
+                    base_class=BaseModel,
                 )
                 self._input_model = new_input_model
 
@@ -178,7 +176,7 @@ class BaseNode(BaseModel, ABC):
                 # Input is a dictionary of primitive values
                 validated_input = self._input_model.model_validate(input)
         else:
-            # Input is already a BaseNodeInput instance
+            # Input is already a BaseModel instance
             validated_input = input
 
         # Store the validated input
@@ -199,11 +197,11 @@ class BaseNode(BaseModel, ABC):
         return output_validated
 
     @abstractmethod
-    async def run(self, input: BaseNodeInput) -> BaseNodeOutput:
+    async def run(self, input: BaseModel) -> BaseModel:
         """Abstract method where the node's core logic is implemented.
 
         Args:
-            input: Pydantic model containing predecessor outputs
+            input: Validated input model
 
         Returns:
             An instance compatible with output_model
@@ -253,12 +251,12 @@ class BaseNode(BaseModel, ABC):
         return self.__class__
 
     @property
-    def input_model(self) -> Type[BaseNodeInput]:
+    def input_model(self) -> Type[BaseModel]:
         """Return the node's input model."""
         return self._input_model
 
     @property
-    def output_model(self) -> Type[BaseNodeOutput]:
+    def output_model(self) -> Type[BaseModel]:
         """Return the node's output model."""
         return self._output_model
 
@@ -268,14 +266,14 @@ class BaseNode(BaseModel, ABC):
         return self
 
     @property
-    def input(self) -> Optional[BaseNodeInput]:
+    def input(self) -> Optional[BaseModel]:
         """Return the node's input."""
         if self._input_data is None:
             return None
         return self._input_model.model_validate(self._input_data.model_dump())
 
     @property
-    def output(self) -> Optional[BaseNodeOutput]:
+    def output(self) -> Optional[BaseModel]:
         """Return the node's output."""
         if self._output_data is None:
             return None
