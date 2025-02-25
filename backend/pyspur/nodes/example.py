@@ -26,6 +26,8 @@ class ExampleNode(BaseNode):
     repeat_count: int = Field(
         description="Number of times to repeat the message", default=1
     )
+    input_model = ExampleNodeInput
+    output_model = ExampleNodeOutput
 
     async def run(self, input: BaseModel) -> BaseModel:
         """Process the input and return the output.
