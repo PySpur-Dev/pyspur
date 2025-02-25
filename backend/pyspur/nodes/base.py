@@ -1,10 +1,9 @@
-import inspect
 import json
 from abc import ABC, abstractmethod
 from hashlib import md5
-from typing import Any, Dict, List, Optional, Type, TypeVar
+from typing import Any, Dict, List, Optional, Sequence, Type, TypeVar, Union
 
-from pydantic import BaseModel, Field, create_model
+from pydantic import BaseModel, Field, PrivateAttr, create_model
 
 from ..execution.workflow_execution_context import WorkflowExecutionContext
 from ..schemas.workflow_schemas import WorkflowDefinitionSchema
@@ -20,28 +19,6 @@ class VisualTag(BaseModel):
     color: str = Field(
         ..., pattern=r"^#(?:[0-9a-fA-F]{3}){1,2}$"
     )  # Hex color code validation using regex
-
-
-class BaseNodeConfig(BaseModel):
-    """Base class for node configuration models.
-
-    Each node must define its output_schema.
-    """
-
-    output_schema: Dict[str, str] = Field(
-        default={"output": "string"},
-        title="Output schema",
-        description="The schema for the output of the node",
-    )
-    output_json_schema: str = Field(
-        default='{"type": "object", "properties": {"output": {"type": "string"} } }',
-        title="Output JSON schema",
-        description="The JSON schema for the output of the node",
-    )
-    has_fixed_output: bool = Field(
-        default=False,
-        description="Whether the node has a fixed output schema defined in config",
-    )
 
 
 class BaseNodeOutput(BaseModel):
@@ -63,100 +40,93 @@ class BaseNodeInput(BaseModel):
     pass
 
 
-class BaseNode(ABC):
+# Define a type for the input parameter of __call__
+NodeInputType = Union[
+    Dict[str, Union[str, int, bool, float, Dict[str, Any], List[Any]]],
+    Dict[str, BaseNodeOutput],
+    Dict[str, BaseNodeInput],
+    BaseNodeInput
+]
+
+
+class BaseNode(BaseModel, ABC):
     """Base class for all nodes.
 
     Each node receives inputs as a Pydantic model where:
     - Field names are predecessor node IDs
     - Field types are the corresponding NodeOutputModels
-    
-    Configuration parameters can be passed directly to __init__:
-    >>> node = MyNode(name="my_node", my_config_param=42)
+
+    Configuration parameters are defined as fields in the model:
+    >>> class MyNode(BaseNode):
+    >>>     my_config_param: int = 42
+
+    Required parameters for all nodes:
+    - name: Unique identifier for the node
+    - output_json_schema: Defines the structure of node's output in JSON Schema format 
+    - has_fixed_output: If True, output schema cannot be modified at runtime
     """
 
+    # User-configurable fields (exposed as part of the model)
     name: str
-    display_name: str = ""  # Will be used for config title, defaults to class name if not set
-    logo: Optional[str] = None
-    category: Optional[str] = None
-    output_model: Type[BaseNodeOutput]
-    input_model: Type[BaseNodeInput]
-    _config: BaseNodeConfig
-    _input: BaseNodeInput
-    _output: BaseNodeOutput
-    visual_tag: VisualTag
-    subworkflow: Optional[WorkflowDefinitionSchema]
-    subworkflow_output: Optional[Dict[str, Any]]
+    output_json_schema: str = '{"type": "object", "properties": {"output": {"type": "string"} } }'
+    has_fixed_output: bool = False
 
-    def __init__(
-        self,
-        name: str,
-        context: Optional[WorkflowExecutionContext] = None,
-        **kwargs: Any,
-    ) -> None:
-        self.name = name
-        self.context = context
+    # Internal properties (not exposed to users)
+    _context: Optional[WorkflowExecutionContext] = PrivateAttr(default=None)
+    _display_name: str = PrivateAttr(default="")  # Will be used for config title, defaults to class name if not set
+    _logo: Optional[str] = PrivateAttr(default=None)
+    _category: Optional[str] = PrivateAttr(default=None)
+    _output_model: Any = PrivateAttr(default=None)  # Will be set in setup()
+    _input_model: Any = PrivateAttr(default=None)   # Will be set in setup() or by subclasses
+    _input_data: Optional[BaseNodeInput] = PrivateAttr(default=None)
+    _output_data: Optional[BaseNodeOutput] = PrivateAttr(default=None)
+    _visual_tag: Optional[VisualTag] = PrivateAttr(default=None)
+    _subworkflow: Optional[WorkflowDefinitionSchema] = PrivateAttr(default=None)
+    _subworkflow_output: Optional[Dict[str, Any]] = PrivateAttr(default=None)
 
-        # Create config model programmatically based on __init__ parameters
-        self._create_config_from_kwargs(**kwargs)
+    class Config:
+        arbitrary_types_allowed = True
+        extra = "allow"  # Allow extra fields for flexibility
 
-        self.subworkflow = None
-        self.subworkflow_output = None
-        if not hasattr(self, "visual_tag"):
-            self.visual_tag = self.get_default_visual_tag()
+    def __init__(self, **data: Any) -> None:
+        """Initialize the node with the given data."""
+        # Extract internal properties if provided
+        context = data.pop('context', None)
+        display_name = data.pop('display_name', "")
+        logo = data.pop('logo', None)
+        category = data.pop('category', None)
+
+        super().__init__(**data)
+
+        # Set internal properties
+        self._context = context
+        self._display_name = display_name
+        self._logo = logo
+        self._category = category
+
+        # Initialize default input and output models if not set
+        if self._input_model is None:
+            self._input_model = BaseNodeInput
+
+        if self._output_model is None:
+            self._output_model = BaseNodeOutput
+
+        if self._visual_tag is None:
+            self._visual_tag = self.get_default_visual_tag()
+
         self.setup()
-
-    def _create_config_from_kwargs(self, **kwargs: Any) -> None:
-        """Create a config model from kwargs passed to __init__."""
-        # Get the signature of the class's __init__ method
-        init_signature = inspect.signature(self.__class__.__init__)
-
-        # Extract parameter names and annotations from the signature
-        config_fields = {}
-        for param_name, param in init_signature.parameters.items():
-            # Skip self, name, context, and kwargs parameters
-            if param_name in ['self', 'name', 'context', 'kwargs']:
-                continue
-
-            # Get annotation if available, otherwise use Any
-            annotation = param.annotation if param.annotation != inspect.Parameter.empty else Any
-
-            # Get default value if available
-            default = param.default if param.default != inspect.Parameter.empty else ...
-
-            # Add to config fields
-            config_fields[param_name] = (annotation, default)
-
-        # Create dynamic config model
-        config_model_name = f"{self.__class__.__name__}Config"
-        dynamic_config_model = create_model(
-            config_model_name,
-            __base__=BaseNodeConfig,
-            __module__=self.__module__,
-            __doc__=f"Config model for {self.__class__.__name__}",
-            __validators__=None,
-            __cls_kwargs__=None,
-            __config__=None,
-            **config_fields
-        )
-
-        # Extract config kwargs from all kwargs
-        config_kwargs = {k: v for k, v in kwargs.items() if k in config_fields}
-
-        # Create config instance
-        config_instance = dynamic_config_model(**config_kwargs)
-        self._config = config_instance
 
     def setup(self) -> None:
         """Define output_model and any other initialization.
 
-        For dynamic schema nodes, these can be created based on self.config.
+        For dynamic schema nodes, these can be created based on the node's configuration.
         """
-        if self._config.has_fixed_output:
-            schema = json.loads(self._config.output_json_schema)
+        if self.has_fixed_output:
+            schema = json.loads(self.output_json_schema)
             model = pydantic_utils.json_schema_to_model(
                 schema, model_class_name=self.name, base_class=BaseNodeOutput
             )
-            self.output_model = model  # type: ignore
+            self._output_model = model
 
     def create_output_model_class(self, output_schema: Dict[str, str]) -> Type[BaseNodeOutput]:
         """Dynamically creates an output model based on the node's output schema."""
@@ -194,13 +164,13 @@ class BaseNode(ABC):
         )
 
     def create_composite_model_instance(
-        self, model_name: str, instances: List[BaseModel]
+        self, model_name: str, instances: Sequence[BaseModel]
     ) -> Type[BaseNodeInput]:
         """Create a new Pydantic model that combines all the given models based on their instances.
 
         Args:
             model_name: The name of the new model.
-            instances: A list of Pydantic model instances.
+            instances: A sequence of Pydantic model instances.
 
         Returns:
             A new Pydantic model with fields named after the class names of the instances.
@@ -220,12 +190,7 @@ class BaseNode(ABC):
 
     async def __call__(
         self,
-        input: (
-            Dict[str, str | int | bool | float | Dict[str, Any] | List[Any]]
-            | Dict[str, BaseNodeOutput]
-            | Dict[str, BaseNodeInput]
-            | BaseNodeInput
-        ),
+        input: NodeInputType,
     ) -> BaseNodeOutput:
         """Validate inputs and runs the node's logic.
 
@@ -237,39 +202,54 @@ class BaseNode(ABC):
             The node's output model
 
         """
-        if isinstance(input, dict):
-            if all(isinstance(value, BaseNodeOutput) for value in input.values()) or all(
-                isinstance(value, BaseNodeInput) for value in input.values()
-            ):
-                # Input is a dictionary of BaseNodeOutput instances, creating a composite model
-                self.input_model = self.create_composite_model_instance(
-                    model_name=self.input_model.__name__,
-                    instances=list(input.values()),  # type: ignore we already checked that all values are BaseNodeOutput instances
-                )
-                data = {  # type: ignore
-                    instance.__class__.__name__: instance.model_dump()  # type: ignore
-                    for instance in input.values()
-                }
-                input = self.input_model.model_validate(data)
-            else:
-                # Input is not a dictionary of BaseNodeOutput instances, validating as BaseNodeInput
-                input = self.input_model.model_validate(input)
+        validated_input: BaseNodeInput
 
-        self._input = input
-        result = await self.run(input)
+        if isinstance(input, dict):
+            if all(isinstance(value, (BaseNodeOutput, BaseNodeInput)) for value in input.values()):
+                # Input is a dictionary of BaseNodeOutput/BaseNodeInput instances
+                model_instances = [v for v in input.values() if isinstance(v, BaseModel)]
+
+                # Create a new input model based on these instances
+                input_model_name = getattr(self._input_model, "__name__", "DynamicInputModel")
+                new_input_model = self.create_composite_model_instance(
+                    model_name=input_model_name,
+                    instances=model_instances
+                )
+                self._input_model = new_input_model
+
+                # Create data for validation
+                data = {}
+                for _, instance in input.items():
+                    if isinstance(instance, BaseModel):
+                        data[instance.__class__.__name__] = instance.model_dump()
+
+                validated_input = self._input_model.model_validate(data)
+            else:
+                # Input is a dictionary of primitive values
+                validated_input = self._input_model.model_validate(input)
+        else:
+            # Input is already a BaseNodeInput instance
+            validated_input = input
+
+        # Store the validated input
+        self._input_data = validated_input
+
+        # Run the node's logic
+        result = await self.run(validated_input)
 
         try:
-            output_validated = self.output_model.model_validate(result.model_dump())
+            output_validated = self._output_model.model_validate(result.model_dump())
         except AttributeError:
-            output_validated = self.output_model.model_validate(result)
+            output_validated = self._output_model.model_validate(result)
         except Exception as e:
             raise ValueError(f"Output validation error in {self.name}: {e}") from e
 
-        self._output = output_validated
+        # Store the validated output
+        self._output_data = output_validated
         return output_validated
 
     @abstractmethod
-    async def run(self, input: BaseModel) -> BaseModel:
+    async def run(self, input: BaseNodeInput) -> BaseModel:
         """Abstract method where the node's core logic is implemented.
 
         Args:
@@ -281,24 +261,95 @@ class BaseNode(ABC):
         """
         pass
 
+    # Property getters for internal attributes
     @property
-    def config(self) -> Any:
-        """Return the node's configuration."""
-        return self._config
+    def context(self) -> Optional[WorkflowExecutionContext]:
+        """Return the node's execution context."""
+        return self._context
 
-    def update_config(self, config: BaseNodeConfig) -> None:
-        """Update the node's configuration."""
-        self._config = config
+    @property
+    def display_name(self) -> str:
+        """Return the node's display name."""
+        return self._display_name
+
+    @display_name.setter
+    def display_name(self, value: str) -> None:
+        """Set the node's display name."""
+        self._display_name = value
+
+    @property
+    def logo(self) -> Optional[str]:
+        """Return the node's logo."""
+        return self._logo
+
+    @logo.setter
+    def logo(self, value: Optional[str]) -> None:
+        """Set the node's logo."""
+        self._logo = value
+
+    @property
+    def category(self) -> Optional[str]:
+        """Return the node's category."""
+        return self._category
+
+    @category.setter
+    def category(self, value: Optional[str]) -> None:
+        """Set the node's category."""
+        self._category = value
+
+    @property
+    def input_model(self) -> Any:
+        """Return the node's input model."""
+        return self._input_model
+
+    @property
+    def output_model(self) -> Any:
+        """Return the node's output model."""
+        return self._output_model
 
     @property
     def input(self) -> Any:
         """Return the node's input."""
-        return self.input_model.model_validate(self._input.model_dump())
+        if self._input_data is None:
+            return None
+        return self._input_model.model_validate(self._input_data.model_dump())
 
     @property
     def output(self) -> Any:
         """Return the node's output."""
-        return self.output_model.model_validate(self._output.model_dump())
+        if self._output_data is None:
+            return None
+        return self._output_model.model_validate(self._output_data.model_dump())
+
+    @property
+    def visual_tag(self) -> Optional[VisualTag]:
+        """Return the node's visual tag."""
+        return self._visual_tag
+
+    @visual_tag.setter
+    def visual_tag(self, value: VisualTag) -> None:
+        """Set the node's visual tag."""
+        self._visual_tag = value
+
+    @property
+    def subworkflow(self) -> Optional[WorkflowDefinitionSchema]:
+        """Return the node's subworkflow."""
+        return self._subworkflow
+
+    @subworkflow.setter
+    def subworkflow(self, value: Optional[WorkflowDefinitionSchema]) -> None:
+        """Set the node's subworkflow."""
+        self._subworkflow = value
+
+    @property
+    def subworkflow_output(self) -> Optional[Dict[str, Any]]:
+        """Return the node's subworkflow output."""
+        return self._subworkflow_output
+
+    @subworkflow_output.setter
+    def subworkflow_output(self, value: Optional[Dict[str, Any]]) -> None:
+        """Set the node's subworkflow output."""
+        self._subworkflow_output = value
 
     @classmethod
     def get_default_visual_tag(cls) -> VisualTag:
