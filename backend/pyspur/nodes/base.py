@@ -83,8 +83,12 @@ class BaseNode(BaseModel, ABC):
     _display_name: str = PrivateAttr(default="")
     _logo: Optional[str] = PrivateAttr(default=None)
     _category: Optional[str] = PrivateAttr(default=None)
-    _output_model: Any = PrivateAttr(default=None)  # Will be set in setup()
-    _input_model: Any = PrivateAttr(default=None)   # Will be set in setup() or by subclasses
+
+    # input and output models can be defined in subclasses
+    # or set in setup()
+    _output_model: Type[BaseNodeOutput] = PrivateAttr(default=BaseNodeOutput)
+    _input_model: Type[BaseNodeInput] = PrivateAttr(default=BaseNodeInput)
+
     _input_data: Optional[BaseNodeInput] = PrivateAttr(default=None)
     _output_data: Optional[BaseNodeOutput] = PrivateAttr(default=None)
     _visual_tag: Optional[VisualTag] = PrivateAttr(default=None)
@@ -115,12 +119,6 @@ class BaseNode(BaseModel, ABC):
         model_extra = getattr(self, "model_extra", {}) or {}
 
         self._context = model_extra.pop('context', None)
-        # Initialize default input and output models if not set
-        if self._input_model is None:
-            self._input_model = BaseNodeInput
-
-        if self._output_model is None:
-            self._output_model = BaseNodeOutput
 
         if self._visual_tag is None:
             self._visual_tag = self.get_default_visual_tag()
@@ -135,10 +133,9 @@ class BaseNode(BaseModel, ABC):
         if self.has_fixed_output:
             schema = json.loads(self.output_json_schema)
             model = pydantic_utils.json_schema_to_model(
-                schema, model_class_name=self.name, base_class=BaseNodeOutput
+                schema, model_class_name=self.name, base_class=self._output_model
             )
             self._output_model = model
-
 
     async def __call__(
         self,
@@ -165,7 +162,8 @@ class BaseNode(BaseModel, ABC):
                 input_model_name = getattr(self._input_model, "__name__", "DynamicInputModel")
                 new_input_model = pydantic_utils.create_composite_model_instance(
                     model_name=input_model_name,
-                    instances=model_instances
+                    instances=model_instances,
+                    base_class=self._input_model,
                 )
                 self._input_model = new_input_model
 
