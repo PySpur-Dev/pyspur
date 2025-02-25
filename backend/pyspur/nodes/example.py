@@ -1,53 +1,62 @@
-from pydantic import BaseModel
 
-from .base import BaseNode
+from pydantic import Field
+
+from .base import BaseNode, BaseNodeInput, BaseNodeOutput
 
 
-class ExampleNodeConfig(BaseModel):
-    """
-    Configuration parameters for the ExampleNode.
-    """
+class ExampleNodeInput(BaseNodeInput):
+    """Input model for ExampleNode."""
 
     pass
 
 
-class ExampleNodeInput(BaseModel):
-    """
-    Input parameters for the ExampleNode.
-    """
+class ExampleNodeOutput(BaseNodeOutput):
+    """Output model for ExampleNode."""
 
-    name: str
-
-
-class ExampleNodeOutput(BaseModel):
-    """
-    Output parameters for the ExampleNode.
-    """
-
-    greeting: str
+    output: str = Field(description="The processed message")
 
 
 class ExampleNode(BaseNode):
+    """Example node that demonstrates the simplified BaseNode usage.
+
+    This node can be initialized with config parameters directly:
+    >>> node = ExampleNode(name="my_node", message="Hi!", repeat_count=3)
     """
-    Example node that takes a name and returns a greeting.
-    """
 
-    name = "example"
-    config_model = ExampleNodeConfig
-    input_model = ExampleNodeInput
-    output_model = ExampleNodeOutput
+    # Node configuration parameters
+    message: str = Field(description="The message to be repeated", default="Hello World!")
+    repeat_count: int = Field(
+        description="Number of times to repeat the message", default=1
+    )
+    _output_model = ExampleNodeOutput
 
-    def setup(self) -> None:
-        self.input_model = ExampleNodeInput
-        self.output_model = ExampleNodeOutput
+    async def run(self, input: BaseNodeInput) -> BaseNodeOutput:
+        """Process the input and return the output.
 
-    async def run(self, input_data: ExampleNodeInput) -> ExampleNodeOutput:
-        return ExampleNodeOutput(greeting=f"Hello, {input_data.name}!")
+        Args:
+            input: The input data
+
+        Returns:
+            The output data with the message repeated
+
+        """
+        # Access configuration parameters directly from self
+        message = self.message
+        repeat_count = self.repeat_count
+        output = message * repeat_count
+        return self.output_model.model_validate({"output": output})
 
 
 if __name__ == "__main__":
     import asyncio
 
-    example_node = ExampleNode(ExampleNodeConfig())
-    output = asyncio.run(example_node(ExampleNodeInput(name="Alice")))
+    # Create a node instance with configuration parameters
+    example_node = ExampleNode(
+        name="example_node",
+        message="Hello, World!",
+        repeat_count=3
+    )
+
+    # Call the node with an empty input
+    output = asyncio.run(example_node({}))
     print(output)
