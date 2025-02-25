@@ -12,7 +12,6 @@ from ..utils import pydantic_utils
 # Define TypeVar for BaseNode reference
 T = TypeVar('T', bound='BaseNode')
 
-
 class VisualTag(BaseModel):
     """Pydantic model for visual tag properties."""
 
@@ -60,17 +59,38 @@ class BaseNode(BaseModel, ABC):
     >>>     async def run(self, input: BaseModel) -> BaseModel:
     >>>         return MyOutputModel(...)
 
+    You can define the output schema using either a JSON schema string or a Pydantic model:
+
+    Using JSON schema string:
+    >>> class MyNode(BaseNode):
+    >>>     output_json_schema = '{"type": "object", "properties": {"result": {"type": "string"}}}'
+    >>>     async def run(self, input: BaseModel) -> BaseModel:
+    >>>         # ...
+
+    Using Pydantic model (preferred for better developer experience):
+    >>> class MyOutputModel(BaseModel):
+    >>>     result: str
+    >>>
+    >>> class MyNode(BaseNode):
+    >>>     output_json_schema = MyOutputModel
+    >>>     async def run(self, input: BaseModel) -> BaseModel:
+    >>>         return MyOutputModel(result="some result")
+
     Required parameters for all nodes:
     - name: Unique identifier for the node
-    - output_json_schema: Defines the structure of node's output in JSON Schema format
+    - output_json_schema: Define using either a JSON schema string or a Pydantic model class
     - has_fixed_output: If True, output schema cannot be modified at runtime
     """
 
     # Node configuration parameters
     name: str = Field(description="Unique identifier for the node")
-    output_json_schema: str = Field(
+    input_model: Union[str, Type[BaseModel]] = Field(
+        default='{"type": "object", "properties": {} }',
+        description="Defines the structure of node's input using either a JSON schema string or a Pydantic model class"
+    )
+    output_model: Union[str, Type[BaseModel]] = Field(
         default='{"type": "object", "properties": {"output": {"type": "string"} } }',
-        description="Defines the structure of node's output in JSON Schema format"
+        description="Defines the structure of node's output using either a JSON schema string or a Pydantic model class"
     )
     has_fixed_output: bool = Field(
         default=False,
@@ -83,10 +103,6 @@ class BaseNode(BaseModel, ABC):
     _display_name: str = PrivateAttr(default="")
     _logo: Optional[str] = PrivateAttr(default=None)
     _category: Optional[str] = PrivateAttr(default=None)
-
-    # Default empty models that will be replaced in subclasses or setup()
-    _input_model: Type[BaseModel] = PrivateAttr(default=BaseModel)
-    _output_model: Type[BaseModel] = PrivateAttr(default=BaseModel)
 
     _input_data: Optional[BaseModel] = PrivateAttr(default=None)
     _output_data: Optional[BaseModel] = PrivateAttr(default=None)
@@ -122,6 +138,28 @@ class BaseNode(BaseModel, ABC):
         if self._visual_tag is None:
             self._visual_tag = self.get_default_visual_tag()
 
+        # Store the JSON schema representation for serialization purposes
+        try:
+            if isinstance(self.input_model, str):
+                self._input_model = pydantic_utils.json_schema_to_model(
+                    json_schema=json.loads(self.input_model),
+                    base_class=BaseModel,
+                    model_class_name=self.name + "InputModel",
+                )
+            else:
+                self._input_model = self.input_model
+            if isinstance(self.output_model, str):
+                self._output_model = pydantic_utils.json_schema_to_model(
+                    json_schema=json.loads(self.output_model),
+                    base_class=BaseModel,
+                    model_class_name=self.name,
+                )
+            else:
+                self._output_model = self.output_model
+
+        except Exception as e:
+            raise ValueError(f"Invalid JSON schema for {self.name}: {e}") from e
+
         self.setup()
 
     def setup(self) -> None:
@@ -129,12 +167,7 @@ class BaseNode(BaseModel, ABC):
 
         For dynamic schema nodes, these can be created based on the node's configuration.
         """
-        if self.has_fixed_output:
-            schema = json.loads(self.output_json_schema)
-            model = pydantic_utils.json_schema_to_model(
-                schema, model_class_name=self.name
-            )
-            self._output_model = model
+        pass
 
     async def __call__(
         self,
@@ -249,16 +282,6 @@ class BaseNode(BaseModel, ABC):
     def config_model(self) -> Type["BaseNode"]:
         """Return the node's config model."""
         return self.__class__
-
-    @property
-    def input_model(self) -> Type[BaseModel]:
-        """Return the node's input model."""
-        return self._input_model
-
-    @property
-    def output_model(self) -> Type[BaseModel]:
-        """Return the node's output model."""
-        return self._output_model
 
     @property
     def config(self) -> "BaseNode":
