@@ -84,12 +84,12 @@ class BaseNode(BaseModel, ABC):
 
     # Node configuration parameters
     name: str = Field(description="Unique identifier for the node")
-    input_model: Union[str, Type[BaseModel]] = Field(
-        default='{"type": "object", "properties": {} }',
+    input_model: Type[BaseModel] = Field(
+        default=BaseModel,
         description="Defines the structure of node's input using either a JSON schema string or a Pydantic model class"
     )
-    output_model: Union[str, Type[BaseModel]] = Field(
-        default='{"type": "object", "properties": {"output": {"type": "string"} } }',
+    output_model: Type[BaseModel] = Field(
+        default=BaseModel,
         description="Defines the structure of node's output using either a JSON schema string or a Pydantic model class"
     )
     has_fixed_output: bool = Field(
