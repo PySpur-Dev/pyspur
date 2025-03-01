@@ -1,11 +1,11 @@
 import asyncio
 import traceback
 from datetime import datetime
-from typing import Any, Dict, Iterator, List, Optional, Set, Tuple
+from typing import Any, Dict, Iterator, List, Optional, Set, Tuple, TypeVar
 
-from pydantic import ValidationError
+from pydantic import BaseModel, ValidationError
 
-from ..nodes.base import BaseNode, BaseNodeOutput
+from ..nodes.base import Tool
 from ..nodes.factory import NodeFactory
 from ..schemas.workflow_schemas import (
     WorkflowDefinitionSchema,
@@ -14,6 +14,8 @@ from ..schemas.workflow_schemas import (
 from .task_recorder import TaskRecorder, TaskStatus
 from .workflow_execution_context import WorkflowExecutionContext
 
+# Define a type variable for the output of a node
+T = TypeVar('T', bound=BaseModel)
 
 class UpstreamFailure(Exception):
     pass
@@ -24,8 +26,7 @@ class UnconnectedNode(Exception):
 
 
 class WorkflowExecutor:
-    """
-    Handles the execution of a workflow.
+    """Handles the execution of a workflow.
     """
 
     def __init__(
@@ -45,11 +46,11 @@ class WorkflowExecutor:
             self.task_recorder = None
         self.context = context
         self._node_dict: Dict[str, WorkflowNodeSchema] = {}
-        self.node_instances: Dict[str, BaseNode] = {}
+        self.node_instances: Dict[str, Tool] = {}
         self._dependencies: Dict[str, Set[str]] = {}
-        self._node_tasks: Dict[str, asyncio.Task[Optional[BaseNodeOutput]]] = {}
+        self._node_tasks: Dict[str, asyncio.Task[Optional[BaseModel]]] = {}
         self._initial_inputs: Dict[str, Dict[str, Any]] = {}
-        self._outputs: Dict[str, Optional[BaseNodeOutput]] = {}
+        self._outputs: Dict[str, Optional[BaseModel]] = {}
         self._failed_nodes: Set[str] = set()
         self._build_node_dict()
         self._build_dependencies()
@@ -132,7 +133,7 @@ class WorkflowExecutor:
 
     def _get_async_task_for_node_execution(
         self, node_id: str
-    ) -> asyncio.Task[Optional[BaseNodeOutput]]:
+    ) -> asyncio.Task[Optional[BaseModel]]:
         if node_id in self._node_tasks:
             return self._node_tasks[node_id]
         # Start task for the node
@@ -144,7 +145,7 @@ class WorkflowExecutor:
             self.task_recorder.create_task(node_id, {})
         return task
 
-    async def _execute_node(self, node_id: str) -> Optional[BaseNodeOutput]:
+    async def _execute_node(self, node_id: str) -> Optional[BaseModel]:
         node = self._node_dict[node_id]
         node_input = {}
         try:
@@ -155,7 +156,7 @@ class WorkflowExecutor:
             dependency_ids = self._dependencies.get(node_id, set())
 
             # Wait for dependencies
-            predecessor_outputs: List[Optional[BaseNodeOutput]] = []
+            predecessor_outputs: List[Optional[BaseModel]] = []
             if dependency_ids:
                 try:
                     predecessor_outputs = await asyncio.gather(
@@ -188,7 +189,7 @@ class WorkflowExecutor:
             source_handles = self._get_source_handles()
 
             # Build node input, handling router outputs specially
-            for dep_id, output in zip(dependency_ids, predecessor_outputs):
+            for dep_id, output in zip(dependency_ids, predecessor_outputs, strict=False):
                 predecessor_node = self._node_dict[dep_id]
                 if predecessor_node.node_type == "RouterNode":
                     # For router nodes, we must have a source handle
@@ -245,32 +246,38 @@ class WorkflowExecutor:
                 self._outputs[node_id] = None
                 raise UnconnectedNode(f"Node {node_id} has no input")
 
-            node_instance = NodeFactory.create_node(
+            # Create the node instance
+            node_instance: Tool = NodeFactory.create_node(
                 node_name=node.title,
                 node_type_name=node.node_type,
                 config=node.config,
             )
             self.node_instances[node_id] = node_instance
+
             # Update task recorder
             if self.task_recorder:
                 self.task_recorder.update_task(
                     node_id=node_id,
                     status=TaskStatus.RUNNING,
-                    subworkflow=node_instance.subworkflow,
+                    subworkflow=getattr(node_instance, 'subworkflow', None),
                 )
 
             # Execute node
-            output = await node_instance(node_input)
+            output: Optional[BaseModel] = await node_instance(node_input)
 
             # Update task recorder
             if self.task_recorder:
+                output_dict: Dict[str, Any] = {}
+                if hasattr(output, 'model_dump'):
+                    output_dict = output.model_dump()
+
                 self.task_recorder.update_task(
                     node_id=node_id,
                     status=TaskStatus.COMPLETED,
-                    outputs=output.model_dump(),
+                    outputs=output_dict,
                     end_time=datetime.now(),
-                    subworkflow=node_instance.subworkflow,
-                    subworkflow_output=node_instance.subworkflow_output,
+                    subworkflow=getattr(node_instance, 'subworkflow', None),
+                    subworkflow_output=getattr(node_instance, 'subworkflow_output', None),
                 )
 
             # Store output
@@ -312,17 +319,18 @@ class WorkflowExecutor:
         input: Dict[str, Any] = {},
         node_ids: List[str] = [],
         precomputed_outputs: Dict[str, Dict[str, Any] | List[Dict[str, Any]]] = {},
-    ) -> Dict[str, BaseNodeOutput]:
+    ) -> Dict[str, BaseModel]:
         # Handle precomputed outputs first
         if precomputed_outputs:
             for node_id, output in precomputed_outputs.items():
                 try:
                     if isinstance(output, dict):
-                        self._outputs[node_id] = NodeFactory.create_node(
+                        node_instance: Tool = NodeFactory.create_node(
                             node_name=self._node_dict[node_id].title,
                             node_type_name=self._node_dict[node_id].node_type,
                             config=self._node_dict[node_id].config,
-                        ).output_model.model_validate(output)
+                        )
+                        self._outputs[node_id] = node_instance.output_model.model_validate(output)
                     else:
                         # If output is a list of dicts, do not validate the output
                         # these are outputs of loop nodes, their precomputed outputs are not supported yet
@@ -351,7 +359,7 @@ class WorkflowExecutor:
         )
         self._initial_inputs[input_node.id] = input
         # also update outputs for input node
-        input_node_obj = NodeFactory.create_node(
+        input_node_obj: Tool = NodeFactory.create_node(
             node_name=input_node.title,
             node_type_name=input_node.node_type,
             config=input_node.config,
@@ -379,7 +387,7 @@ class WorkflowExecutor:
         results = await asyncio.gather(*self._node_tasks.values(), return_exceptions=True)
 
         # Process results to handle any exceptions
-        for node_id, result in zip(self._node_tasks.keys(), results):
+        for node_id, result in zip(self._node_tasks.keys(), results, strict=False):
             if isinstance(result, Exception):
                 print(f"Node {node_id} failed with error: {str(result)}")
                 self._failed_nodes.add(node_id)
@@ -393,9 +401,8 @@ class WorkflowExecutor:
         input: Dict[str, Any] = {},
         node_ids: List[str] = [],
         precomputed_outputs: Dict[str, Dict[str, Any] | List[Dict[str, Any]]] = {},
-    ) -> Dict[str, BaseNodeOutput]:
-        """
-        Execute the workflow with the given input data.
+    ) -> Dict[str, BaseModel]:
+        """Execute the workflow with the given input data.
         input: input for the input node of the workflow. Dict[<field_name>: <value>]
         node_ids: list of node_ids to run. If empty, run all nodes.
         precomputed_outputs: precomputed outputs for the nodes. These nodes will not be executed again.
@@ -404,12 +411,11 @@ class WorkflowExecutor:
 
     async def run_batch(
         self, input_iterator: Iterator[Dict[str, Any]], batch_size: int = 100
-    ) -> List[Dict[str, BaseNodeOutput]]:
+    ) -> List[Dict[str, BaseModel]]:
+        """Run the workflow on a batch of inputs.
         """
-        Run the workflow on a batch of inputs.
-        """
-        results: List[Dict[str, BaseNodeOutput]] = []
-        batch_tasks: List[asyncio.Task[Dict[str, BaseNodeOutput]]] = []
+        results: List[Dict[str, BaseModel]] = []
+        batch_tasks: List[asyncio.Task[Dict[str, BaseModel]]] = []
         for input in input_iterator:
             batch_tasks.append(asyncio.create_task(self.run(input)))
             if len(batch_tasks) == batch_size:
