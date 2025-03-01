@@ -2,7 +2,7 @@ import importlib
 from typing import Any, Dict, List, Optional, cast
 
 from ..schemas.node_type_schemas import NodeTypeSchema
-from .base import BaseNode
+from .base import Tool
 from .node_types import (
     SUPPORTED_NODE_TYPES,
     get_all_node_types,
@@ -61,7 +61,7 @@ class NodeFactory:
         return result
 
     @staticmethod
-    def create_node(node_name: str, node_type_name: str, config: Dict[str, Any]) -> BaseNode:
+    def create_node(node_name: str, node_type_name: str, config: Dict[str, Any]) -> Tool:
         """Creates a node instance from a configuration.
         Checks both registration methods for the node type.
         """
@@ -104,4 +104,5 @@ class NodeFactory:
         node_class = getattr(module, class_name)
 
         # Create the node with config parameters passed directly
-        return node_class(name=node_name, **config)
+        node_instance = node_class(name=node_name, **config)
+        return cast(Tool, node_instance)
