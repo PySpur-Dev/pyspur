@@ -1,53 +1,41 @@
 import json
 import logging
-from typing import Optional
+from typing import Any, Optional, Type
 
 from pydantic import BaseModel, Field  # type: ignore
 
 from firecrawl import FirecrawlApp  # type: ignore
 
-from ...base import (
-    BaseNode,
-    BaseNodeConfig,
-    BaseNodeInput,
-    BaseNodeOutput,
-)
+from ...base import Tool
 from ...utils.template_utils import render_template_or_get_first_string
 
 
-class FirecrawlCrawlNodeInput(BaseNodeInput):
-    """Input for the FirecrawlCrawl node"""
+class FirecrawlCrawlNodeOutput(BaseModel):
+    """Output for the FirecrawlCrawl node"""
 
-    class Config:
-        extra = "allow"
-
-
-class FirecrawlCrawlNodeOutput(BaseNodeOutput):
     crawl_result: str = Field(..., description="The crawled data in markdown or structured format.")
 
 
-class FirecrawlCrawlNodeConfig(BaseNodeConfig):
+class FirecrawlCrawlNode(Tool):
+    """Node for crawling a URL and returning the content in markdown or structured format."""
+
+    name: str = "firecrawl_crawl_node"
+    output_model: Type[BaseModel] = FirecrawlCrawlNodeOutput
+
+    # Configuration fields moved from FirecrawlCrawlNodeConfig
     url_template: str = Field(
         "",
         description="The URL to crawl and convert into clean markdown or structured data.",
     )
     limit: Optional[int] = Field(None, description="The maximum number of pages to crawl.")
     has_fixed_output: bool = True
-    output_json_schema: str = Field(
-        default=json.dumps(FirecrawlCrawlNodeOutput.model_json_schema()),
-        description="The JSON schema for the output of the node",
-    )
 
-
-class FirecrawlCrawlNode(BaseNode):
-    name = "firecrawl_crawl_node"
-    display_name = "FirecrawlCrawl"
-    logo = "/images/firecrawl.png"
-    category = "Firecrawl"
-
-    config_model = FirecrawlCrawlNodeConfig
-    input_model = FirecrawlCrawlNodeInput
-    output_model = FirecrawlCrawlNodeOutput
+    def model_post_init(self, _: Any) -> None:
+        """Initialize after Pydantic model initialization."""
+        super().model_post_init(_)
+        # Set display name and logo
+        self.display_name = "FirecrawlCrawl"
+        self._logo = "/images/firecrawl.png"
 
     async def run(self, input: BaseModel) -> BaseModel:
         try:
@@ -56,14 +44,14 @@ class FirecrawlCrawlNode(BaseNode):
 
             # Render url_template
             url_template = render_template_or_get_first_string(
-                self.config.url_template, raw_input_dict, self.name
+                self.url_template, raw_input_dict, self.name
             )
 
             app = FirecrawlApp()  # type: ignore
             crawl_result = app.crawl_url(  # type: ignore
                 url_template,
                 params={
-                    "limit": self.config.limit,
+                    "limit": self.limit,
                     "scrapeOptions": {"formats": ["markdown", "html"]},
                 },
             )
