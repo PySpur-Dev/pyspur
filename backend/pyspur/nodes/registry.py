@@ -6,12 +6,12 @@ from typing import Dict, List, Optional, Set, Type, Union
 
 from loguru import logger
 
-from .base import BaseNode
+from .base import Tool
 
 
 class NodeRegistry:
     _nodes: Dict[str, List[Dict[str, Union[str, Optional[str]]]]] = {}
-    _decorator_registered_classes: Set[Type[BaseNode]] = (
+    _decorator_registered_classes: Set[Type[Tool]] = (
         set()
     )  # Track classes registered via decorator
 
@@ -24,8 +24,7 @@ class NodeRegistry:
         subcategory: Optional[str] = None,
         position: Optional[Union[int, str]] = None,
     ):
-        """
-        Decorator to register a node class with metadata.
+        """Decorator to register a node class with metadata.
 
         Args:
             category: The category this node belongs to
@@ -36,9 +35,10 @@ class NodeRegistry:
                      - Integer for absolute position
                      - "after:NodeName" for relative position after a node
                      - "before:NodeName" for relative position before a node
+
         """
 
-        def decorator(node_class: Type[BaseNode]) -> Type[BaseNode]:
+        def decorator(node_class: Type[Tool]) -> Type[Tool]:
             # Set metadata on the class
             if not hasattr(node_class, "category"):
                 node_class.category = category
@@ -46,10 +46,6 @@ class NodeRegistry:
                 node_class.display_name = display_name
             if logo:
                 node_class.logo = logo
-
-            # Store subcategory as class attribute without type checking
-            if subcategory:
-                setattr(node_class, "subcategory", subcategory)
 
             # Initialize category if not exists
             if category not in cls._nodes:
@@ -113,8 +109,7 @@ class NodeRegistry:
 
     @classmethod
     def _discover_in_directory(cls, base_path: Path, package_prefix: str) -> None:
-        """
-        Recursively discover nodes in a directory and its subdirectories.
+        """Recursively discover nodes in a directory and its subdirectories.
         Only registers nodes that explicitly use the @NodeRegistry.register decorator.
         """
         # Get all Python files in current directory
@@ -136,12 +131,12 @@ class NodeRegistry:
 
     @classmethod
     def discover_nodes(cls, package_path: str = "pyspur.nodes") -> None:
-        """
-        Automatically discover and register nodes from the package.
+        """Automatically discover and register nodes from the package.
         Only nodes with the @NodeRegistry.register decorator will be registered.
 
         Args:
             package_path: The base package path to search for nodes
+
         """
         try:
             package = importlib.import_module(package_path)
