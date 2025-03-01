@@ -1,20 +1,16 @@
 import json
-from typing import Dict, List, Optional, Any, Callable
+from typing import Any, Callable, Dict, List, Optional, Type
+
 from pydantic import BaseModel, Field
 
+from ..base import Tool
 from ._utils import (
-    ModelInfo,
     LLMModels,
+    ModelInfo,
     create_messages,
     generate_text,
 )
-from ..base import (
-    BaseNode,
-    BaseNodeConfig,
-    BaseNodeInput,
-    BaseNodeOutput,
-)
-from .function_call_node import FunctionCall
+
 
 class FunctionDefinition(BaseModel):
     name: str
@@ -22,7 +18,27 @@ class FunctionDefinition(BaseModel):
     parameters: Dict[str, Any]
     python_function: Optional[Callable[..., Any]] = None
 
-class LLMFunctionCallConfig(BaseNodeConfig):
+class FunctionCall(BaseModel):
+    name: str = Field(..., description="Name of the function called")
+    arguments: Dict[str, Any] = Field(..., description="Arguments passed to the function")
+    result: Any = Field(..., description="Result returned by the function")
+
+class LLMFunctionCallOutput(BaseModel):
+    result: Dict[str, Any] = Field(description="The final result after function execution")
+    function_calls: List[FunctionCall] = Field(
+        default_factory=list,
+        description="List of executed function calls",
+    )
+
+class LLMFunctionCallNode(Tool):
+    """Node for making LLM calls with function calling capabilities.
+    Supports registering Python functions and handling their execution.
+    """
+
+    name: str = "llm_function_call_node"
+    output_model: Type[BaseModel] = LLMFunctionCallOutput
+
+    # LLM configuration
     llm_info: ModelInfo = Field(
         ModelInfo(model=LLMModels.GPT_4O, max_tokens=16384, temperature=0.7),
         description="The LLM model configuration",
@@ -44,38 +60,12 @@ class LLMFunctionCallConfig(BaseNodeConfig):
         description="How to handle function calling: 'auto', 'none', or specific function name",
     )
 
-class LLMFunctionCallInput(BaseNodeInput):
-    user_request: str = Field(description="The user's request to process")
-
-    class Config:
-        extra = "allow"
-
-class FunctionCall(BaseModel):
-    name: str = Field(..., description="Name of the function called")
-    arguments: Dict[str, Any] = Field(..., description="Arguments passed to the function")
-    result: Any = Field(..., description="Result returned by the function")
-
-class LLMFunctionCallOutput(BaseNodeOutput):
-    result: Dict[str, Any] = Field(description="The final result after function execution")
-    function_calls: List[FunctionCall] = Field(
-        default_factory=list,
-        description="List of executed function calls",
-    )
-
-class LLMFunctionCallNode(BaseNode):
-    """
-    Node for making LLM calls with function calling capabilities.
-    Supports registering Python functions and handling their execution.
-    """
-
-    name = "llm_function_call_node"
-    display_name = "LLM Function Call"
-    config_model = LLMFunctionCallConfig
-    input_model = LLMFunctionCallInput
-    output_model = LLMFunctionCallOutput
-
-    def __init__(self, name: str, config: LLMFunctionCallConfig, **kwargs: Any):
-        super().__init__(name=name, config=config, **kwargs)
+    def model_post_init(self, _: Any) -> None:
+        """Initialize after Pydantic model initialization."""
+        super().model_post_init(_)
+        # Set display name
+        self.display_name = "LLM Function Call"
+        # Initialize function registry
         self._function_registry: Dict[str, Callable[..., Any]] = {}
 
     def register_function(self, func: Callable[..., Any], description: str, parameters: Dict[str, Any]) -> None:
@@ -86,7 +76,7 @@ class LLMFunctionCallNode(BaseNode):
             parameters=parameters,
             python_function=func
         )
-        self.config.functions.append(function_def)
+        self.functions.append(function_def)
         self._function_registry[func.__name__] = func
 
     def _prepare_functions_for_litellm(self) -> List[Dict[str, Any]]:
@@ -97,7 +87,7 @@ class LLMFunctionCallNode(BaseNode):
                 "description": f.description,
                 "parameters": f.parameters
             }
-            for f in self.config.functions
+            for f in self.functions
         ]
 
     async def _execute_function(self, name: str, arguments: Dict[str, Any]) -> Any:
@@ -111,17 +101,17 @@ class LLMFunctionCallNode(BaseNode):
         except Exception as e:
             raise RuntimeError(f"Error executing function {name}: {str(e)}")
 
-    async def run(self, input: BaseModel) -> BaseNodeOutput:
+    async def run(self, input: BaseModel) -> BaseModel:
         try:
             # Prepare input data
             raw_input_dict = input.model_dump()
 
             # Render messages
-            system_message = self.config.system_message
+            system_message = self.system_message
             user_message = (
                 json.dumps(raw_input_dict, indent=2)
-                if not self.config.user_message.strip()
-                else self.config.user_message.format(**raw_input_dict)
+                if not self.user_message.strip()
+                else self.user_message.format(**raw_input_dict)
             )
 
             messages = create_messages(
@@ -132,14 +122,18 @@ class LLMFunctionCallNode(BaseNode):
             # Prepare function definitions for litellm
             functions = self._prepare_functions_for_litellm()
 
+            # Ensure temperature and max_tokens are not None
+            temperature = self.llm_info.temperature if self.llm_info.temperature is not None else 0.7
+            max_tokens = self.llm_info.max_tokens if self.llm_info.max_tokens is not None else 1024
+
             # Make initial LLM call
             response = await generate_text(
                 messages=messages,
-                model_name=self.config.llm_info.model.value,
-                temperature=self.config.llm_info.temperature,
-                max_tokens=self.config.llm_info.max_tokens,
+                model_name=self.llm_info.model.value,
+                temperature=temperature,
+                max_tokens=max_tokens,
                 functions=functions,
-                function_call=self.config.function_call
+                function_call=self.function_call
             )
 
             # Parse response and handle function calls
@@ -177,11 +171,15 @@ class LLMFunctionCallNode(BaseNode):
                     "content": json.dumps(result)
                 })
 
+                # Ensure temperature and max_tokens are not None for the second call
+                temperature = self.llm_info.temperature if self.llm_info.temperature is not None else 0.7
+                max_tokens = self.llm_info.max_tokens if self.llm_info.max_tokens is not None else 1024
+
                 final_response = await generate_text(
                     messages=messages,
-                    model_name=self.config.llm_info.model.value,
-                    temperature=self.config.llm_info.temperature,
-                    max_tokens=self.config.llm_info.max_tokens
+                    model_name=self.llm_info.model.value,
+                    temperature=temperature,
+                    max_tokens=max_tokens
                 )
 
                 return LLMFunctionCallOutput(
@@ -200,7 +198,7 @@ class LLMFunctionCallNode(BaseNode):
 if __name__ == "__main__":
     import asyncio
     import datetime
-    from typing import Dict, List, Any, Optional
+    from typing import Any, Dict, List, Optional
 
     # Example functions that could be registered
     async def get_weather(location: str, unit: str = "celsius") -> Dict[str, Any]:
@@ -234,20 +232,18 @@ if __name__ == "__main__":
         # Create node instance with multiple functions
         node = LLMFunctionCallNode(
             name="personal_assistant",
-            config=LLMFunctionCallConfig(
-                llm_info=ModelInfo(
-                    model=LLMModels.GPT_4O,
-                    max_tokens=1000,
-                    temperature=0.7
-                ),
-                system_message=(
-                    "You are a helpful personal assistant that can check weather, "
-                    "search information, and manage calendar events. "
-                    "Use the available functions to help the user."
-                ),
-                user_message="{user_request}",
-                function_call="auto"
-            )
+            llm_info=ModelInfo(
+                model=LLMModels.GPT_4O,
+                max_tokens=1000,
+                temperature=0.7
+            ),
+            system_message=(
+                "You are a helpful personal assistant that can check weather, "
+                "search information, and manage calendar events. "
+                "Use the available functions to help the user."
+            ),
+            user_message="{user_request}",
+            function_call="auto"
         )
 
         # Register weather function
@@ -344,17 +340,24 @@ if __name__ == "__main__":
             }
         ]
 
+        # Create a simple input model for testing
+        class UserRequest(BaseModel):
+            user_request: str
+
         # Run test cases
         for test in test_cases:
             print(f"\n=== Testing: {test['name']} ===")
             print(f"Request: {test['request']}")
 
             try:
-                result = await node(LLMFunctionCallInput(user_request=test['request']))
+                # Cast the result to the proper type for type checking
+                result = await node(UserRequest(user_request=test['request']))
+                output = LLMFunctionCallOutput.model_validate(result.model_dump())
+
                 print("\nResult:")
-                print(f"- Final output: {result.result}")
+                print(f"- Final output: {output.result}")
                 print("\nFunction calls made:")
-                for call in result.function_calls:
+                for call in output.function_calls:
                     print(f"- Called: {call.name}")
                     print(f"  Args: {call.arguments}")
                     print(f"  Result: {call.result}")

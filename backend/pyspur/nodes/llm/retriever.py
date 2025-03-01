@@ -1,5 +1,4 @@
-import json
-from typing import Dict, List
+from typing import Any, List, Type
 
 from jinja2 import Template
 from loguru import logger
@@ -14,44 +13,23 @@ from ...schemas.rag_schemas import (
     ChunkMetadataSchema,
     RetrievalResultSchema,
 )
-from ..base import (
-    BaseNode,
-    BaseNodeConfig,
-    BaseNodeInput,
-    BaseNodeOutput,
-)
-
-# Todo: Use Fixed Node Output; where the outputs will always be chunks
+from ..base import Tool
 
 
-class RetrieverNodeInput(BaseNodeInput):
-    """Input for the retriever node"""
-
-    class Config:
-        extra = "allow"
-
-
-class RetrieverNodeOutput(BaseNodeOutput):
+class RetrieverNodeOutput(BaseModel):
     """Output from the retriever node"""
 
     results: List[RetrievalResultSchema] = Field(..., description="List of retrieved results")
     total_results: int = Field(..., description="Total number of results found")
 
 
-class RetrieverNodeConfig(BaseNodeConfig):
-    """Configuration for the retriever node"""
+class RetrieverNode(Tool):
+    """Node for retrieving relevant documents from a vector index"""
 
-    output_schema: Dict[str, str] = Field(
-        default={
-            "results": "list[RetrievalResultSchema]",
-            "total_results": "integer",
-        },
-        description="The schema for the output of the node",
-    )
-    output_json_schema: str = Field(
-        default=json.dumps(RetrieverNodeOutput.model_json_schema(), indent=2),
-        description="The JSON schema for the output of the node",
-    )
+    name: str = "retriever_node"
+    output_model: Type[BaseModel] = RetrieverNodeOutput
+
+    # Configuration fields
     vector_index_id: str = Field(..., description="ID of the vector index to query", min_length=1)
     top_k: int = Field(5, description="Number of results to return", ge=1, le=10)
     query_template: str = Field(
@@ -62,28 +40,24 @@ class RetrieverNodeConfig(BaseNodeConfig):
     # semantic_weight: float = Field(1.0, description="Weight for semantic search (0 to 1)")
     # keyword_weight: Optional[float] = Field(None, description="Weight for keyword search (0 to 1)")
 
-
-class RetrieverNode(BaseNode):
-    """Node for retrieving relevant documents from a vector index"""
-
-    name = "retriever_node"
-    display_name = "Retriever"
-    config_model = RetrieverNodeConfig
-    input_model = RetrieverNodeInput
-    output_model = RetrieverNodeOutput
+    def model_post_init(self, _: Any) -> None:
+        """Initialize after Pydantic model initialization."""
+        super().model_post_init(_)
+        # Set display name
+        self.display_name = "Retriever"
 
     async def validate_index(self, db: Session) -> None:
         """Validate that the vector index exists and is ready"""
         index = (
             db.query(VectorIndexModel)
-            .filter(VectorIndexModel.id == self.config.vector_index_id)
+            .filter(VectorIndexModel.id == self.vector_index_id)
             .first()
         )
         if not index:
-            raise ValueError(f"Vector index {self.config.vector_index_id} not found")
+            raise ValueError(f"Vector index {self.vector_index_id} not found")
         if index.status != "ready":
             raise ValueError(
-                f"Vector index {self.config.vector_index_id} is not ready (status: {index.status})"
+                f"Vector index {self.vector_index_id} is not ready (status: {index.status})"
             )
 
     async def run(self, input: BaseModel) -> BaseModel:
@@ -97,11 +71,11 @@ class RetrieverNode(BaseNode):
             # Get vector index configuration from database
             vector_index_model = (
                 db.query(VectorIndexModel)
-                .filter(VectorIndexModel.id == self.config.vector_index_id)
+                .filter(VectorIndexModel.id == self.vector_index_id)
                 .first()
             )
             if not vector_index_model:
-                raise ValueError(f"Vector index {self.config.vector_index_id} not found")
+                raise ValueError(f"Vector index {self.vector_index_id} not found")
 
             logger.info(
                 f"[DEBUG] Vector index configuration: {vector_index_model.embedding_config}"
@@ -115,7 +89,7 @@ class RetrieverNode(BaseNode):
             logger.info(f"[DEBUG] Using embedding model: {embedding_model}")
 
             # Initialize vector index and set its configuration
-            vector_index = VectorIndex(self.config.vector_index_id)
+            vector_index = VectorIndex(self.vector_index_id)
             embedding_model_info = EmbeddingModels.get_model_info(embedding_model)
             assert embedding_model_info is not None
             vector_index.update_config(
@@ -130,12 +104,12 @@ class RetrieverNode(BaseNode):
 
             # Render query template with input variables
             raw_input_dict = input.model_dump()
-            query = Template(self.config.query_template).render(**raw_input_dict)
+            query = Template(self.query_template).render(**raw_input_dict)
 
             # Create retrieval request
             results = await vector_index.retrieve(
                 query=query,
-                top_k=self.config.top_k,
+                top_k=self.top_k,
             )
 
             # Format results
@@ -173,15 +147,16 @@ if __name__ == "__main__":
         # Create a test instance
         retriever = RetrieverNode(
             name="test_retriever",
-            config=RetrieverNodeConfig(
-                vector_index_id="VI1",  # Using proper vector index ID format
-                top_k=3,
-                query_template="{{input_1}}",
-            ),
+            vector_index_id="VI1",  # Using proper vector index ID format
+            top_k=3,
+            query_template="{{input_1}}",
         )
 
         # Create test input
-        test_input = RetrieverNodeInput(input_1="What is machine learning?")  # type: ignore
+        class TestInput(BaseModel):
+            input_1: str = "What is machine learning?"
+
+        test_input = TestInput()
 
         print("[DEBUG] Testing retriever_node...")
         try:
