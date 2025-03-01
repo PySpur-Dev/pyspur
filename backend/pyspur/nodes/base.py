@@ -9,8 +9,8 @@ from ..execution.workflow_execution_context import WorkflowExecutionContext
 from ..schemas.workflow_schemas import WorkflowDefinitionSchema
 from ..utils import pydantic_utils
 
-# Define TypeVar for BaseNode reference
-T = TypeVar('T', bound='BaseNode')
+# Define TypeVar for Tool reference
+T = TypeVar('T', bound='Tool')
 
 class VisualTag(BaseModel):
     """Pydantic model for visual tag properties."""
@@ -21,40 +21,40 @@ class VisualTag(BaseModel):
     )  # Hex color code validation using regex
 
 
-class BaseNodeOutput(BaseModel):
-    """Base class for all node outputs.
+class ToolOutput(BaseModel):
+    """Base class for all tool outputs.
 
-    Each node type will define its own output model that inherits from this.
+    Each tool type will define its own output model that inherits from this.
     """
 
     pass
 
 
-class BaseNodeInput(BaseModel):
-    """Base class for node inputs.
+class ToolInput(BaseModel):
+    """Base class for tool inputs.
 
-    Each node's input model will be dynamically created based on its predecessor nodes,
-    with fields named after node IDs and types being the corresponding NodeOutputModels.
+    Each tool's input model will be dynamically created based on its predecessor tools,
+    with fields named after tool IDs and types being the corresponding ToolOutputModels.
     """
 
     pass
 
 
 # Define a type for the input parameter of __call__
-NodeInputType = Union[
+ToolInputType = Union[
     Dict[str, Any],
     Dict[str, BaseModel],
     BaseModel
 ]
 
 
-class BaseNode(BaseModel, ABC):
-    """Base class for all nodes.
+class Tool(BaseModel, ABC):
+    """Base class for all tools.
 
-    Each node receives inputs as a Pydantic model and produces outputs as a Pydantic model.
+    Each tool receives inputs as a Pydantic model and produces outputs as a Pydantic model.
     Subclasses can define their own input and output model types:
 
-    >>> class MyNode(BaseNode):
+    >>> class MyTool(Tool):
     >>>     my_config_param: int = 42
     >>>     async def run(self, input: BaseModel) -> BaseModel:
     >>>         return MyOutputModel(...)
@@ -62,7 +62,7 @@ class BaseNode(BaseModel, ABC):
     You can define the output schema using either a JSON schema string or a Pydantic model:
 
     Using JSON schema string:
-    >>> class MyNode(BaseNode):
+    >>> class MyTool(Tool):
     >>>     output_json_schema = '{"type": "object", "properties": {"result": {"type": "string"}}}'
     >>>     async def run(self, input: BaseModel) -> BaseModel:
     >>>         # ...
@@ -71,26 +71,26 @@ class BaseNode(BaseModel, ABC):
     >>> class MyOutputModel(BaseModel):
     >>>     result: str
     >>>
-    >>> class MyNode(BaseNode):
+    >>> class MyTool(Tool):
     >>>     output_json_schema = MyOutputModel
     >>>     async def run(self, input: BaseModel) -> BaseModel:
     >>>         return MyOutputModel(result="some result")
 
-    Required parameters for all nodes:
-    - name: Unique identifier for the node
+    Required parameters for all tools:
+    - name: Unique identifier for the tool
     - output_json_schema: Define using either a JSON schema string or a Pydantic model class
     - has_fixed_output: If True, output schema cannot be modified at runtime
     """
 
-    # Node configuration parameters
-    name: str = Field(description="Unique identifier for the node")
+    # Tool configuration parameters
+    name: str = Field(description="Unique identifier for the tool")
     input_model: Type[BaseModel] = Field(
         default=BaseModel,
-        description="Defines the structure of node's input using either a JSON schema string or a Pydantic model class"
+        description="Defines the structure of tool's input using either a JSON schema string or a Pydantic model class"
     )
     output_model: Type[BaseModel] = Field(
         default=BaseModel,
-        description="Defines the structure of node's output using either a JSON schema string or a Pydantic model class"
+        description="Defines the structure of tool's output using either a JSON schema string or a Pydantic model class"
     )
     has_fixed_output: bool = Field(
         default=False,
@@ -123,9 +123,9 @@ class BaseNode(BaseModel, ABC):
 
         Internal properties that can be set:
         - context: The workflow execution context
-        - display_name: The display name for the node (used in UI)
-        - logo: Path to the node's logo
-        - category: The category the node belongs to
+        - display_name: The display name for the tool (used in UI)
+        - logo: Path to the tool's logo
+        - category: The category the tool belongs to
 
         It also initializes default input and output models if not set by subclasses.
         """
@@ -165,21 +165,21 @@ class BaseNode(BaseModel, ABC):
     def setup(self) -> None:
         """Define output_model and any other initialization.
 
-        For dynamic schema nodes, these can be created based on the node's configuration.
+        For dynamic schema tools, these can be created based on the tool's configuration.
         """
         pass
 
     async def __call__(
         self,
-        input: NodeInputType,
+        input: ToolInputType,
     ) -> BaseModel:
-        """Validate inputs and runs the node's logic.
+        """Validate inputs and runs the tool's logic.
 
         Args:
             input: Pydantic model or dictionary containing inputs
 
         Returns:
-            The node's output model
+            The tool's output model
 
         """
         validated_input: BaseModel
@@ -215,7 +215,7 @@ class BaseNode(BaseModel, ABC):
         # Store the validated input
         self._input_data = validated_input
 
-        # Run the node's logic
+        # Run the tool's logic
         result = await self.run(validated_input)
 
         try:
@@ -231,7 +231,7 @@ class BaseNode(BaseModel, ABC):
 
     @abstractmethod
     async def run(self, input: BaseModel) -> BaseModel:
-        """Abstract method where the node's core logic is implemented.
+        """Abstract method where the tool's core logic is implemented.
 
         Args:
             input: Validated input model
@@ -245,97 +245,97 @@ class BaseNode(BaseModel, ABC):
     # Property getters for internal attributes
     @property
     def context(self) -> Optional[WorkflowExecutionContext]:
-        """Return the node's execution context."""
+        """Return the tool's execution context."""
         return self._context
 
     @property
     def display_name(self) -> str:
-        """Return the node's display name."""
+        """Return the tool's display name."""
         return self._display_name
 
     @display_name.setter
     def display_name(self, value: str) -> None:
-        """Set the node's display name."""
+        """Set the tool's display name."""
         self._display_name = value
 
     @property
     def logo(self) -> Optional[str]:
-        """Return the node's logo."""
+        """Return the tool's logo."""
         return self._logo
 
     @logo.setter
     def logo(self, value: Optional[str]) -> None:
-        """Set the node's logo."""
+        """Set the tool's logo."""
         self._logo = value
 
     @property
     def category(self) -> Optional[str]:
-        """Return the node's category."""
+        """Return the tool's category."""
         return self._category
 
     @category.setter
     def category(self, value: Optional[str]) -> None:
-        """Set the node's category."""
+        """Set the tool's category."""
         self._category = value
 
     @property
-    def config_model(self) -> Type["BaseNode"]:
-        """Return the node's config model."""
+    def config_model(self) -> Type["Tool"]:
+        """Return the tool's config model."""
         return self.__class__
 
     @property
-    def config(self) -> "BaseNode":
-        """Return the node's config."""
+    def config(self) -> "Tool":
+        """Return the tool's config."""
         return self
 
     @property
     def input(self) -> Optional[BaseModel]:
-        """Return the node's input."""
+        """Return the tool's input."""
         if self._input_data is None:
             return None
         return self._input_model.model_validate(self._input_data.model_dump())
 
     @property
     def output(self) -> Optional[BaseModel]:
-        """Return the node's output."""
+        """Return the tool's output."""
         if self._output_data is None:
             return None
         return self._output_model.model_validate(self._output_data.model_dump())
 
     @property
     def visual_tag(self) -> Optional[VisualTag]:
-        """Return the node's visual tag."""
+        """Return the tool's visual tag."""
         return self._visual_tag
 
     @visual_tag.setter
     def visual_tag(self, value: VisualTag) -> None:
-        """Set the node's visual tag."""
+        """Set the tool's visual tag."""
         self._visual_tag = value
 
     @property
     def subworkflow(self) -> Optional[WorkflowDefinitionSchema]:
-        """Return the node's subworkflow."""
+        """Return the tool's subworkflow."""
         return self._subworkflow
 
     @subworkflow.setter
     def subworkflow(self, value: Optional[WorkflowDefinitionSchema]) -> None:
-        """Set the node's subworkflow."""
+        """Set the tool's subworkflow."""
         self._subworkflow = value
 
     @property
     def subworkflow_output(self) -> Optional[Dict[str, Any]]:
-        """Return the node's subworkflow output."""
+        """Return the tool's subworkflow output."""
         return self._subworkflow_output
 
     @subworkflow_output.setter
     def subworkflow_output(self, value: Optional[Dict[str, Any]]) -> None:
-        """Set the node's subworkflow output."""
+        """Set the tool's subworkflow output."""
         self._subworkflow_output = value
 
     @classmethod
     def get_default_visual_tag(cls) -> VisualTag:
-        """Set a default visual tag for the node."""
-        # default acronym is the first letter of each word in the node name
+        """Set a default visual tag for the tool."""
+        # default acronym is the first letter of each word in the tool name
         acronym = "".join([word[0] for word in cls.__name__.split("_")]).upper()
 
         # default color is randomly picked from a list of pastel colors

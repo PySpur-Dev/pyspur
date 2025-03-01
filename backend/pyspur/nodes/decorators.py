@@ -4,10 +4,10 @@ from typing import Any, Callable, Dict, Optional, Type, get_origin, get_type_hin
 from pydantic import BaseModel
 
 from ..utils import pydantic_utils
-from .base import BaseNode, VisualTag
+from .base import Tool, VisualTag
 
 
-def node_function(
+def tool(
     name: Optional[str] = None,
     input_model: Optional[Type[BaseModel]] = None,
     output_model: Optional[Type[BaseModel]] = None,
@@ -16,42 +16,42 @@ def node_function(
     logo: Optional[str] = None,
     visual_tag: Optional[VisualTag] = None,
     has_fixed_output: bool = False,
-) -> Callable[[Callable[..., Any]], Type[BaseNode]]:
-    """Decorator to convert a function into a BaseNode.
+) -> Callable[[Callable[..., Any]], Type[Tool]]:
+    """Decorator to convert a function into a Tool.
     
-    This decorator allows you to easily convert any function into a BaseNode
+    This decorator allows you to easily convert any function into a Tool
     without having to create a full class definition. It automatically handles
     input and output validation, and provides a consistent interface for
-    working with nodes in the workflow system.
+    working with tools in the workflow system.
     
     Args:
-        name: Name for the node (defaults to function name if not provided)
+        name: Name for the tool (defaults to function name if not provided)
         input_model: Pydantic model for input validation (auto-generated from function signature if None)
         output_model: Pydantic model for output validation (inferred from return type annotation if possible)
-        display_name: Display name for the node in UI
-        category: Category for the node
+        display_name: Display name for the tool in UI
+        category: Category for the tool
         logo: Path to logo image
-        visual_tag: Visual tag for the node
+        visual_tag: Visual tag for the tool
         has_fixed_output: Whether the output schema is fixed
         
     Returns:
-        A decorator function that converts the decorated function into a BaseNode class
+        A decorator function that converts the decorated function into a Tool class
         
     Examples:
-        >>> @node_function(category="Math")
+        >>> @tool(category="Math")
         >>> def add_numbers(a: float, b: float) -> float:
         >>>     return a + b
         >>>
-        >>> # Create an instance of the node
-        >>> add_node = add_numbers()
-        >>> result = await add_node({"a": 1, "b": 2})
+        >>> # Create an instance of the tool
+        >>> add_tool = add_numbers()
+        >>> result = await add_tool({"a": 1, "b": 2})
         >>> print(result)  # Output will contain the value 3
 
     """
-    def decorator(func: Callable[..., Any]) -> Type[BaseNode]:
-        # Generate a name for the node class
-        node_name: str = name or func.__name__
-        node_class_name: str = f"{node_name.title().replace('_', '')}Node"
+    def decorator(func: Callable[..., Any]) -> Type[Tool]:
+        # Generate a name for the tool class
+        tool_name: str = name or func.__name__
+        tool_class_name: str = f"{tool_name.title().replace('_', '')}Tool"
 
         # Create input model from function signature if not provided
         func_input_model = input_model
@@ -66,7 +66,7 @@ def node_function(
                 fields[param_name] = (annotation, default)
 
             func_input_model = pydantic_utils.create_model(
-                f"{node_class_name}Input",
+                f"{tool_class_name}Input",
                 **fields,
                 __base__=BaseModel
             )
@@ -82,7 +82,7 @@ def node_function(
                 if return_type is None or return_type == type(None):  # noqa
                     # Create an empty output model
                     func_output_model = pydantic_utils.create_model(
-                        f"{node_class_name}Output",
+                        f"{tool_class_name}Output",
                         __base__=BaseModel
                     )
                 # Check if return type is a BaseModel subclass
@@ -92,29 +92,29 @@ def node_function(
                 elif get_origin(return_type) is dict:
                     # Create a dynamic output model that accepts any dictionary
                     func_output_model = pydantic_utils.create_model(
-                        f"{node_class_name}Output",
+                        f"{tool_class_name}Output",
                         __base__=BaseModel,
                         model_config={"extra": "allow"}
                     )
                 else:
                     # For primitive return types, create a model with a single field named "value"
                     func_output_model = pydantic_utils.create_model(
-                        f"{node_class_name}Output",
+                        f"{tool_class_name}Output",
                         value=(return_type, ...),
                         __base__=BaseModel
                     )
             except (TypeError, AttributeError):
                 # If we can't get type hints, use a generic output model
                 func_output_model = pydantic_utils.create_model(
-                    f"{node_class_name}Output",
+                    f"{tool_class_name}Output",
                     __base__=BaseModel,
                     model_config={"extra": "allow"}
                 )
 
-        # Create the node class
-        class FunctionNode(BaseNode):
+        # Create the tool class
+        class FunctionTool(Tool):
             def __init__(self, **kwargs: Any) -> None:
-                kwargs['name'] = node_name
+                kwargs['name'] = tool_name
                 kwargs['input_model'] = func_input_model
                 kwargs['output_model'] = func_output_model
                 kwargs['has_fixed_output'] = has_fixed_output
@@ -123,7 +123,7 @@ def node_function(
                 if display_name:
                     self.display_name = display_name
                 else:
-                    self.display_name = node_name.replace('_', ' ').title()
+                    self.display_name = tool_name.replace('_', ' ').title()
 
                 if category:
                     self.category = category
@@ -190,10 +190,10 @@ def node_function(
                     return dynamic_model()
 
         # Set the class name and docstring
-        FunctionNode.__name__ = node_class_name
-        FunctionNode.__qualname__ = node_class_name
-        FunctionNode.__doc__ = func.__doc__ or f"Node created from function {func.__name__}"
+        FunctionTool.__name__ = tool_class_name
+        FunctionTool.__qualname__ = tool_class_name
+        FunctionTool.__doc__ = func.__doc__ or f"Tool created from function {func.__name__}"
 
-        return FunctionNode
+        return FunctionTool
 
     return decorator
