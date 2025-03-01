@@ -1,23 +1,11 @@
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional, Type
 
-from pydantic import BaseModel, create_model
+from pydantic import BaseModel, Field, create_model
 
-from ..base import BaseNode, BaseNodeConfig, BaseNodeInput, BaseNodeOutput
-
-
-class CoalesceNodeConfig(BaseNodeConfig):
-    """Configuration for the coalesce node."""
-
-    preferences: List[str] = []
+from ..base import Tool
 
 
-class CoalesceNodeInput(BaseNodeInput):
-    """Input model for the coalesce node."""
-
-    pass
-
-
-class CoalesceNodeOutput(BaseNodeOutput):
+class CoalesceNodeOutput(BaseModel):
     """Output model for the coalesce node."""
 
     class Config:
@@ -26,20 +14,25 @@ class CoalesceNodeOutput(BaseNodeOutput):
     pass
 
 
-class CoalesceNode(BaseNode):
-    """
-    A Coalesce node that takes multiple incoming branches and outputs
+class CoalesceNode(Tool):
+    """A Coalesce node that takes multiple incoming branches and outputs
     the first non-null branch's value as its result.
     """
 
-    name = "coalesce_node"
-    display_name = "Coalesce"
-    input_model = CoalesceNodeInput
-    config_model = CoalesceNodeConfig
+    name: str = "coalesce_node"
+    output_model: Type[BaseModel] = CoalesceNodeOutput
+
+    # Configuration fields moved from CoalesceNodeConfig
+    preferences: List[str] = Field(default_factory=list, description="Order of preference for inputs")
+
+    def model_post_init(self, _: Any) -> None:
+        """Initialize after Pydantic model initialization."""
+        super().model_post_init(_)
+        # Set display name
+        self.display_name = "Coalesce"
 
     async def run(self, input: BaseModel) -> BaseModel:
-        """
-        The `input` here is typically a Pydantic model whose fields correspond
+        """The `input` here is typically a Pydantic model whose fields correspond
         to each upstream dependency. Some may be None, some may be a valid
         BaseModel/dict. We find the first non-None field and return it.
         """
@@ -49,7 +42,7 @@ class CoalesceNode(BaseNode):
         first_non_null_output: Dict[str, Optional[BaseModel]] = {}
 
         # Iterate over the keys based on the order specified in preferences
-        for key in self.config.preferences:  # {{ edit_1 }}
+        for key in self.preferences:
             if key in data and data[key] is not None:
                 # Return the first non-None value according to preferences
                 output_model = create_model(
