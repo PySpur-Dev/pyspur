@@ -13,6 +13,7 @@ import {
     Textarea,
     useDisclosure
 } from '@heroui/react'
+import { Icon } from '@iconify/react'
 import { generateWorkflowWithAI, WorkflowGenerationRequest, createWorkflow } from '@/utils/api'
 import { WorkflowCreateRequest, WorkflowResponse } from '@/types/api_types/workflowSchemas'
 
@@ -309,6 +310,7 @@ const AIWorkflowWizard: React.FC<AIWorkflowWizardProps> = ({ isOpen, onClose, on
                                                 variant="light"
                                                 size="sm"
                                                 onClick={() => removeInput(key)}
+                                                startContent={<Icon icon="solar:trash-bin-trash-linear" width={16} />}
                                             >
                                                 Remove
                                             </Button>
@@ -327,7 +329,7 @@ const AIWorkflowWizard: React.FC<AIWorkflowWizardProps> = ({ isOpen, onClose, on
                                         value={inputValue}
                                         onChange={(e) => setInputValue(e.target.value)}
                                     />
-                                    <Button onClick={addInput}>Add</Button>
+                                    <Button onClick={addInput} startContent={<Icon icon="solar:add-circle-linear" width={16} />}>Add</Button>
                                 </div>
                             </div>
 
@@ -348,6 +350,7 @@ const AIWorkflowWizard: React.FC<AIWorkflowWizardProps> = ({ isOpen, onClose, on
                                                 variant="light"
                                                 size="sm"
                                                 onClick={() => removeOutput(key)}
+                                                startContent={<Icon icon="solar:trash-bin-trash-linear" width={16} />}
                                             >
                                                 Remove
                                             </Button>
@@ -366,7 +369,7 @@ const AIWorkflowWizard: React.FC<AIWorkflowWizardProps> = ({ isOpen, onClose, on
                                         value={outputValue}
                                         onChange={(e) => setOutputValue(e.target.value)}
                                     />
-                                    <Button onClick={addOutput}>Add</Button>
+                                    <Button onClick={addOutput} startContent={<Icon icon="solar:add-circle-linear" width={16} />}>Add</Button>
                                 </div>
                             </div>
                         </div>
@@ -435,15 +438,15 @@ const AIWorkflowWizard: React.FC<AIWorkflowWizardProps> = ({ isOpen, onClose, on
                 <ModalFooter>
                     {currentStep !== 'generating' && (
                         <>
-                            <Button color="default" variant="light" onClick={onClose}>
+                            <Button color="default" variant="light" onClick={onClose} startContent={<Icon icon="solar:close-circle-linear" width={18} />}>
                                 Cancel
                             </Button>
                             {currentStep !== 'purpose' && (
-                                <Button color="default" onClick={handleBack}>
+                                <Button color="default" onClick={handleBack} startContent={<Icon icon="solar:arrow-left-linear" width={18} />}>
                                     Back
                                 </Button>
                             )}
-                            <Button color="primary" onClick={handleNext}>
+                            <Button color="primary" onClick={handleNext} endContent={currentStep !== 'review' ? <Icon icon="solar:arrow-right-linear" width={18} /> : <Icon icon="solar:play-bold" width={18} />}>
                                 {currentStep === 'review' ? 'Generate Workflow' : 'Next'}
                             </Button>
                         </>
