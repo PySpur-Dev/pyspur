@@ -1,40 +1,58 @@
 from abc import abstractmethod
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Type
 
-from pydantic import BaseModel, create_model
+from pydantic import BaseModel, Field, create_model
 
 from ...execution.workflow_executor import WorkflowExecutor
 from ...schemas.workflow_schemas import WorkflowDefinitionSchema
-from ..base import BaseNodeInput, BaseNodeOutput
 from ..primitives.output import OutputNode
 from ..subworkflow.base_subworkflow_node import (
     BaseSubworkflowNode,
-    BaseSubworkflowNodeConfig,
+    SubworkflowToolInput,
+    SubworkflowToolOutput,
 )
 
 
-class BaseLoopSubworkflowNodeConfig(BaseSubworkflowNodeConfig):
-    subworkflow: WorkflowDefinitionSchema
+class LoopToolInput(SubworkflowToolInput):
+    """Base class for loop tool inputs."""
 
-
-class BaseLoopSubworkflowNodeInput(BaseNodeInput):
     pass
 
 
-class BaseLoopSubworkflowNodeOutput(BaseNodeOutput):
+class LoopToolOutput(SubworkflowToolOutput):
+    """Base class for loop tool outputs."""
+
     pass
 
 
 class BaseLoopSubworkflowNode(BaseSubworkflowNode):
-    name = "loop_subworkflow_node"
-    config_model = BaseLoopSubworkflowNodeConfig
-    iteration: int
-    loop_outputs: Dict[str, List[Dict[str, Any]]]
+    """Base class for loop subworkflow nodes.
+    
+    A loop subworkflow node executes a nested workflow repeatedly until a stopping condition is met.
+    """
+
+    name: str = "loop_subworkflow_node"
+    input_model: Type[BaseModel] = LoopToolInput
+    output_model: Type[BaseModel] = LoopToolOutput
+
+    # Configuration parameters
+    subworkflow: WorkflowDefinitionSchema = Field(
+        ...,
+        title="Subworkflow",
+        description="The workflow definition to execute in a loop",
+    )
+
+    # Loop state
+    iteration: int = 0
+    loop_outputs: Dict[str, List[Dict[str, Any]]] = {}
 
     def setup(self) -> None:
+        """Initialize the loop subworkflow node."""
         super().setup()
         self.loop_outputs = {}
         self.iteration = 0
+        # Set the subworkflow from the configuration
+        self._subworkflow = self.subworkflow
 
     def _update_loop_outputs(self, iteration_output: Dict[str, Dict[str, Any]]) -> None:
         """Update the loop_outputs dictionary with the current iteration's output"""
@@ -55,14 +73,13 @@ class BaseLoopSubworkflowNode(BaseSubworkflowNode):
 
     async def run_iteration(self, input: Dict[str, Any]) -> Dict[str, Any]:
         """Run a single iteration of the loop subworkflow"""
-        self.subworkflow = self.config.subworkflow
-        assert self.subworkflow is not None
+        assert self._subworkflow is not None
 
         # Inject loop outputs into the input
         iteration_input = {**input, "loop_history": self.loop_outputs}
 
         # Execute the subworkflow
-        self._executor = WorkflowExecutor(workflow=self.config.subworkflow, context=self.context)
+        self._executor = WorkflowExecutor(workflow=self._subworkflow, context=self._context)
         workflow_executor = self._executor
         outputs = await workflow_executor.run(iteration_input)
 
@@ -74,7 +91,7 @@ class BaseLoopSubworkflowNode(BaseSubworkflowNode):
 
         # Get the output node's results
         output_node = next(
-            node for node in self.subworkflow.nodes if node.node_type == "OutputNode"
+            node for node in self._subworkflow.nodes if node.node_type == "OutputNode"
         )
         return iteration_outputs[output_node.id]
 
@@ -88,24 +105,28 @@ class BaseLoopSubworkflowNode(BaseSubworkflowNode):
             current_input.update(iteration_output)
             self.iteration += 1
 
-        self.subworkflow_output = self.loop_outputs
+        self._subworkflow_output = self.loop_outputs
 
-        # create output model for the loop from the subworkflow output node's output_model
+        # Create output model for the loop from the subworkflow output node's output_model
         output_node = next(
             node
             for _id, node in self._executor.node_instances.items()
             if issubclass(node.__class__, OutputNode)
         )
-        self.output_model = create_model(
-            f"{self.name}",
-            **{name: (field, ...) for name, field in output_node.output_model.model_fields.items()},
-            __base__=BaseLoopSubworkflowNodeOutput,
-            __config__=None,
-            __module__=self.__module__,
-            __cls_kwargs__={"arbitrary_types_allowed": True},
-            __doc__=None,
-            __validators__=None,
+
+        # Create a dynamic output model based on the output node's model
+        output_model_fields = {}
+        for name, field in output_node.output_model.model_fields.items():
+            output_model_fields[name] = (field.annotation, ...)
+
+        dynamic_output_model = create_model(
+            f"{self.name}Output",
+            **output_model_fields,
+            __base__=LoopToolOutput,
         )
 
+        # Update the output model
+        self.output_model = dynamic_output_model
+
         # Return final state as BaseModel
-        return self.output_model.model_validate(current_input)  # type: ignore
+        return self.output_model.model_validate(current_input)
