@@ -1054,3 +1054,24 @@ export const cancelWorkflow = async (runId: string): Promise<RunResponse> => {
         throw error;
     }
 };
+
+// Add a new function for AI workflow generation
+export interface WorkflowGenerationRequest {
+    purpose: string
+    description: string
+    inputs?: Record<string, string>
+    outputs?: Record<string, string>
+    advanced_options?: Record<string, any>
+}
+
+export const generateWorkflowWithAI = async (
+    request: WorkflowGenerationRequest
+): Promise<WorkflowResponse> => {
+    try {
+        const response = await axios.post(`${API_BASE_URL}/ai/generate_workflow/`, request)
+        return response.data
+    } catch (error) {
+        console.error('Error generating workflow with AI:', error)
+        throw error
+    }
+}

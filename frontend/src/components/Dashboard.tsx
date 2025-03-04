@@ -41,6 +41,7 @@ import {
 import TemplateCard from './cards/TemplateCard'
 import WelcomeModal from './modals/WelcomeModal'
 import HumanInputModal from './modals/HumanInputModal'
+import AIWorkflowWizard from './modals/AIWorkflowWizard'
 import { formatDistanceToNow } from 'date-fns'
 
 // Calendly Widget Component
@@ -127,6 +128,7 @@ const Dashboard: React.FC = () => {
     const [alertMessage, setAlertMessage] = useState<string | null>(null)
     const [alertColor, setAlertColor] = useState<'success' | 'danger' | 'warning' | 'default'>('default')
     const [showAlert, setShowAlert] = useState(false)
+    const [isAIWorkflowWizardOpen, setIsAIWorkflowWizardOpen] = useState(false)
 
     // Function to show alerts
     const onAlert = (message: string, color: 'success' | 'danger' | 'warning' | 'default' = 'default') => {
@@ -499,6 +501,23 @@ const Dashboard: React.FC = () => {
         }
     };
 
+    // Function to handle successful workflow creation from AI
+    const handleAIWorkflowSuccess = (workflow: WorkflowResponse) => {
+        // Add the new workflow to the list
+        setWorkflows([workflow, ...workflows])
+
+        // Show success alert
+        onAlert(`Workflow "${workflow.name}" created successfully!`, 'success')
+
+        // Highlight the new workflow
+        setHighlightedWorkflowId(workflow.id)
+
+        // Clear the highlight after 3 seconds
+        setTimeout(() => {
+            setHighlightedWorkflowId(null)
+        }, 3000)
+    }
+
     return (
         <div className="flex flex-col gap-2 max-w-7xl w-full mx-auto pt-2 px-6">
             <Head>
@@ -541,6 +560,13 @@ const Dashboard: React.FC = () => {
                             <p className="text-small text-default-400 lg:text-medium">Manage your spurs</p>
                         </div>
                         <div className="ml-auto flex items-center gap-2" id="new-workflow-entries">
+                            <Button
+                                onClick={() => setIsAIWorkflowWizardOpen(true)}
+                                color="primary"
+                            >
+                                <Icon icon="mdi:robot" className="mr-1" />
+                                Create with AI
+                            </Button>
                             <Button
                                 className="bg-foreground text-background dark:bg-foreground/90 dark:text-background/90"
                                 startContent={
@@ -852,6 +878,11 @@ const Dashboard: React.FC = () => {
                     onSubmit={handleHumanInputSubmit}
                 />
             )}
+            <AIWorkflowWizard
+                isOpen={isAIWorkflowWizardOpen}
+                onClose={() => setIsAIWorkflowWizardOpen(false)}
+                onSuccess={handleAIWorkflowSuccess}
+            />
         </div>
     )
 }

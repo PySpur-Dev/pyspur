@@ -534,3 +534,156 @@ def convert_docx_to_xml(file_path: str) -> str:
     except Exception as e:
         logging.error(f"Error converting DOCX to XML: {str(e)}")
         raise
+
+
+# Example workflow definitions for reference in AI-powered workflow generation
+EXAMPLE_WORKFLOWS = {
+    "slack_summarizer": {
+        "name": "Slack Summarizer",
+        "definition": {
+            "nodes": [
+                {
+                    "id": "input_node",
+                    "title": "input_node",
+                    "parent_id": None,
+                    "node_type": "InputNode",
+                    "config": {
+                        "output_schema": {
+                            "blogpost_url": "string",
+                            "paper_pdf_file": "string"
+                        },
+                        "output_json_schema": "{\"type\": \"object\",\"properties\": {\"blogpost_url\": {\"type\": \"string\"},\"paper_pdf_file\": {\"type\": \"string\"}},\"required\": [\"blogpost_url\",\"paper_pdf_file\"]}",
+                        "has_fixed_output": False,
+                        "enforce_schema": False
+                    },
+                    "coordinates": {
+                        "x": 0,
+                        "y": 432
+                    },
+                    "dimensions": None,
+                    "subworkflow": None
+                },
+                {
+                    "id": "RouterNode_1",
+                    "title": "RouterNode_1",
+                    "parent_id": None,
+                    "node_type": "RouterNode",
+                    "config": {
+                        "title": "RouterNode_1",
+                        "type": "object",
+                        "output_schema": {
+                            "output": "string"
+                        },
+                        "output_json_schema": "{\"type\":\"object\",\"properties\":{\"input_node\":{\"type\":\"object\",\"properties\":{\"blogpost_url\":{\"type\":\"string\"},\"paper_pdf_file\":{\"type\":\"string\"}},\"required\":[\"blogpost_url\",\"paper_pdf_file\"]}},\"required\":[\"input_node\"],\"additionalProperties\":false}",
+                        "has_fixed_output": False,
+                        "route_map": {
+                            "route1": {
+                                "conditions": [
+                                    {
+                                        "logicalOperator": "AND",
+                                        "operator": "is_not_empty",
+                                        "value": "",
+                                        "variable": "input_node.blogpost_url"
+                                    }
+                                ]
+                            },
+                            "route2": {
+                                "conditions": [
+                                    {
+                                        "variable": "input_node.paper_pdf_file",
+                                        "operator": "is_not_empty",
+                                        "value": ""
+                                    }
+                                ]
+                            }
+                        }
+                    },
+                    "coordinates": {
+                        "x": 438,
+                        "y": 0
+                    },
+                    "dimensions": {
+                        "width": 428,
+                        "height": 1077
+                    },
+                    "subworkflow": None
+                },
+                {
+                    "id": "SingleLLMCallNode_1",
+                    "title": "KeyPointsSummarizer",
+                    "parent_id": None,
+                    "node_type": "SingleLLMCallNode",
+                    "config": {
+                        "title": "KeyPointsSummarizer",
+                        "type": "object",
+                        "output_schema": {
+                            "output": "string"
+                        },
+                        "output_json_schema": "{\"type\": \"object\", \"properties\": {\"output\": {\"type\": \"string\"} } }",
+                        "has_fixed_output": False,
+                        "llm_info": {
+                            "model": "openai/chatgpt-4o-latest",
+                            "max_tokens": 4096,
+                            "temperature": 0.7,
+                            "top_p": 0.9
+                        },
+                        "system_message": "You are a software engineer who breaks down a technical article for colleagues to read.\n\n- Use bullet points to summarize key concepts\n- If appropriate, add some humour sparingly but never force it\n- Your audience are technical software engineers or researchers.",
+                        "user_message": "{{FirecrawlScrapeNode_1.markdown}}",
+                        "few_shot_examples": None,
+                        "url_variables": None
+                    },
+                    "coordinates": {
+                        "x": 1714,
+                        "y": 463.5
+                    },
+                    "dimensions": None,
+                    "subworkflow": None
+                },
+                {
+                    "id": "SlackNotifyNode_1",
+                    "title": "SlackNotifyNode_1",
+                    "parent_id": None,
+                    "node_type": "SlackNotifyNode",
+                    "config": {
+                        "title": "SlackNotifyNode_1",
+                        "type": "object",
+                        "output_schema": {
+                            "output": "string"
+                        },
+                        "output_json_schema": "{\"properties\": {\"status\": {\"description\": \"Error message if the message was not sent successfully.\", \"title\": \"Status\", \"type\": \"string\"}}, \"required\": [\"status\"], \"title\": \"SlackNotifyNodeOutput\", \"type\": \"object\"}",
+                        "has_fixed_output": True,
+                        "channel": "learning",
+                        "mode": "bot",
+                        "message": "Here is your awesome summary:\n\n{{SingleLLMCallNode_1.output}}\n\nNow back to work!"
+                    },
+                    "coordinates": {
+                        "x": 3050,
+                        "y": 463.5
+                    },
+                    "dimensions": None,
+                    "subworkflow": None
+                }
+            ],
+            "links": [
+                {
+                    "source_id": "input_node",
+                    "target_id": "RouterNode_1",
+                    "source_handle": None,
+                    "target_handle": None
+                },
+                {
+                    "source_id": "RouterNode_1",
+                    "target_id": "SingleLLMCallNode_1",
+                    "source_handle": "route1",
+                    "target_handle": "RouterNode_1.route1"
+                },
+                {
+                    "source_id": "SingleLLMCallNode_1",
+                    "target_id": "SlackNotifyNode_1",
+                    "source_handle": None,
+                    "target_handle": None
+                }
+            ]
+        }
+    }
+}
