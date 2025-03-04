@@ -161,6 +161,17 @@ async def generate_workflow(request: WorkflowGenerationRequest) -> Dict[str, Any
     """Generate a workflow definition using AI."""
     response = ""
     try:
+        # Get all available node types dynamically
+        from .node_management import get_node_types
+        available_node_types = await get_node_types()
+
+        # Format node types for the prompt
+        node_types_description = "The available node types include:\n"
+        for category, nodes in available_node_types.items():
+            node_types_description += f"\n{category}:\n"
+            for node in nodes:
+                node_types_description += f"- {node['name']}: {node['config']['title']}\n"
+
         # Prepare system message with workflow creation instructions
         system_message = """You are an AI workflow architect expert. Your task is to create a complete workflow definition based on the user's requirements.
 
@@ -180,7 +191,7 @@ Here's an example of a workflow that summarizes articles or papers and posts the
           "blogpost_url": "string",
           "paper_pdf_file": "string"
         },
-        "output_json_schema": "{\\"type\\": \\"object\\",\\"properties\\": {\\"blogpost_url\\": {\\"type\\": \\"string\\"},\\"paper_pdf_file\\": {\\"type\\": \\"string\\"}},\\"required\\": [\\"blogpost_url\\",\\"paper_pdf_file\\"]}",
+        "output_json_schema": "{\\"type\\":\\"object\\",\\"properties\\":{\\"blogpost_url\\":{\\"type\\":\\"string\\"},\\"paper_pdf_file\\":{\\"type\\":\\"string\\"}},\\"required\\":[\\"blogpost_url\\",\\"paper_pdf_file\\"]}",
         "has_fixed_output": false,
         "enforce_schema": false
       },
@@ -249,20 +260,16 @@ Here's an example of a workflow that summarizes articles or papers and posts the
         },
         "output_json_schema": "{...}",
         "has_fixed_output": false,
-        "llm_info": {
-          "model": "openai/chatgpt-4o-latest",
-          "max_tokens": 4096,
-          "temperature": 0.7,
-          "top_p": 0.9
+        "model": "openai/o3",
+        "instructions": "You are a skilled research assistant. Your task is to extract and summarize the key points from the provided blog post or paper. Focus on the main arguments, findings, and conclusions. Organize information clearly with bullet points or sections as appropriate.",
+        "input_mapping": {
+          "text": "{{$inputs.text}}"
         },
-        "system_message": "You are a software engineer who breaks down a technical article for colleagues to read...",
-        "user_message": "{{FirecrawlScrapeNode_1.markdown}}",
-        "few_shot_examples": null,
-        "url_variables": null
+        "temperature": 0
       },
       "coordinates": {
-        "x": 1714,
-        "y": 463.5
+        "x": 233,
+        "y": 171
       },
       "dimensions": null,
       "subworkflow": null
@@ -272,34 +279,36 @@ Here's an example of a workflow that summarizes articles or papers and posts the
     {
       "source_id": "input_node",
       "target_id": "RouterNode_1",
-      "source_handle": null,
-      "target_handle": null
+      "source_port": "parent",
+      "target_port": "parent"
+    },
+    {
+      "source_id": "RouterNode_1",
+      "target_id": "SingleLLMCallNode_1",
+      "source_port": "route1",
+      "target_port": "parent"
     }
   ]
 }
 ```
 
 Important guidelines:
-1. Always create an input_node as the first node
-2. Use appropriate node types based on the workflow purpose
-3. Ensure all nodes are properly linked
-4. Set reasonable coordinates for visual layout
-5. Provide detailed configurations for each node
-6. Return ONLY the workflow definition JSON (nodes and links) without any markdown or explanation
-7. The workflow should be fully functional and ready to use
+1. Design the workflow to accomplish the user's purpose
+2. Use the appropriate node types for specific tasks
+3. Structure your JSON response with nodes and links
+4. Include proper node configuration matching the schema
+5. Ensure each node has a unique ID
+6. Connect nodes with appropriate links
+7. Provide a logical flow from inputs to outputs
 8. Choose appropriate LLM models for any AI-related tasks
 9. Consider error handling and edge cases
+""" + f"""
+{node_types_description}
 
-The available node types include:
-- InputNode: For user inputs
-- SingleLLMCallNode: For LLM API calls
-- PythonFunctionNode: For custom Python functions
-- RouterNode: For conditional branching
-- CoalesceNode: For merging paths
-- FirecrawlScrapeNode: For web scraping
-- SlackNotifyNode: For Slack notifications
-- MarkdownNode: For displaying markdown content
-- HTTPRequestNode: For making HTTP requests
+IMPORTANT CONSTRAINTS:
+1. ONLY use the node types listed above. Do not use any other node types not included in this list.
+2. Each node must conform exactly to its schema as provided.
+3. The workflow must be valid and executable with the given node types.
 """
 
         # Prepare user message with user's requirements
