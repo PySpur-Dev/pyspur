@@ -37,17 +37,17 @@ REV_TITLE=$2
 
 # Start the necessary Docker services
 echo "Starting Docker services..."
-docker compose up -d db backend
+docker compose -f docker-compose.dev.yml up -d db backend
 
 # Wait for the database to be healthy
 echo "Waiting for the database to be healthy..."
-until docker compose exec db pg_isready -U pyspur; do
+until docker compose -f docker-compose.dev.yml exec db pg_isready -U pyspur; do
   sleep 1
 done
 
 # Run Alembic commands to generate migrations
 echo "Generating Alembic migration with rev-id: $REV_ID and rev-title: $REV_TITLE..."
-docker compose exec backend alembic revision --autogenerate -m "$REV_TITLE" --rev-id "$REV_ID"
+docker compose -f docker-compose.dev.yml exec backend alembic revision --autogenerate -m "$REV_TITLE" --rev-id "$REV_ID"
 
 # Optionally, you can apply the migration immediately
 # echo "Applying migrations..."

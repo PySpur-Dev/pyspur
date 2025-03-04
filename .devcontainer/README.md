@@ -93,12 +93,16 @@ All log commands show the last 5 minutes of logs and continue to tail new entrie
    git push origin <branch>
    ```
 
+### Troubleshooting DBs issues
 
-### Docker commands
+When modifying the DB models, one needs to be careful to not destroy the local DB due to lacking migrations.
+
+Sometimes the local dev DB gets corrupted. In such cases, assuming it does not contain production data, the quickest fix is to simply delete it and let the backend rebuild it the next time you run `docker compose up` (or `dcup`).
+
+You can do so via running
 
 ```bash
-docker compose down
-docker compose up --build
+docker volume rm pyspur_postgres_data
 ```
 
 ## Customization

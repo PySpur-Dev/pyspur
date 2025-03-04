@@ -12,6 +12,7 @@ from fastapi import (
     Query,
     UploadFile,
     status,
+    BackgroundTasks,
 )
 from sqlalchemy.orm import Session
 
@@ -24,8 +25,70 @@ from ..schemas.workflow_schemas import (
     WorkflowNodeSchema,
     WorkflowResponseSchema,
 )
+from ..schemas.pause_schemas import (
+    PausedWorkflowResponseSchema,
+    PauseHistoryResponseSchema,
+)
+from ..schemas.run_schemas import (
+    RunResponseSchema,
+    ResumeRunRequestSchema,
+)
+from .workflow_run import get_paused_workflows, get_run_pause_history, process_pause_action
 
+# Main router for workflow management
 router = APIRouter()
+
+# Paused workflow endpoints
+@router.get(
+    "/paused_workflows/",
+    response_model=List[PausedWorkflowResponseSchema],
+    description="List all paused workflows",
+    tags=["workflows"],
+)
+def list_paused_workflows(
+    page: int = Query(default=1, ge=1),
+    page_size: int = Query(default=10, ge=1, le=100),
+    db: Session = Depends(get_db),
+) -> List[PausedWorkflowResponseSchema]:
+    return get_paused_workflows(db, page, page_size)
+
+@router.get(
+    "/pause_history/{run_id}/",
+    response_model=List[PauseHistoryResponseSchema],
+    description="Get pause history for a run",
+    tags=["workflows"],
+)
+def get_pause_history(run_id: str, db: Session = Depends(get_db)) -> List[PauseHistoryResponseSchema]:
+    return get_run_pause_history(db, run_id)
+
+@router.post(
+    "/process_pause_action/{run_id}/",
+    response_model=RunResponseSchema,
+    description="Take action on a paused workflow",
+    tags=["workflows"],
+)
+def take_pause_action(
+    run_id: str,
+    action_request: ResumeRunRequestSchema,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+) -> RunResponseSchema:
+    """
+    Process an action on a paused workflow.
+
+    It allows approving, declining, or overriding a workflow that has been paused
+    for human intervention.
+
+    Args:
+        run_id: The ID of the paused run
+        action_request: The details of the action to take
+        background_tasks: FastAPI background tasks handler to resume the workflow asynchronously
+        db: Database session
+
+    Returns:
+        Information about the resumed run
+    """
+    return process_pause_action(db, run_id, action_request, background_tasks)
 
 
 def create_a_new_workflow_definition() -> WorkflowDefinitionSchema:

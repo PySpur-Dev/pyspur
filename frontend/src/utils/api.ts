@@ -6,6 +6,7 @@ import { EvalRunRequest, EvalRunResponse } from '@/types/api_types/evalSchemas'
 import { NodeTypeSchema, MinimumNodeConfigSchema } from '@/types/api_types/nodeTypeSchemas'
 import { OutputFileResponse } from '@/types/api_types/outputFileSchemas'
 import { RunResponse } from '@/types/api_types/runSchemas'
+import { PauseHistoryResponse, PausedWorkflowResponse, ResumeActionRequest } from '@/types/api_types/pausedWorkflowSchemas'
 import {
     DocumentChunkSchema,
     DocumentWithChunksSchema,
@@ -995,3 +996,61 @@ export const uploadTestFiles = async (
         throw error
     }
 }
+
+// Add new functions for paused workflows
+export const listPausedWorkflows = async (
+    page: number = 1,
+    pageSize: number = 10
+): Promise<PausedWorkflowResponse[]> => {
+    try {
+        const response = await axios.get(`${API_BASE_URL}/wf/paused_workflows/`, {
+            params: { page, page_size: pageSize },
+        });
+        return response.data;
+    } catch (error) {
+        console.error('Error listing paused workflows:', error);
+        throw error;
+    }
+}
+
+export const getPauseHistory = async (runId: string): Promise<PauseHistoryResponse[]> => {
+    try {
+        const response = await axios.get(`${API_BASE_URL}/wf/pause_history/${runId}/`);
+        return response.data;
+    } catch (error) {
+        console.error('Error getting pause history:', error);
+        throw error;
+    }
+}
+
+/**
+ * Take action on a paused workflow
+ */
+export const takePauseAction = async (
+    runId: string,
+    actionRequest: ResumeActionRequest
+): Promise<RunResponse> => {
+    try {
+        const response = await axios.post(
+            `${API_BASE_URL}/wf/process_pause_action/${runId}/`,
+            actionRequest
+        );
+        return response.data;
+    } catch (error) {
+        console.error('Error taking action on paused workflow:', error);
+        throw error;
+    }
+};
+
+/**
+ * Cancel a workflow that is awaiting human approval
+ */
+export const cancelWorkflow = async (runId: string): Promise<RunResponse> => {
+    try {
+        const response = await axios.post(`${API_BASE_URL}/wf/cancel_workflow/${runId}/`);
+        return response.data;
+    } catch (error) {
+        console.error('Error canceling workflow:', error);
+        throw error;
+    }
+};

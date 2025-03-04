@@ -1,52 +1,55 @@
-import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react'
 import {
-    ReactFlow,
     Background,
-    ReactFlowProvider,
-    Node,
+    ConnectionMode,
     Edge,
     EdgeTypes,
-    ReactFlowInstance,
-    SelectionMode,
-    ConnectionMode,
-    useReactFlow,
     getNodesBounds,
     getViewportForBounds,
+    Node,
+    ReactFlow,
+    ReactFlowInstance,
+    ReactFlowProvider,
+    SelectionMode,
+    useReactFlow,
 } from '@xyflow/react'
 import { toPng } from 'html-to-image'
+import React, { useCallback, useEffect, useMemo, useState } from 'react'
 
-import '@xyflow/react/dist/style.css'
-import { useSelector, useDispatch } from 'react-redux'
-import Operator from './footer/Operator'
-import {
-    setSelectedNode,
-    deleteNode,
-    setWorkflowInputVariable,
-    setNodes,
-} from '../../store/flowSlice'
-import { FlowWorkflowNode, FlowWorkflowEdge } from '@/types/api_types/nodeTypeSchemas'
-import NodeSidebar from '../nodes/nodeSidebar/NodeSidebar'
-import CustomEdge from './Edge'
-import HelperLinesRenderer from '../HelperLines'
-import { useModeStore } from '../../store/modeStore'
-import { initializeFlow, setNodeOutputs } from '../../store/flowSlice'
-import LoadingSpinner from '../LoadingSpinner'
+import { FlowWorkflowEdge, FlowWorkflowNode } from '@/types/api_types/nodeTypeSchemas'
 import { WorkflowDefinition } from '@/types/api_types/workflowSchemas'
 import { getLayoutedNodes } from '@/utils/nodeLayoutUtils'
+import '@xyflow/react/dist/style.css'
+import { useDispatch, useSelector } from 'react-redux'
+import { useKeyboardShortcuts } from '../../hooks/useKeyboardShortcuts'
+import {
+    deleteNode,
+    initializeFlow,
+    setNodes,
+    setSelectedNode,
+    setWorkflowInputVariable,
+    updateNodeDataOnly,
+} from '../../store/flowSlice'
+import { useModeStore } from '../../store/modeStore'
 import { RootState } from '../../store/store'
 import {
+    useAdjustGroupNodesZIndex,
+    useFlowEventHandlers,
+    useNodesWithMode,
     useNodeTypes,
     useStyledEdges,
-    useNodesWithMode,
-    useFlowEventHandlers,
-    useAdjustGroupNodesZIndex,
+    useNodesWithStatus,
 } from '../../utils/flowUtils'
-import { useKeyboardShortcuts } from '../../hooks/useKeyboardShortcuts'
+import HelperLinesRenderer from '../HelperLines'
+import LoadingSpinner from '../LoadingSpinner'
+import NodeSidebar from '../nodes/nodeSidebar/NodeSidebar'
+import CustomEdge from './Edge'
+import Operator from './footer/Operator'
+import { TaskResponse } from '@/types/api_types/taskSchemas'
 
 interface RunViewFlowCanvasProps {
     workflowData?: { name: string; definition: WorkflowDefinition }
     workflowID?: string
-    nodeOutputs?: Record<string, any>
+    tasksData?: TaskResponse[]
     onDownloadImageInit?: (handler: () => void) => void
     projectName?: string
 }
@@ -56,7 +59,13 @@ interface HelperLines {
     vertical: number | null
 }
 
-const RunViewFlowCanvasContent: React.FC<RunViewFlowCanvasProps> = ({ workflowData, workflowID, nodeOutputs, onDownloadImageInit, projectName = 'workflow' }) => {
+const RunViewFlowCanvasContent: React.FC<RunViewFlowCanvasProps> = ({
+    workflowData,
+    workflowID,
+    tasksData,
+    onDownloadImageInit,
+    projectName = 'workflow',
+}) => {
     const dispatch = useDispatch()
 
     const nodeTypesConfig = useSelector((state: RootState) => state.nodeTypes.data)
@@ -100,9 +109,42 @@ const RunViewFlowCanvasContent: React.FC<RunViewFlowCanvasProps> = ({ workflowDa
                     name: workflowData.name,
                 })
             )
-            dispatch(setNodeOutputs(nodeOutputs))
         }
     }, [dispatch, workflowData, workflowID])
+
+    // New effect to update node data after initialization
+    useEffect(() => {
+        if (tasksData && tasksData.length > 0) {
+            tasksData.forEach((task) => {
+                const nodeId = task.node_id
+                dispatch(
+                    updateNodeDataOnly({
+                        id: nodeId,
+                        data: {
+                            run: task.outputs || {},
+                            error: task.error || null,
+                            taskStatus: task.status,
+                        },
+                    })
+                )
+
+                // Handle subworkflow outputs and errors if they exist
+                if (task.subworkflow_output) {
+                    Object.entries(task.subworkflow_output).forEach(([subNodeId, outputs]) => {
+                        dispatch(
+                            updateNodeDataOnly({
+                                id: subNodeId,
+                                data: {
+                                    run: outputs,
+                                    taskStatus: 'COMPLETED',
+                                },
+                            })
+                        )
+                    })
+                }
+            })
+        }
+    }, [dispatch, tasksData])
 
     const nodes = useSelector((state: RootState) => state.flow.nodes)
     const edges = useSelector((state: RootState) => state.flow.edges)
@@ -142,6 +184,37 @@ const RunViewFlowCanvasContent: React.FC<RunViewFlowCanvasProps> = ({ workflowDa
     })
 
     const nodesWithAdjustedZIndex = useAdjustGroupNodesZIndex({ nodes: nodesWithMode })
+
+    // Add nodeOutputs map for node status tracking
+    const nodeOutputs = useMemo(() => {
+        const outputs: Record<string, any> = {};
+        if (tasksData && tasksData.length > 0) {
+            tasksData.forEach((task) => {
+                // Handle both completed tasks with outputs and paused tasks
+                if (task.outputs) {
+                    outputs[task.node_id] = task.outputs;
+                } else if (task.status === 'PAUSED') {
+                    // For paused tasks (like human intervention), create an empty output object
+                    // to indicate the node exists but is paused
+                    outputs[task.node_id] = { __paused: true };
+                }
+
+                // Include any subworkflow outputs
+                if (task.subworkflow_output) {
+                    Object.entries(task.subworkflow_output).forEach(([subNodeId, subOutput]) => {
+                        outputs[subNodeId] = subOutput;
+                    });
+                }
+            });
+        }
+        return outputs;
+    }, [tasksData]);
+
+    // Use nodeOutputs with status hook
+    const nodesWithStatus = useNodesWithStatus({
+        nodes: nodesWithAdjustedZIndex,
+        nodeOutputs
+    });
 
     const onEdgeMouseEnter = useCallback((_: React.MouseEvent, edge: Edge) => {
         setHoveredEdge(edge.id)
@@ -188,10 +261,10 @@ const RunViewFlowCanvasContent: React.FC<RunViewFlowCanvasProps> = ({ workflowDa
 
     const handleKeyDown = useCallback(
         (event: KeyboardEvent) => {
-            const target = event.target as HTMLElement;
-            const tagName = target.tagName.toLowerCase();
+            const target = event.target as HTMLElement
+            const tagName = target.tagName.toLowerCase()
             if (target.isContentEditable || tagName === 'input' || tagName === 'textarea' || tagName === 'select') {
-                return;
+                return
             }
 
             if (event.key === 'Delete' || event.key === 'Backspace') {
@@ -202,25 +275,25 @@ const RunViewFlowCanvasContent: React.FC<RunViewFlowCanvasProps> = ({ workflowDa
             }
 
             // Pan amount per keypress (adjust this value to control pan speed)
-            const BASE_PAN_AMOUNT = 15;
-            const PAN_AMOUNT = event.shiftKey ? BASE_PAN_AMOUNT * 3 : BASE_PAN_AMOUNT;
+            const BASE_PAN_AMOUNT = 15
+            const PAN_AMOUNT = event.shiftKey ? BASE_PAN_AMOUNT * 3 : BASE_PAN_AMOUNT
 
             if (reactFlowInstance) {
-                const { x, y, zoom } = reactFlowInstance.getViewport();
+                const { x, y, zoom } = reactFlowInstance.getViewport()
 
                 switch (event.key) {
                     case 'ArrowLeft':
-                        reactFlowInstance.setViewport({ x: x + PAN_AMOUNT, y, zoom });
-                        break;
+                        reactFlowInstance.setViewport({ x: x + PAN_AMOUNT, y, zoom })
+                        break
                     case 'ArrowRight':
-                        reactFlowInstance.setViewport({ x: x - PAN_AMOUNT, y, zoom });
-                        break;
+                        reactFlowInstance.setViewport({ x: x - PAN_AMOUNT, y, zoom })
+                        break
                     case 'ArrowUp':
-                        reactFlowInstance.setViewport({ x, y: y + PAN_AMOUNT, zoom });
-                        break;
+                        reactFlowInstance.setViewport({ x, y: y + PAN_AMOUNT, zoom })
+                        break
                     case 'ArrowDown':
-                        reactFlowInstance.setViewport({ x, y: y - PAN_AMOUNT, zoom });
-                        break;
+                        reactFlowInstance.setViewport({ x, y: y - PAN_AMOUNT, zoom })
+                        break
                 }
             }
         },
@@ -268,7 +341,7 @@ const RunViewFlowCanvasContent: React.FC<RunViewFlowCanvasProps> = ({ workflowDa
             imageHeight,
             optimalZoom,
             optimalZoom,
-            Math.min(boundsWidth, boundsHeight) * 0.05  // Reduced padding from 10% to 5%
+            Math.min(boundsWidth, boundsHeight) * 0.05 // Reduced padding from 10% to 5%
         )
 
         toPng(document.querySelector('.react-flow__viewport'), {
@@ -319,7 +392,7 @@ const RunViewFlowCanvasContent: React.FC<RunViewFlowCanvasProps> = ({ workflowDa
                 >
                     <ReactFlow
                         key={`flow-${workflowID}`}
-                        nodes={nodesWithAdjustedZIndex}
+                        nodes={nodesWithStatus}
                         edges={styledEdges}
                         onNodesChange={onNodesChange}
                         onEdgesChange={onEdgesChange}
@@ -359,7 +432,11 @@ const RunViewFlowCanvasContent: React.FC<RunViewFlowCanvasProps> = ({ workflowDa
                                 vertical={helperLines.vertical}
                             />
                         )}
-                        <Operator key="operator" handleLayout={handleLayout} handleDownloadImage={handleDownloadImage} />
+                        <Operator
+                            key="operator"
+                            handleLayout={handleLayout}
+                            handleDownloadImage={handleDownloadImage}
+                        />
                     </ReactFlow>
                 </div>
                 {selectedNodeID && (
@@ -375,14 +452,20 @@ const RunViewFlowCanvasContent: React.FC<RunViewFlowCanvasProps> = ({ workflowDa
     )
 }
 
-const RunViewFlowCanvas: React.FC<RunViewFlowCanvasProps> = ({ workflowData, workflowID, nodeOutputs, onDownloadImageInit, projectName }) => {
+const RunViewFlowCanvas: React.FC<RunViewFlowCanvasProps> = ({
+    workflowData,
+    workflowID,
+    tasksData,
+    onDownloadImageInit,
+    projectName,
+}) => {
     return (
         <ReactFlowProvider>
             <RunViewFlowCanvasContent
                 key={`flow-content-${workflowID}`}
                 workflowData={workflowData}
                 workflowID={workflowID}
-                nodeOutputs={nodeOutputs}
+                tasksData={tasksData}
                 onDownloadImageInit={onDownloadImageInit}
                 projectName={projectName}
             />

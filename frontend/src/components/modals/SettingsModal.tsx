@@ -1,25 +1,18 @@
-'use client'
-
 import type { CardProps, SwitchProps } from '@heroui/react'
 import React, { useState, useEffect } from 'react'
 import {
     Card,
     CardBody,
     CardFooter,
-    Tabs,
-    Tab,
     Modal,
     ModalContent,
     ModalHeader,
     ModalBody,
     Button,
-    useDisclosure,
     Input,
     extendVariants,
     Switch,
     cn,
-    Divider,
-    ScrollShadow,
     Accordion,
     AccordionItem,
 } from '@heroui/react'
@@ -355,81 +348,67 @@ const APIKeys = (props: CardProps): React.ReactElement => {
     )
 }
 
-// Main SettingsModal Component
-const SettingsModal = (props: CardProps): JSX.Element => {
-    const { isOpen, onOpen, onOpenChange } = useDisclosure()
+interface SettingsModalProps {
+    isOpen: boolean
+    onOpenChange: (isOpen: boolean) => void
+}
+
+const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onOpenChange }) => {
+    const [activeTab, setActiveTab] = React.useState<'appearance' | 'api-keys'>('appearance')
     const { theme, setTheme } = useTheme()
 
     return (
-        <>
-            <Button onPress={onOpen} variant="light" isIconOnly>
-                <Icon className="text-default-500" icon="solar:settings-linear" width={24} />
-            </Button>
-
-            <Modal
-                isOpen={isOpen}
-                onOpenChange={onOpenChange}
-                size="2xl"
-                scrollBehavior="inside"
-                classNames={{
-                    base: 'max-h-[90vh]',
-                    body: 'p-0',
-                }}
-            >
-                <ModalContent>
-                    {(onClose) => (
-                        <>
-                            <ModalHeader className="flex flex-col gap-1">Settings</ModalHeader>
-                            <ModalBody>
-                                <Tabs
-                                    classNames={{
-                                        tabList: 'mx-4 mt-2',
-                                        panel: 'px-4 py-2',
-                                        cursor: 'bg-primary/20',
-                                        tab: 'max-w-fit px-4 h-10 data-[selected=true]:text-primary data-[selected=true]:font-medium',
-                                        tabContent: 'group-data-[selected=true]:text-primary',
-                                    }}
+        <Modal isOpen={isOpen} onOpenChange={onOpenChange} size="2xl" scrollBehavior="inside">
+            <ModalContent>
+                {() => (
+                    <>
+                        <ModalHeader>Settings</ModalHeader>
+                        <ModalBody>
+                            <div className="flex items-center gap-4 px-4">
+                                <button
+                                    className={`px-3 py-2 ${
+                                        activeTab === 'appearance' ? 'font-semibold text-primary' : ''
+                                    }`}
+                                    onClick={() => setActiveTab('appearance')}
                                 >
-                                    <Tab
-                                        key="appearance"
-                                        title={
-                                            <div className="flex items-center gap-2">
-                                                <Icon icon="solar:palette-bold" width={20} />
-                                                <span>Appearance</span>
-                                            </div>
-                                        }
-                                    >
-                                        <Card className="border-none shadow-none bg-transparent">
-                                            <CardBody>
-                                                <SwitchCell
-                                                    label="Dark Mode"
-                                                    description="Toggle between light and dark theme"
-                                                    isSelected={theme === 'dark'}
-                                                    onValueChange={(isSelected) =>
-                                                        setTheme(isSelected ? 'dark' : 'light')
-                                                    }
-                                                />
-                                            </CardBody>
-                                        </Card>
-                                    </Tab>
-                                    <Tab
-                                        key="api-keys"
-                                        title={
-                                            <div className="flex items-center gap-2">
-                                                <Icon icon="solar:key-minimalistic-bold" width={20} />
-                                                <span>API Keys</span>
-                                            </div>
-                                        }
-                                    >
-                                        <APIKeys className="border-none shadow-none bg-transparent" />
-                                    </Tab>
-                                </Tabs>
-                            </ModalBody>
-                        </>
-                    )}
-                </ModalContent>
-            </Modal>
-        </>
+                                    <Icon icon="solar:palette-bold" width={20} /> Appearance
+                                </button>
+                                <button
+                                    className={`px-3 py-2 ${
+                                        activeTab === 'api-keys' ? 'font-semibold text-primary' : ''
+                                    }`}
+                                    onClick={() => setActiveTab('api-keys')}
+                                >
+                                    <Icon icon="solar:key-minimalistic-bold" width={20} /> API Keys
+                                </button>
+                            </div>
+
+                            {/* Only render the selected tab's content */}
+                            {activeTab === 'appearance' && (
+                                <div className="px-4 py-4">
+                                    <Card className="border-none shadow-none bg-transparent">
+                                        <CardBody>
+                                            <SwitchCell
+                                                label="Dark Mode"
+                                                description="Toggle between light and dark theme"
+                                                isSelected={theme === 'dark'}
+                                                onValueChange={(isSelected) => setTheme(isSelected ? 'dark' : 'light')}
+                                            />
+                                        </CardBody>
+                                    </Card>
+                                </div>
+                            )}
+                            {activeTab === 'api-keys' && (
+                                <div className="px-4 py-4">
+                                    <APIKeys className="border-none shadow-none bg-transparent" />
+                                </div>
+                            )}
+                        </ModalBody>
+                    </>
+                )}
+            </ModalContent>
+        </Modal>
+
     )
 }
 

@@ -1,7 +1,7 @@
 import { WorkflowVersionResponse } from './workflowSchemas'
 import { TaskResponse } from './taskSchemas'
 
-export type RunStatus = 'PENDING' | 'RUNNING' | 'COMPLETED' | 'FAILED' | 'CANCELLED'
+export type RunStatus = 'PENDING' | 'RUNNING' | 'COMPLETED' | 'FAILED' | 'CANCELLED' | 'PAUSED'
 
 export interface StartRunRequest {
     initial_inputs?: Record<string, Record<string, any>>

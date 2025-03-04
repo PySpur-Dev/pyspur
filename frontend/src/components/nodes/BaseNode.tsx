@@ -20,7 +20,6 @@ import NodeErrorDisplay from './NodeErrorDisplay'
 import NodeOutputDisplay from './NodeOutputDisplay'
 import { debounce } from 'lodash'
 
-const PUBLIC_URL = typeof window !== 'undefined' ? `http://${window.location.host}/` : 'http://localhost:6080/'
 
 export interface BaseNodeProps {
     isCollapsed: boolean
@@ -307,6 +306,9 @@ const BaseNode: React.FC<BaseNodeProps> = ({
             break
         case 'CANCELED':
             outlineColor = 'gray'
+            break
+        case 'PAUSED':
+            outlineColor = 'orange'
             break
         default:
             if (status === 'completed') {
@@ -603,7 +605,7 @@ const BaseNode: React.FC<BaseNodeProps> = ({
                                         <div style={{ display: 'flex', alignItems: 'center' }}>
                                             {data.logo && (
                                                 <img
-                                                    src={`${PUBLIC_URL}` + data.logo}
+                                                    src={data.logo}
                                                     alt="Node Logo"
                                                     className="mr-2 max-h-8 max-w-8 mb-3"
                                                 />

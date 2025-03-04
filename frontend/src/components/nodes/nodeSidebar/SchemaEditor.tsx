@@ -1,6 +1,7 @@
-import { Button, Chip, Input, Select, SelectItem, Tooltip } from '@heroui/react'
+import { Alert, Button, Chip, Input, Select, SelectItem, Tooltip } from '@heroui/react'
 import { Icon } from '@iconify/react'
 import React, { useState } from 'react'
+import { isReservedWord } from '../../../utils/schemaValidation'
 import { convertToPythonVariableName } from '../../../utils/variableNameUtils'
 
 export interface SchemaEditorProps {
@@ -601,6 +602,7 @@ const SchemaEditor: React.FC<SchemaEditorProps> = ({
 }) => {
     const [newKey, setNewKey] = useState<string>('')
     const [newType, setNewType] = useState<string>(availableFields[0])
+    const [error, setError] = useState<string>('')
 
     // New utility function to generate default schema structures
     const getDefaultSchemaForType = (type: string) => {
@@ -729,8 +731,19 @@ const SchemaEditor: React.FC<SchemaEditorProps> = ({
 
     const handleAddKey = (): void => {
         const validatedKey = convertToPythonVariableName(newKey)
-        if (schemaForEditing.properties.hasOwnProperty(validatedKey)) return
 
+        // Check if the key is a reserved word
+        if (isReservedWord(validatedKey)) {
+            setError(`"${validatedKey}" is a Python reserved word and cannot be used as a field name`)
+            return
+        }
+
+        if (schemaForEditing.properties.hasOwnProperty(validatedKey)) {
+            setError(`Field name "${validatedKey}" already exists`)
+            return
+        }
+
+        setError('') // Clear any previous errors
         const newField = getDefaultSchemaForType(newType)
         const updatedProperties = {
             ...schemaForEditing.properties,
@@ -947,64 +960,74 @@ const SchemaEditor: React.FC<SchemaEditorProps> = ({
             onDrop={handleDropOnRoot}
         >
             {!readOnly && (
-                <div className="mb-4 flex items-center space-x-4">
-                    <Input
-                        type="text"
-                        value={newKey}
-                        onChange={(e) => setNewKey(convertToPythonVariableName(e.target.value))}
-                        onBlur={(e) => setNewKey(convertToPythonVariableName(e.target.value))}
-                        placeholder={getPlaceholderExample()}
-                        label="Name"
-                        disabled={readOnly}
-                        onKeyDown={(e) => {
-                            if (e.key === 'Enter' && !readOnly && newKey) {
-                                e.currentTarget.blur()
-                                handleAddKey()
-                            }
-                        }}
-                        className="p-2 flex-grow w-2/3"
-                    />
-                    <Select
-                        selectedKeys={[newType]}
-                        onChange={(e) => setNewType(e.target.value)}
-                        disabled={readOnly}
-                        label="Type"
-                        className="w-32"
-                        isMultiline={true}
-                        aria-label="New field type"
-                        renderValue={(items) => (
-                            <div className="flex flex-wrap gap-1">
-                                {items.map((item) => (
-                                    <Chip key={item.key} size="sm">
-                                        {item.textValue}
-                                    </Chip>
-                                ))}
-                            </div>
-                        )}
-                    >
-                        {availableFields.map((field) => (
-                            <SelectItem
-                                key={field}
-                                value={field}
-                                classNames={{
-                                    title: 'w-full whitespace-normal break-words',
-                                }}
-                            >
-                                {field}
-                            </SelectItem>
-                        ))}
-                    </Select>
-                    <Button
-                        isIconOnly
-                        radius="full"
-                        variant="light"
-                        onPress={handleAddKey}
-                        color="primary"
-                        disabled={readOnly || !newKey}
-                        aria-label="Add new field"
-                    >
-                        <Icon icon="solar:add-circle-linear" width={22} />
-                    </Button>
+                <div className="mb-4 flex flex-col space-y-2">
+                    {error && (
+                        <Alert color="danger" className="mb-2">
+                            {error}
+                        </Alert>
+                    )}
+                    <div className="flex items-center space-x-4">
+                        <Input
+                            type="text"
+                            value={newKey}
+                            onChange={(e) => {
+                                setNewKey(convertToPythonVariableName(e.target.value))
+                                setError('') // Clear error when input changes
+                            }}
+                            onBlur={(e) => setNewKey(convertToPythonVariableName(e.target.value))}
+                            placeholder={getPlaceholderExample()}
+                            label="Name"
+                            disabled={readOnly}
+                            onKeyDown={(e) => {
+                                if (e.key === 'Enter' && !readOnly && newKey) {
+                                    e.currentTarget.blur()
+                                    handleAddKey()
+                                }
+                            }}
+                            className="p-2 flex-grow w-2/3"
+                        />
+                        <Select
+                            selectedKeys={[newType]}
+                            onChange={(e) => setNewType(e.target.value)}
+                            disabled={readOnly}
+                            label="Type"
+                            className="w-32"
+                            isMultiline={true}
+                            aria-label="New field type"
+                            renderValue={(items) => (
+                                <div className="flex flex-wrap gap-1">
+                                    {items.map((item) => (
+                                        <Chip key={item.key} size="sm">
+                                            {item.textValue}
+                                        </Chip>
+                                    ))}
+                                </div>
+                            )}
+                        >
+                            {availableFields.map((field) => (
+                                <SelectItem
+                                    key={field}
+                                    value={field}
+                                    classNames={{
+                                        title: 'w-full whitespace-normal break-words',
+                                    }}
+                                >
+                                    {field}
+                                </SelectItem>
+                            ))}
+                        </Select>
+                        <Button
+                            isIconOnly
+                            radius="full"
+                            variant="light"
+                            onPress={handleAddKey}
+                            color="primary"
+                            disabled={readOnly || !newKey}
+                            aria-label="Add new field"
+                        >
+                            <Icon icon="solar:add-circle-linear" width={22} />
+                        </Button>
+                    </div>
                 </div>
             )}
             {schemaForEditing &&

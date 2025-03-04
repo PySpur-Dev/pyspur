@@ -31,7 +31,8 @@ https://github.com/user-attachments/assets/1ebf78c9-94b2-468d-bbbb-566311df16fe
 
 # 🕸️ ¿Por qué PySpur?
 
-- 🖐️ **Arrastrar y Soltar**: Construye, prueba e itera en segundos.
+- ✅ **Desarrollo Guiado por Pruebas**: Construye flujos de trabajo, ejecuta casos de prueba e itera.
+- 👤 **Humano en el Bucle**: Flujos de trabajo persistentes que esperan aprobación o rechazo humano.
 - 🔄 **Bucles**: Llamadas iterativas a herramientas con memoria.
 - 📤 **Carga de Archivos**: Sube archivos o pega URLs para procesar documentos.
 - 📋 **Salidas Estructuradas**: Editor de interfaz para esquemas JSON.
@@ -45,9 +46,7 @@ https://github.com/user-attachments/assets/1ebf78c9-94b2-468d-bbbb-566311df16fe
 
 # ⚡ Inicio Rápido
 
-## Opción A: Usando el Paquete Python `pyspur`
-
-Esta es la forma más rápida de comenzar. Se requiere Python 3.12 o superior.
+Esta es la forma más rápida de comenzar. Se requiere Python 3.11 o superior.
 
 1. **Instala PySpur:**
     ```sh
@@ -68,59 +67,20 @@ Esta es la forma más rápida de comenzar. Se requiere Python 3.12 o superior.
     Por defecto, esto iniciará la aplicación PySpur en `http://localhost:6080` utilizando una base de datos SQLite.
     Se recomienda configurar una URL de instancia de Postgres en el archivo `.env` para obtener una experiencia más estable.
 
-4. **[Opcional] Personaliza tu despliegue:**
-    Puedes personalizar tu despliegue de PySpur de dos maneras:
-
-    a. **A través de la aplicación** (Recomendado):
-       - Navega a la pestaña de API Keys en la aplicación
-       - Agrega tus claves API para varios proveedores (OpenAI, Anthropic, etc.)
-       - Los cambios se aplican inmediatamente
-
-    b. **Configuración Manual**:
-       - Edita el archivo `.env` en el directorio de tu proyecto
-       - Se recomienda configurar una base de datos Postgres en el archivo `.env` para mayor fiabilidad
-       - Reinicia la aplicación con `pyspur serve`. Agrega `--sqlite` si no estás utilizando Postgres
-
-## Opción B: Usando Docker (Recomendado para sistemas escalables y en producción)
-
-Esta es la forma recomendada para despliegues en producción:
-
-1. **Instala Docker:**
-    Primero, instala Docker siguiendo la guía oficial de instalación para tu sistema operativo:
-    - [Docker para Linux](https://docs.docker.com/engine/install/)
-    - [Docker Desktop para Mac](https://docs.docker.com/desktop/install/mac-install/)
-
-2. **Crea un Proyecto PySpur:**
-    Una vez instalado Docker, crea un nuevo proyecto PySpur con:
-    ```sh
-    curl -fsSL https://raw.githubusercontent.com/PySpur-com/pyspur/main/start_pyspur_docker.sh | bash -s pyspur-project
-    ```
-    Esto:
-    - Iniciará un nuevo proyecto PySpur en un directorio llamado `pyspur-project`
-    - Configurará los archivos de configuración necesarios
-    - Iniciará la aplicación PySpur automáticamente, respaldada por una instancia local de Postgres en Docker
-
-3. **Accede a PySpur:**
-    Ve a `http://localhost:6080` en tu navegador.
-
-4. **[Opcional] Personaliza tu despliegue:**
-    Puedes personalizar tu despliegue de PySpur de dos maneras:
-
-    a. **A través de la aplicación** (Recomendado):
-       - Navega a la pestaña de API Keys en la aplicación
-       - Agrega tus claves API para varios proveedores (OpenAI, Anthropic, etc.)
-       - Los cambios se aplican inmediatamente
-
-    b. **Configuración Manual**:
-       - Edita el archivo `.env` en el directorio de tu proyecto
-       - Reinicia los servicios con:
-         ```sh
-         docker compose up -d
-         ```
+4. **[Opcional] Configura tu entorno y añade claves API:**
+    - **A través de la interfaz de la aplicación**: Navega a la pestaña de API Keys para añadir claves de proveedores (OpenAI, Anthropic, etc.)
+    - **Configuración manual**: Edita el archivo `.env` (recomendado: configura postgres) y reinicia con `pyspur serve`
 
 ¡Eso es todo! Haz clic en "New Spur" para crear un flujo de trabajo, o comienza con una de las plantillas predefinidas.
 
 # ✨ Beneficios Principales
+
+## Puntos de Interrupción con Humano en el Bucle:
+
+Estos puntos de interrupción pausan el flujo de trabajo cuando se alcanzan y lo reanudan tan pronto como un humano lo aprueba.
+Permiten la supervisión humana para flujos de trabajo que requieren garantía de calidad: verifique las salidas críticas antes de que el flujo de trabajo continúe.
+
+https://github.com/user-attachments/assets/98cb2b4e-207c-4d97-965b-4fee47c94ce8
 
 ## Depuración a Nivel de Nodo:
 

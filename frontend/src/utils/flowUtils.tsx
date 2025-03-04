@@ -642,3 +642,55 @@ export const createThrottledPositionChange = () => {
         }
     }
 }
+
+interface NodesWithStatusOptions {
+    nodes: Node[]
+    nodeOutputs?: Record<string, any>
+}
+
+export const useNodesWithStatus = ({ nodes, nodeOutputs }: NodesWithStatusOptions) => {
+    return useMemo(() => {
+        return nodes.filter(Boolean).map((node) => {
+            const nodeTitle = node.data?.title || node.id;
+
+            // If this node already has a defined status, keep it
+            if (node.data?.taskStatus) {
+                return node;
+            }
+
+            // If node has outputs in nodeOutputs, check if it's completed or paused
+            if (nodeOutputs && nodeOutputs[nodeTitle]) {
+                // If this is a paused node (like human intervention)
+                if (nodeOutputs[nodeTitle].__paused) {
+                    return {
+                        ...node,
+                        data: {
+                            ...node.data,
+                            taskStatus: 'PAUSED',
+                            run: nodeOutputs[nodeTitle]
+                        }
+                    };
+                }
+
+                // Regular completed node
+                return {
+                    ...node,
+                    data: {
+                        ...node.data,
+                        taskStatus: 'COMPLETED',
+                        run: nodeOutputs[nodeTitle]
+                    }
+                };
+            }
+
+            // Otherwise, mark as pending
+            return {
+                ...node,
+                data: {
+                    ...node.data,
+                    taskStatus: 'PENDING'
+                }
+            };
+        });
+    }, [nodes, nodeOutputs]);
+};

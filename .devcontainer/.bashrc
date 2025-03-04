@@ -4,7 +4,7 @@ if [ -f /etc/bash_completion ]; then
 fi
 
 # Docker compose aliases
-alias dcup='docker compose up --build -d'
+alias dcup='docker compose -f docker-compose.dev.yml up --build -d'
 alias dlogb='docker logs -f pyspur-backend-1 --since 5m'
 alias dlogf='docker logs -f pyspur-frontend-1 --since 5m'
 alias dlogn='docker logs -f pyspur-nginx-1 --since 5m'

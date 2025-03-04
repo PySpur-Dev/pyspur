@@ -29,9 +29,10 @@
 
 https://github.com/user-attachments/assets/1ebf78c9-94b2-468d-bbbb-566311df16fe
 
-# 🕸️ なぜ PySpur なのか？
+# ��️ なぜ PySpur なのか？
 
-- 🖐️ **ドラッグ＆ドロップ**: 数秒で構築、テスト、反復できます。
+- ✅ **テスト駆動型**: ワークフローを構築し、テストケースを実行し、反復します。
+- 👤 **ヒューマンインザループ**: 人間の承認または拒否を待つ永続的なワークフロー。
 - 🔄 **ループ**: メモリを活用した反復的なツール呼び出し。
 - 📤 **ファイルアップロード**: ファイルのアップロードやURLの貼り付けによりドキュメントを処理します。
 - 📋 **構造化された出力**: JSONスキーマ用のUIエディタ。
@@ -45,9 +46,7 @@ https://github.com/user-attachments/assets/1ebf78c9-94b2-468d-bbbb-566311df16fe
 
 # ⚡ クイックスタート
 
-## オプション A: `pyspur` Pythonパッケージの使用
-
-これは最も迅速なスタート方法です。Python 3.12以上が必要です。
+これは最も迅速なスタート方法です。Python 3.11以上が必要です。
 
 1. **PySpurのインストール:**
     ```sh
@@ -67,57 +66,18 @@ https://github.com/user-attachments/assets/1ebf78c9-94b2-468d-bbbb-566311df16fe
     ```
     デフォルトでは、SQLiteデータベースを使用して `http://localhost:6080` でPySpurアプリが起動します。より安定した動作を求める場合は、`.env`ファイルにPostgresのインスタンスURLを設定することを推奨します。
 
-4. **[オプション] デプロイのカスタマイズ:**
-    PySpurのデプロイは以下の2通りの方法でカスタマイズできます：
-
-    a. **アプリ内から** (推奨):
-       - アプリ内の「APIキー」タブに移動する
-       - 各種プロバイダー（OpenAI、Anthropicなど）のAPIキーを追加する
-       - 変更は即座に反映される
-
-    b. **手動設定**:
-       - プロジェクトディレクトリ内の `.env` ファイルを編集する
-       - より信頼性を高めるために、`.env`でPostgresデータベースを設定することを推奨
-       - `pyspur serve` でアプリを再起動する。Postgresを使用していない場合は `--sqlite` を追加する
-
-## オプション B: Dockerの利用（スケーラブルな本番システム向けに推奨）
-
-本番環境でのデプロイにはこちらの方法を推奨します：
-
-1. **Dockerのインストール:**
-    まず、お使いのOSに合わせた公式インストールガイドに従い、Dockerをインストールしてください：
-    - [Docker for Linux](https://docs.docker.com/engine/install/)
-    - [Docker Desktop for Mac](https://docs.docker.com/desktop/install/mac-install/)
-
-2. **PySpurプロジェクトの作成:**
-    Dockerをインストールしたら、以下のコマンドで新しいPySpurプロジェクトを作成します：
-    ```sh
-    curl -fsSL https://raw.githubusercontent.com/PySpur-com/pyspur/main/start_pyspur_docker.sh | bash -s pyspur-project
-    ```
-    このコマンドは以下の処理を行います：
-    - `pyspur-project` という新しいディレクトリ内にPySpurプロジェクトを作成
-    - 必要な設定ファイルを構成
-    - ローカルのPostgres Dockerインスタンスをバックエンドに、PySpurアプリを自動で起動
-
-3. **PySpurへのアクセス:**
-    ブラウザで `http://localhost:6080` にアクセスしてください。
-
-4. **[オプション] デプロイのカスタマイズ:**
-    a. **アプリ内から** (推奨):
-       - アプリ内の「APIキー」タブに移動する
-       - 各種プロバイダー（OpenAI、Anthropicなど）のAPIキーを追加する
-       - 変更は即座に反映される
-
-    b. **手動設定**:
-       - プロジェクトディレクトリ内の `.env` ファイルを編集する
-       - 以下のコマンドでサービスを再起動する：
-         ```sh
-         docker compose up -d
-         ```
-
-以上です！「New Spur」をクリックしてワークフローを作成するか、標準テンプレートから開始してください。
+4. **[オプション] 環境設定とAPIキーの追加:**
+    - **アプリUI**: APIキータブに移動して各プロバイダーのキー（OpenAI、Anthropicなど）を追加
+    - **手動設定**: `.env`ファイルを編集（推奨：postgresを設定）し、`pyspur serve`で再起動
 
 # ✨ 主な利点
+
+## ヒューマンインザループブレークポイント:
+
+これらのブレークポイントは到達時にワークフローを一時停止し、人間が承認するとすぐに再開します。
+品質保証が必要なワークフローに人間の監視を可能にします：ワークフローが進む前に重要な出力を検証します。
+
+https://github.com/user-attachments/assets/98cb2b4e-207c-4d97-965b-4fee47c94ce8
 
 ## ノードレベルでのデバッグ:
 

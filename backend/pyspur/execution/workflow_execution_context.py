@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Optional, Dict, Any
 
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
@@ -13,7 +13,8 @@ class WorkflowExecutionContext(BaseModel):
     run_id: str
     parent_run_id: Optional[str]
     run_type: str
-    db_session: Session
+    db_session: Optional[Session] = None
+    workflow_definition: Optional[Dict[str, Any]] = None
 
     class Config:
         arbitrary_types_allowed = True

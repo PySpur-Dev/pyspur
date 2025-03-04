@@ -376,12 +376,20 @@ async def generate_text(
             raw_response = await completion_with_backoff(**kwargs)
             response = raw_response
     else:
+        if model_name.startswith("ollama"):
+            if api_base is None:
+                api_base = os.getenv("OLLAMA_BASE_URL")
+            kwargs['api_base'] = api_base
         raw_response = await completion_with_backoff(**kwargs)
         response = raw_response
 
     # For models that don't support JSON output, wrap the response in a JSON structure
     if not supports_json:
         sanitized_response = response.replace('"', '\\"').replace("\n", "\\n")
+        if model_info and model_info.constraints.supports_reasoning:
+            separator = model_info.constraints.reasoning_separator
+            sanitized_response = re.sub(separator, '', sanitized_response, flags=re.DOTALL)
+
         # Check for provider-specific fields
         if hasattr(raw_response, "choices") and len(raw_response.choices) > 0:
             if hasattr(raw_response.choices[0].message, "provider_specific_fields"):

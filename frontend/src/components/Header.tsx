@@ -32,7 +32,7 @@ import ConfirmationModal from './modals/ConfirmationModal'
 import DeployModal from './modals/DeployModal'
 import HelpModal from './modals/HelpModal'
 import RunModal from './modals/RunModal'
-import SettingsCard from './modals/SettingsModal'
+import SettingsModal from './modals/SettingsModal'
 
 interface HeaderProps {
     activePage: 'dashboard' | 'workflow' | 'evals' | 'trace' | 'rag'
@@ -58,6 +58,7 @@ const Header: React.FC<HeaderProps> = ({ activePage, associatedWorkflowId, runId
     const testInputs = useSelector((state: RootState) => state.flow.testInputs)
     const selectedTestInputId = useSelector((state: RootState) => state.flow.selectedTestInputId)
     const [isHelpModalOpen, setIsHelpModalOpen] = useState<boolean>(false)
+    const [isSettingsModalOpen, setIsSettingsModalOpen] = useState<boolean>(false)
     const isRunModalOpen = useSelector((state: RootState) => state.flow.isRunModalOpen)
 
     const router = useRouter()
@@ -415,7 +416,8 @@ const Header: React.FC<HeaderProps> = ({ activePage, associatedWorkflowId, runId
                                             >
                                                 {`${run.id} | ${run.status.toLowerCase()} ${
                                                     (run.status.toLowerCase() === 'running' ||
-                                                        run.status.toLowerCase() === 'pending') &&
+                                                        run.status.toLowerCase() === 'pending' ||
+                                                        run.status.toLowerCase() === 'paused') &&
                                                     run.start_time
                                                         ? `for last ${formatDistanceStrict(Date.parse(run.start_time + 'Z'), new Date(), { addSuffix: false })}`
                                                         : (run.status.toLowerCase() === 'failed' ||
@@ -535,7 +537,9 @@ const Header: React.FC<HeaderProps> = ({ activePage, associatedWorkflowId, runId
                     justify="end"
                 >
                     <NavbarItem className="hidden sm:flex">
-                        <SettingsCard />
+                        <Button isIconOnly radius="full" variant="light" onPress={() => setIsSettingsModalOpen(true)} aria-label="Settings">
+                            <Icon className="text-foreground/60" icon="solar:settings-linear" width={24} />
+                        </Button>
                     </NavbarItem>
                     <NavbarItem className="hidden sm:flex">
                         <Button
@@ -565,6 +569,7 @@ const Header: React.FC<HeaderProps> = ({ activePage, associatedWorkflowId, runId
                 testInput={testInputs.find((row) => row.id.toString() === selectedTestInputId) ?? testInputs[0]}
             />
             <HelpModal isOpen={isHelpModalOpen} onClose={() => setIsHelpModalOpen(false)} />
+            <SettingsModal isOpen={isSettingsModalOpen} onOpenChange={setIsSettingsModalOpen} />
         </>
     )
 }

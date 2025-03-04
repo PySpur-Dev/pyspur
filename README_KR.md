@@ -31,7 +31,8 @@ https://github.com/user-attachments/assets/1ebf78c9-94b2-468d-bbbb-566311df16fe
 
 # 🕸️ 왜 PySpur인가?
 
-- 🖐️ **드래그 앤 드롭**: 몇 초 안에 구축, 테스트 및 반복 진행.
+- ✅ **테스트 주도**: 워크플로우를 구축하고, 테스트 케이스를 실행하며, 반복합니다.
+- 👤 **인간 참여 루프**: 인간의 승인 또는 거부를 기다리는 지속적인 워크플로우.
 - 🔄 **루프**: 메모리를 활용한 반복적 도구 호출.
 - 📤 **파일 업로드**: 파일을 업로드하거나 URL을 붙여넣어 문서를 처리.
 - 📋 **구조화된 출력**: JSON 스키마용 UI 편집기.
@@ -45,9 +46,7 @@ https://github.com/user-attachments/assets/1ebf78c9-94b2-468d-bbbb-566311df16fe
 
 # ⚡ 빠른 시작
 
-## 옵션 A: `pyspur` 파이썬 패키지 사용
-
-시작하는 가장 빠른 방법입니다. 파이썬 3.12 이상이 필요합니다.
+시작하는 가장 빠른 방법입니다. 파이썬 3.11 이상이 필요합니다.
 
 1. **PySpur 설치:**
     ```sh
@@ -68,59 +67,18 @@ https://github.com/user-attachments/assets/1ebf78c9-94b2-468d-bbbb-566311df16fe
     기본적으로 SQLite 데이터베이스를 사용하여 `http://localhost:6080`에서 PySpur 앱이 시작됩니다.
     보다 안정적인 사용을 위해 `.env` 파일에 PostgreSQL 인스턴스 URL을 설정하는 것을 권장합니다.
 
-4. **[선택 사항] 배포 맞춤 설정:**
-    PySpur 배포는 두 가지 방법으로 맞춤 설정할 수 있습니다:
-
-    a. **앱을 통한 설정** (권장):
-       - 앱의 API 키 탭으로 이동
-       - 다양한 제공업체(OpenAI, Anthropic 등)의 API 키를 추가
-       - 변경 사항이 즉시 적용됨
-
-    b. **수동 설정:**
-       - 프로젝트 디렉토리 내의 `.env` 파일을 수정
-       - 보다 안정적인 사용을 위해 `.env` 파일에 PostgreSQL 데이터베이스 설정을 권장
-       - PostgreSQL을 사용하지 않을 경우 `--sqlite` 옵션을 추가하여 `pyspur serve` 명령어로 앱을 재시작
-
-## 옵션 B: Docker 사용 (확장 가능, 운영 환경에 적합)
-
-운영 환경 배포에 권장되는 방법입니다:
-
-1. **Docker 설치:**
-    먼저, 사용 중인 운영 체제에 맞는 공식 설치 가이드를 따라 Docker를 설치하세요:
-    - [Docker for Linux](https://docs.docker.com/engine/install/)
-    - [Docker Desktop for Mac](https://docs.docker.com/desktop/install/mac-install/)
-
-2. **PySpur 프로젝트 생성:**
-    Docker 설치 후, 다음 명령어로 새로운 PySpur 프로젝트를 생성합니다:
-    ```sh
-    curl -fsSL https://raw.githubusercontent.com/PySpur-com/pyspur/main/start_pyspur_docker.sh | bash -s pyspur-project
-    ```
-    이 명령어는:
-    - `pyspur-project`라는 새 디렉토리에서 PySpur 프로젝트를 시작하고,
-    - 필요한 구성 파일들을 설정하며,
-    - 로컬 PostgreSQL Docker 인스턴스를 백엔드로 하여 PySpur 앱을 자동으로 시작합니다.
-
-3. **PySpur 접속:**
-    브라우저에서 `http://localhost:6080`으로 접속합니다.
-
-4. **[선택 사항] 배포 맞춤 설정:**
-    PySpur 배포는 두 가지 방법으로 맞춤 설정할 수 있습니다:
-
-    a. **앱을 통한 설정** (권장):
-       - 앱의 API 키 탭으로 이동
-       - 다양한 제공업체(OpenAI, Anthropic 등)의 API 키를 추가
-       - 변경 사항이 즉시 적용됨
-
-    b. **수동 설정:**
-       - 프로젝트 디렉토리 내의 `.env` 파일을 수정
-       - 다음 명령어로 서비스를 재시작:
-         ```sh
-         docker compose up -d
-         ```
-
-이제 끝입니다! "New Spur"을 클릭하여 워크플로우를 생성하거나 기본 템플릿 중 하나로 시작하세요.
+4. **[선택 사항] 환경 구성 및 API 키 추가:**
+    - **앱 UI**: API 키 탭으로 이동하여 공급자 키(OpenAI, Anthropic 등) 추가
+    - **수동 구성**: `.env` 파일 편집(권장: postgres 구성) 후 `pyspur serve`로 재시작
 
 # ✨ 핵심 이점
+
+## 인간 참여 중단점:
+
+이러한 중단점은 도달했을 때 워크플로우를 일시 중지하고 인간이 승인하면 재개됩니다.
+품질 보증이 필요한 워크플로우에 인간의 감독을 가능하게 합니다: 워크플로우가 진행되기 전에 중요한 출력을 검증합니다.
+
+https://github.com/user-attachments/assets/98cb2b4e-207c-4d97-965b-4fee47c94ce8
 
 ## 노드 레벨에서 디버그:
 

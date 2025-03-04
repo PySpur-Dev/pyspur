@@ -22,6 +22,7 @@ class TaskStatus(PyEnum):
     COMPLETED = "COMPLETED"
     FAILED = "FAILED"
     CANCELED = "CANCELED"
+    PAUSED = "PAUSED"
 
 
 class TaskModel(BaseModel):

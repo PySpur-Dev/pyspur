@@ -31,23 +31,22 @@ https://github.com/user-attachments/assets/1ebf78c9-94b2-468d-bbbb-566311df16fe
 
 # 🕸️ Pourquoi PySpur ?
 
-- 🖐️ **Glisser-déposer** : Créez, testez et itérez en quelques secondes.
-- 🔄 **Boucles** : Appels d’outils itératifs avec mémoire.
+- ✅ **Piloté par les tests** : Construisez des workflows, exécutez des cas de test et itérez.
+- 👤 **Humain dans la boucle** : Workflows persistants qui attendent l'approbation ou le rejet humain.
+- 🔄 **Boucles** : Appels d'outils itératifs avec mémoire.
 - 📤 **Téléversement de fichiers** : Téléchargez des fichiers ou collez des URL pour traiter des documents.
-- 📋 **Sorties structurées** : Éditeur d’interface utilisateur pour les schémas JSON.
+- 📋 **Sorties structurées** : Éditeur d'interface utilisateur pour les schémas JSON.
 - 🗃️ **RAG** : Analyser, découper, intégrer et insérer ou mettre à jour des données dans une base de données vectorielle.
 - 🖼️ **Multimodal** : Support pour vidéos, images, audio, textes, code.
 - 🧰 **Outils** : Slack, Firecrawl.dev, Google Sheets, GitHub, et plus encore.
 - 🧪 **Évaluations** : Évaluez les agents sur des ensembles de données réelles.
-- 🚀 **Déploiement en un clic** : Publiez en tant qu’API et intégrez-le où vous le souhaitez.
+- 🚀 **Déploiement en un clic** : Publiez en tant qu'API et intégrez-le où vous le souhaitez.
 - 🐍 **Basé sur Python** : Ajoutez de nouveaux nœuds en créant un seul fichier Python.
 - 🎛️ **Support multi-fournisseurs** : >100 fournisseurs de LLM, intégrateurs et bases de données vectorielles.
 
 # ⚡ Démarrage rapide
 
-## Option A : Utiliser le package Python `pyspur`
-
-C'est la manière la plus rapide de commencer. Python 3.12 ou une version supérieure est requis.
+C'est la manière la plus rapide de commencer. Python 3.11 ou une version supérieure est requis.
 
 1. **Installer PySpur :**
     ```sh
@@ -68,58 +67,20 @@ C'est la manière la plus rapide de commencer. Python 3.12 ou une version supér
     Par défaut, cela démarrera l'application PySpur sur `http://localhost:6080` en utilisant une base de données SQLite.
     Nous vous recommandons de configurer une URL d'instance Postgres dans le fichier `.env` pour une expérience plus stable.
 
-4. **[Optionnel] Personnaliser votre déploiement :**
-    Vous pouvez personnaliser votre déploiement PySpur de deux façons :
-
-    a. **Via l'application** (Recommandé) :
-       - Naviguez vers l'onglet des clés API dans l'application
-       - Ajoutez vos clés API pour divers fournisseurs (OpenAI, Anthropic, etc.)
-       - Les modifications prennent effet immédiatement
-
-    b. **Configuration manuelle** :
-       - Éditez le fichier `.env` dans le répertoire de votre projet
-       - Il est recommandé de configurer une base de données Postgres dans le fichier `.env` pour une meilleure fiabilité
-       - Redémarrez l'application avec `pyspur serve`. Ajoutez `--sqlite` si vous n'utilisez pas Postgres
-
-## Option B : Utiliser Docker (Recommandé pour des systèmes évolutifs en production)
-
-C'est la méthode recommandée pour les déploiements en production :
-
-1. **Installer Docker :**
-    Tout d'abord, installez Docker en suivant le guide d'installation officiel pour votre système d'exploitation :
-    - [Docker pour Linux](https://docs.docker.com/engine/install/)
-    - [Docker Desktop pour Mac](https://docs.docker.com/desktop/install/mac-install/)
-
-2. **Créer un projet PySpur :**
-    Une fois Docker installé, créez un nouveau projet PySpur avec :
-    ```sh
-    curl -fsSL https://raw.githubusercontent.com/PySpur-com/pyspur/main/start_pyspur_docker.sh | bash -s pyspur-project
-    ```
-    Cela va :
-    - Démarrer un nouveau projet PySpur dans un nouveau répertoire nommé `pyspur-project`
-    - Configurer les fichiers de configuration nécessaires
-    - Démarrer automatiquement l'application PySpur avec une instance Docker Postgres locale
-
-3. **Accéder à PySpur :**
-    Allez sur `http://localhost:6080` dans votre navigateur.
-
-4. **[Optionnel] Personnaliser votre déploiement :**
-
-    a. **Via l'application** (Recommandé) :
-       - Naviguez vers l'onglet des clés API dans l'application
-       - Ajoutez vos clés API pour divers fournisseurs (OpenAI, Anthropic, etc.)
-       - Les modifications prennent effet immédiatement
-
-    b. **Configuration manuelle** :
-       - Éditez le fichier `.env` dans le répertoire de votre projet
-       - Redémarrez les services avec :
-         ```sh
-         docker compose up -d
-         ```
+4. **[Optionnel] Configurer votre environnement et ajouter des clés API :**
+    - **Via l'interface de l'application** : Naviguez vers l'onglet des clés API pour ajouter des clés de fournisseurs (OpenAI, Anthropic, etc.)
+    - **Configuration manuelle** : Éditez le fichier `.env` (recommandé : configurez postgres) et redémarrez avec `pyspur serve`
 
 C'est tout ! Cliquez sur « New Spur » pour créer un workflow, ou commencez avec l'un des modèles de base.
 
 # ✨ Avantages principaux
+
+## Points d'arrêt avec humain dans la boucle :
+
+Ces points d'arrêt mettent en pause le flux de travail lorsqu'ils sont atteints et le reprennent dès qu'un humain l'approuve.
+Ils permettent une supervision humaine pour les flux de travail nécessitant une assurance qualité : vérifiez les sorties critiques avant que le flux de travail ne continue.
+
+https://github.com/user-attachments/assets/98cb2b4e-207c-4d97-965b-4fee47c94ce8
 
 ## Déboguer au niveau des nœuds :
 

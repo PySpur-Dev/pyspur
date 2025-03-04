@@ -42,6 +42,12 @@ export const useWorkflowExecution = ({ onAlert }: UseWorkflowExecutionProps) => 
                     setCompletionPercentage(statusResponse.percentage_complete)
                 }
 
+                // Check if any task is paused
+                const hasPausedTask = tasks.some(task => task.status === 'PAUSED')
+                const hasRunningTask = tasks.some(task => task.status === 'RUNNING')
+                const hasFailedTask = tasks.some(task => task.status === 'FAILED')
+                const hasPendingTask = tasks.some(task => task.status === 'PENDING')
+
                 if (tasks.length > 0) {
                     tasks.forEach((task) => {
                         const nodeId = task.node_id
@@ -74,7 +80,7 @@ export const useWorkflowExecution = ({ onAlert }: UseWorkflowExecutionProps) => 
                                             id: subNode.id,
                                             data: {
                                                 run: outputs,
-                                                taskStatus: 'COMPLETED', // Assuming subworkflow outputs are from completed tasks
+                                                taskStatus: 'COMPLETED',
                                             },
                                         })
                                     )
@@ -97,35 +103,37 @@ export const useWorkflowExecution = ({ onAlert }: UseWorkflowExecutionProps) => 
                     })
                 }
 
-                if (statusResponse.status !== 'RUNNING') {
-                    setIsRunning(false)
-                    setCompletionPercentage(0)
-                    // Clear all intervals
-                    statusIntervals.current.forEach((interval) => clearInterval(interval))
-                    clearInterval(currentStatusInterval)
-                    onAlert('Workflow run completed.', 'success')
-                }
-                if (
-                    statusResponse.status === 'FAILED' ||
-                    (tasks.some((task) => task.status === 'FAILED') &&
-                        !tasks.some((task) => task.status === 'RUNNING' || task.status === 'PENDING'))
-                ) {
+                // Update running state and show appropriate messages
+                if (hasPausedTask) {
+                    setIsRunning(true) // Keep running state true when paused
+                    if (!hasRunningTask) {
+                        onAlert('Workflow run paused for human intervention.', 'warning')
+                        // Stop polling when paused with no running tasks
+                        statusIntervals.current.forEach((interval) => clearInterval(interval))
+                        clearInterval(currentStatusInterval)
+                    }
+                } else if (statusResponse.status !== 'RUNNING') {
                     setIsRunning(false)
                     setCompletionPercentage(0)
                     // Clear all intervals
                     statusIntervals.current.forEach((interval) => clearInterval(interval))
                     clearInterval(currentStatusInterval)
 
-                    // Check if some tasks succeeded while others failed
-                    if (
-                        tasks.some((task) => task.status === 'COMPLETED') &&
-                        tasks.some((task) => task.status === 'FAILED')
-                    ) {
-                        onAlert('Workflow ran with some failed tasks.', 'warning')
+                    if (hasFailedTask) {
+                        if (tasks.some((task) => task.status === 'COMPLETED')) {
+                            onAlert('Workflow ran with some failed tasks.', 'warning')
+                        } else {
+                            onAlert('Workflow run failed.', 'danger')
+                        }
                     } else {
-                        onAlert('Workflow run failed.', 'danger')
+                        onAlert('Workflow run completed.', 'success')
                     }
-                    return
+                }
+
+                // Stop polling if workflow is done or fully paused
+                if (!hasRunningTask && (!hasPendingTask || hasPausedTask)) {
+                    statusIntervals.current.forEach((interval) => clearInterval(interval))
+                    clearInterval(currentStatusInterval)
                 }
             } catch (error) {
                 console.error('Error fetching workflow status:', error)

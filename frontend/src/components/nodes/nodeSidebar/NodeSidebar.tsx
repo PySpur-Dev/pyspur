@@ -46,6 +46,7 @@ import SchemaEditor from './SchemaEditor'
 import { extractSchemaFromJsonSchema, generateJsonSchemaFromSchema } from '@/utils/schemaUtils'
 import { convertToPythonVariableName } from '@/utils/variableNameUtils'
 import Ajv from 'ajv'
+import { isReservedWord } from '../../../utils/schemaValidation'
 
 // Define types for props and state
 interface NodeSidebarProps {
@@ -144,6 +145,12 @@ const validateJsonSchema = (schema: string): string | null => {
             }
         }
 
+        // Check for reserved keywords in property names
+        const reservedProps = Object.keys(parsedSchema.properties).filter((prop) => isReservedWord(prop))
+        if (reservedProps.length > 0) {
+            return `Property names [${reservedProps.join(', ')}] are Python reserved keywords and cannot be used`
+        }
+
         // Check that each property has a valid type
         const validTypes = ['string', 'number', 'integer', 'boolean', 'array', 'object', 'null']
         for (const [propName, propSchema] of Object.entries(parsedSchema.properties)) {
@@ -200,7 +207,7 @@ const isTemplateField = (key: string, fieldMetadata?: FieldMetadata): boolean =>
 
     // Check known template field names and suffixes
     const templatePatterns = ['template', 'message', 'prompt']
-    return templatePatterns.some(pattern => key === pattern || key.endsWith(pattern))
+    return templatePatterns.some((pattern) => key === pattern || key.endsWith(pattern))
 }
 
 const NodeSidebar: React.FC<NodeSidebarProps> = ({ nodeID }) => {
@@ -261,6 +268,28 @@ const NodeSidebar: React.FC<NodeSidebarProps> = ({ nodeID }) => {
                                 if (routeProperties && typeof routeProperties === 'object') {
                                     Object.keys(routeProperties).forEach((propKey) => {
                                         acc.push(`${nodeTitle}.${routeKey}.${propKey}`)
+                                    })
+                                }
+                            }
+                        })
+                    } else if (node.type === 'HumanInterventionNode') {
+                        // For HumanInterventionNode, we need to look for the input fields that are being passed through
+
+                        // Find nodes that feed into the HumanInterventionNode
+                        const humanNodeInputEdges = edges.filter((edge) => edge.target === node.id)
+                        const humanNodeInputs = humanNodeInputEdges.map((edge) => nodes.find((n) => n.id === edge.source))
+
+                        // Collect the schema from those nodes as they will be passed through
+                        humanNodeInputs.forEach(inputNode => {
+                            if (!inputNode) return
+                            const inputConfig = allNodeConfigs[inputNode.id]
+                            if (inputConfig?.output_json_schema) {
+                                const inputSchema = extractSchemaFromJsonSchema(inputConfig.output_json_schema)
+                                if (!inputSchema.error && inputSchema.schema && typeof inputSchema.schema === 'object') {
+                                    Object.keys(inputSchema.schema).forEach((key) => {
+                                        // Use the title of the predecessor node to suggest nested access, e.g., HumanInterventionNode_1.input_node.input_1
+                                        const predecessorTitle = inputNode.title || inputNode.id;
+                                        acc.push(`${nodeTitle}.${predecessorTitle}.${key}`);
                                     })
                                 }
                             }
@@ -752,11 +781,15 @@ const NodeSidebar: React.FC<NodeSidebarProps> = ({ nodeID }) => {
 
             // Use specific tooltips for well-known template fields
             if (key === 'system_message') {
-                tooltipContent = "The System Message sets the AI's behavior, role, and constraints. It's like giving the AI its job description and rules to follow. Use it to define the tone, format, and any specific requirements for the responses."
+                tooltipContent =
+                    "The System Message sets the AI's behavior, role, and constraints. It's like giving the AI its job description and rules to follow. Use it to define the tone, format, and any specific requirements for the responses."
             } else if (key === 'user_message') {
-                tooltipContent = "The User Message is your main prompt template. Use variables like {{input.variable}} to make it dynamic. This is where you specify what you want the AI to do with each input it receives."
+                tooltipContent =
+                    'The User Message is your main prompt template. Use variables like {{input.variable}} to make it dynamic. This is where you specify what you want the AI to do with each input it receives.'
             } else {
-                tooltipContent = tooltipContent || "Use variables like {{input.variable}} to make the content dynamic. This template will be rendered with data from connected nodes."
+                tooltipContent =
+                    tooltipContent ||
+                    'Use variables like {{input.variable}} to make the content dynamic. This template will be rendered with data from connected nodes.'
             }
 
             return (
@@ -786,8 +819,8 @@ const NodeSidebar: React.FC<NodeSidebarProps> = ({ nodeID }) => {
                         fieldTitle={key}
                         content={currentNodeConfig[key] || ''}
                         setContent={(value) => handleInputChange(key, value)}
-                        disableFormatting={key.endsWith('_template')}  // Disable formatting for pure template fields
-                        isTemplateEditor={true}  // This is a template editor in NodeSidebar
+                        disableFormatting={key.endsWith('_template')} // Disable formatting for pure template fields
+                        isTemplateEditor={true} // This is a template editor in NodeSidebar
                     />
                     {key === 'user_message' && renderFewShotExamples()}
                     {!isLast && <hr className="my-2" />}
@@ -1031,22 +1064,13 @@ const NodeSidebar: React.FC<NodeSidebarProps> = ({ nodeID }) => {
 
         // Prioritize system_message, user_message, and template fields to appear first
         const priorityFields = ['system_message', 'user_message']
-        const templateFields = keys.filter(key =>
-            key.includes('template') ||
-            key.includes('message') ||
-            key.includes('prompt')
-        ).filter(key => !priorityFields.includes(key))
+        const templateFields = keys
+            .filter((key) => key.includes('template') || key.includes('message') || key.includes('prompt'))
+            .filter((key) => !priorityFields.includes(key))
 
-        const remainingKeys = keys.filter((key) =>
-            !priorityFields.includes(key) &&
-            !templateFields.includes(key)
-        )
+        const remainingKeys = keys.filter((key) => !priorityFields.includes(key) && !templateFields.includes(key))
 
-        const orderedKeys = [
-            ...priorityFields.filter((key) => keys.includes(key)),
-            ...templateFields,
-            ...remainingKeys
-        ]
+        const orderedKeys = [...priorityFields.filter((key) => keys.includes(key)), ...templateFields, ...remainingKeys]
 
         return (
             <React.Fragment>
@@ -1083,8 +1107,8 @@ const NodeSidebar: React.FC<NodeSidebarProps> = ({ nodeID }) => {
                         updateNodeConfigOnly({
                             id: nodeID,
                             data: {
-                                few_shot_examples: examples
-                            }
+                                few_shot_examples: examples,
+                            },
                         })
                     )
                 }}

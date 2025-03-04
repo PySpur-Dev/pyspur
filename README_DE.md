@@ -31,7 +31,8 @@ https://github.com/user-attachments/assets/1ebf78c9-94b2-468d-bbbb-566311df16fe
 
 # 🕸️ Warum PySpur?
 
-- 🖐️ **Drag-and-Drop**: Erstellen, Testen und iteratives Anpassen in Sekunden.
+- ✅ **Testgetrieben**: Erstellen Sie Workflows, führen Sie Testfälle aus und iterieren Sie.
+- 👤 **Human in the Loop**: Persistente Workflows, die auf Genehmigung oder Ablehnung des Users warten.
 - 🔄 **Loops**: Wiederholte Toolaufrufe mit Zwischenspeicherung.
 - 📤 **Datei-Upload**: Laden Sie Dateien hoch oder fügen Sie URLs ein, um Dokumente zu verarbeiten.
 - 📋 **Strukturierte Outputs**: UI-Editor für JSON-Schemata.
@@ -45,9 +46,7 @@ https://github.com/user-attachments/assets/1ebf78c9-94b2-468d-bbbb-566311df16fe
 
 # ⚡ Schnellstart
 
-## Option A: Verwendung des `pyspur` Python-Pakets
-
-Dies ist der schnellste Weg, um loszulegen. Python 3.12 oder höher wird benötigt.
+Dies ist der schnellste Weg, um loszulegen. Python 3.11 oder höher wird benötigt.
 
 1. **PySpur installieren:**
     ```sh
@@ -68,59 +67,18 @@ Dies ist der schnellste Weg, um loszulegen. Python 3.12 oder höher wird benöti
     Standardmäßig startet dies die PySpur-App unter `http://localhost:6080` mit einer SQLite-Datenbank.
     Wir empfehlen, in der `.env`-Datei eine PostgreSQL-Instanz-URL zu konfigurieren, um eine stabilere Erfahrung zu gewährleisten.
 
-4. **[Optional] Bereitstellung anpassen:**
-    Sie können Ihre PySpur-Bereitstellung auf zwei Arten anpassen:
-
-    a. **Über die App** (Empfohlen):
-       - Navigieren Sie zum Tab „API Keys“ in der App.
-       - Fügen Sie Ihre API-Schlüssel für verschiedene Anbieter (OpenAI, Anthropic usw.) hinzu.
-       - Die Änderungen werden sofort wirksam.
-
-    b. **Manuelle Konfiguration**:
-       - Bearbeiten Sie die `.env`-Datei in Ihrem Projektverzeichnis.
-       - Es wird empfohlen, in der `.env`-Datei eine PostgreSQL-Datenbank zu konfigurieren, um mehr Zuverlässigkeit zu gewährleisten.
-       - Starten Sie die App mit `pyspur serve` neu. Fügen Sie `--sqlite` hinzu, falls Sie keine PostgreSQL verwenden.
-
-## Option B: Verwendung von Docker (Empfohlen für skalierbare, produktive Systeme)
-
-Dies ist der empfohlene Weg für produktive Bereitstellungen:
-
-1. **Docker installieren:**
-    Installieren Sie Docker, indem Sie der offiziellen Installationsanleitung für Ihr Betriebssystem folgen:
-    - [Docker for Linux](https://docs.docker.com/engine/install/)
-    - [Docker Desktop for Mac](https://docs.docker.com/desktop/install/mac-install/)
-
-2. **Ein PySpur-Projekt erstellen:**
-    Sobald Docker installiert ist, erstellen Sie ein neues PySpur-Projekt mit:
-    ```sh
-    curl -fsSL https://raw.githubusercontent.com/PySpur-com/pyspur/main/start_pyspur_docker.sh | bash -s pyspur-project
-    ```
-    Dies wird:
-    - Ein neues PySpur-Projekt in einem neuen Verzeichnis namens `pyspur-project` starten.
-    - Die notwendigen Konfigurationsdateien einrichten.
-    - Die PySpur-App automatisch starten, unterstützt durch eine lokale PostgreSQL-Docker-Instanz.
-
-3. **Auf PySpur zugreifen:**
-    Öffnen Sie `http://localhost:6080` in Ihrem Browser.
-
-4. **[Optional] Bereitstellung anpassen:**
-    Sie können Ihre PySpur-Bereitstellung auf zwei Arten anpassen:
-
-    a. **Über die App** (Empfohlen):
-       - Navigieren Sie zum Tab „API Keys“ in der App.
-       - Fügen Sie Ihre API-Schlüssel für verschiedene Anbieter (OpenAI, Anthropic usw.) hinzu.
-       - Die Änderungen werden sofort wirksam.
-
-    b. **Manuelle Konfiguration**:
-       - Bearbeiten Sie die `.env`-Datei in Ihrem Projektverzeichnis.
-       - Starten Sie die Dienste mit:
-         ```sh
-         docker compose up -d
-         ```
-
-Das war's! Klicken Sie auf „New Spur“, um einen Workflow zu erstellen, oder starten Sie mit einer der Standardvorlagen.
+4. **[Optional] Umgebung konfigurieren und API-Schlüssel hinzufügen:**
+    - **App-Oberfläche**: Navigieren Sie zum Tab „API Keys", um Anbieter-Schlüssel hinzuzufügen (OpenAI, Anthropic usw.)
+    - **Manuelle Konfiguration**: Bearbeiten Sie die `.env`-Datei (empfohlen: PostgreSQL konfigurieren) und starten Sie mit `pyspur serve` neu
 
 # ✨ Kernvorteile
+
+## Mensch-im-Regelkreis-Haltepunkte:
+
+Diese Haltepunkte pausieren den Workflow, wenn sie erreicht werden, und setzen ihn fort, sobald ein Mensch ihn genehmigt.
+Sie ermöglichen menschliche Aufsicht für Workflows, die Qualitätssicherung erfordern: Überprüfen Sie kritische Ausgaben, bevor der Workflow fortgesetzt wird.
+
+https://github.com/user-attachments/assets/98cb2b4e-207c-4d97-965b-4fee47c94ce8
 
 ## Debuggen auf Node-Ebene:
 

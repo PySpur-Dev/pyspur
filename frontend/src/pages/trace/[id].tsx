@@ -1,32 +1,31 @@
-import React, { useEffect, useState } from 'react'
-import { useRouter } from 'next/router'
 import RunViewFlowCanvas from '@/components/canvas/RunViewFlowCanvas'
-import Header from '../../components/Header'
-import { PersistGate } from 'redux-persist/integration/react'
-import { persistor } from '../../store/store'
+import { useRouter } from 'next/router'
+import React, { useEffect, useState } from 'react'
 import { useDispatch, useSelector } from 'react-redux'
+import { PersistGate } from 'redux-persist/integration/react'
+import Header from '../../components/Header'
 import LoadingSpinner from '../../components/LoadingSpinner'
-import { fetchNodeTypes } from '../../store/nodeTypesSlice'
 import { setTestInputs } from '../../store/flowSlice'
+import { fetchNodeTypes } from '../../store/nodeTypesSlice'
+import { AppDispatch, persistor, RootState } from '../../store/store'
 import { getRunStatus } from '../../utils/api'
-import { AppDispatch, RootState } from '../../store/store'
 import { rolloutWorkflowDefinition } from '../../utils/subworkflowUtils'
 
 import { RunResponse } from '@/types/api_types/runSchemas'
-import { WorkflowDefinition, WorkflowResponse } from '@/types/api_types/workflowSchemas'
+import { WorkflowDefinition } from '@/types/api_types/workflowSchemas'
 
 const TracePage: React.FC = () => {
     const dispatch = useDispatch<AppDispatch>()
     const router = useRouter()
     const { id } = router.query
     const [runData, setRunData] = useState<RunResponse | null>(null)
-    const [nodeOutputs, setNodeOutputs] = useState<Record<string, any>>({})
     const [workflowId, setWorkflowId] = useState<string | null>(null)
     const [workflowData, setWorkflowData] = useState<{
         name: string
         definition: WorkflowDefinition
     } | null>(null)
     const [handleDownloadImage, setHandleDownloadImage] = useState<(() => void) | undefined>()
+    const [tasksData, setTasksData] = useState<any[]>([])
     const projectName = useSelector((state: RootState) => state.flow.projectName)
 
     useEffect(() => {
@@ -42,14 +41,13 @@ const TracePage: React.FC = () => {
                     dispatch(setTestInputs(data.workflow_version.definition.test_inputs))
 
                     // Roll out the workflow definition if tasks are available
-                    const { rolledOutDefinition, outputs } = data.tasks
+                    const { rolledOutDefinition } = data.tasks
                         ? rolloutWorkflowDefinition({
                               workflowDefinition: data.workflow_version.definition,
                               tasks: data.tasks,
                           })
                         : {
                               rolledOutDefinition: data.workflow_version.definition,
-                              outputs: data.outputs,
                           }
 
                     setWorkflowData({
@@ -57,8 +55,9 @@ const TracePage: React.FC = () => {
                         definition: rolledOutDefinition,
                     })
 
-                    if (outputs) {
-                        setNodeOutputs(outputs)
+                    // Store tasks data to pass to RunViewFlowCanvas
+                    if (data.tasks) {
+                        setTasksData(data.tasks)
                     }
                 }
             } catch (error) {
@@ -87,8 +86,8 @@ const TracePage: React.FC = () => {
                 <div style={{ flexGrow: 1 }}>
                     <RunViewFlowCanvas
                         workflowData={workflowData}
-                        nodeOutputs={nodeOutputs}
                         workflowID={workflowId}
+                        tasksData={tasksData}
                         onDownloadImageInit={(handler) => setHandleDownloadImage(() => handler)}
                         projectName={projectName}
                     />
