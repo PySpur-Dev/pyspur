@@ -133,7 +133,7 @@ const flowSlice = createSlice({
             state.nodeTypes = action.payload.nodeTypes
             const { nodes, links } = definition
             state.nodes = nodes.map((node) => {
-                const { node: nodeObj } = createNode(
+                const result = createNode(
                     state.nodeTypes,
                     node.node_type,
                     node.id,
@@ -145,9 +145,14 @@ const flowSlice = createSlice({
                     node.dimensions,
                     node.title
                 )
+
+                if (!result) {
+                    throw new Error(`Failed to create node with type: ${node.node_type}`)
+                }
+
                 // Load the config directly from the definition instead of creating fresh
                 state.nodeConfigs[node.id] = node.config
-                return nodeObj
+                return result.node
             })
 
             let edges = links.map((link) => {
