@@ -11,6 +11,7 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
 from .api_app import api_app
+from .mcp_management import cleanup_mcp_client, initialize_mcp_client
 
 load_dotenv()
 
@@ -35,7 +36,13 @@ async def lifespan(app: FastAPI):
     if static_dir.exists():
         shutil.copytree(static_dir, temporary_static_dir, dirs_exist_ok=True)
 
+    # Initialize MCP client
+    await initialize_mcp_client()
+
     yield
+
+    # Cleanup MCP client
+    await cleanup_mcp_client()
 
     # Cleanup: Remove temporary directory and close ExitStack
     exit_stack.close()

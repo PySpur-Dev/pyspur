@@ -9,6 +9,7 @@ from .dataset_management import router as dataset_management_router
 from .evals_management import router as evals_management_router
 from .file_management import router as file_management_router
 from .key_management import router as key_management_router
+from .mcp_management import router as mcp_management_router
 from .node_management import router as node_management_router
 from .openai_compatible_api import router as openai_compatible_api_router
 from .output_file_management import router as output_file_management_router
@@ -41,3 +42,4 @@ api_app.include_router(google_auth_router, prefix="/google")
 api_app.include_router(rag_management_router, prefix="/rag")
 api_app.include_router(file_management_router, prefix="/files")
 api_app.include_router(ai_management_router, prefix="/ai")
+api_app.include_router(mcp_management_router, prefix="/mcp")
