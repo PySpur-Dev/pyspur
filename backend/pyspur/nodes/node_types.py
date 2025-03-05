@@ -47,6 +47,16 @@ SUPPORTED_NODE_TYPES = {
             "module": ".nodes.llm.generative.best_of_n",
             "class_name": "BestOfNNode",
         },
+        {
+            "node_type_name": "ToolCallNode",
+            "module": ".nodes.llm.tool_call_node",
+            "class_name": "ToolCallNode",
+        },
+        # {
+        #     "node_type_name": "LLMFunctionCallNode",
+        #     "module": ".nodes.llm.function_call_node",
+        #     "class_name": "LLMFunctionCallNode",
+        # },
     ],
     "Code Execution": [
         {
@@ -199,9 +209,7 @@ DEPRECATED_NODE_TYPES = [
 
 
 def get_all_node_types() -> Dict[str, List[NodeTypeSchema]]:
-    """
-    Returns a dictionary of all available node types grouped by category.
-    """
+    """Returns a dictionary of all available node types grouped by category."""
     node_type_groups: Dict[str, List[NodeTypeSchema]] = {}
     for group_name, node_types in SUPPORTED_NODE_TYPES.items():
         node_type_groups[group_name] = []
@@ -212,9 +220,7 @@ def get_all_node_types() -> Dict[str, List[NodeTypeSchema]]:
 
 
 def is_valid_node_type(node_type_name: str) -> bool:
-    """
-    Checks if a node type is valid (supported, deprecated, or registered via decorator).
-    """
+    """Checks if a node type is valid (supported, deprecated, or registered via decorator)."""
     # Check configured nodes first
     for node_types in SUPPORTED_NODE_TYPES.values():
         for node_type in node_types:
