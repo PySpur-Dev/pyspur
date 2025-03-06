@@ -5,9 +5,10 @@ from jinja2 import Template
 from pydantic import BaseModel, Field
 
 from ...api.mcp_management import get_mcp_client
+from ...utils.pydantic_utils import json_schema_to_model
 from ..base import BaseNode, BaseNodeConfig, BaseNodeInput, BaseNodeOutput
 from ._utils import LLMModels, ModelInfo
-from ...utils.pydantic_utils import json_schema_to_model
+
 
 class ToolCallNodeInput(BaseNodeInput):
     """Input for the MCP Tool node."""
@@ -20,6 +21,7 @@ class ToolCallNodeInput(BaseNodeInput):
 
 class ToolCallNodeOutput(BaseNodeOutput):
     """Output for the MCP Tool node."""
+
     pass
     # response: str = Field(..., description="The response from the MCP client")
 
@@ -53,12 +55,13 @@ class ToolCallNodeConfig(BaseNodeConfig):
     few_shot_examples: Optional[List[Dict[str, str]]] = None
     url_variables: Optional[Dict[str, str]] = Field(
         None,
-        description="Optional mapping of URL types (image, video, pdf) to input schema variables for Gemini models",
+        description="Optional mapping of URL types to input schema variables for Gemini models",
     )
     # tool names is enum
     # tool_names: MCPToolEnum = Field(
     #     MCPToolEnum.DEFAULT,
-    #     description="The tool names to use for this user message. If empty, all tools will be used.",
+    #     description="The tool names to use for this user message. "
+    #                   If empty, all tools will be used.",
     # )
     # has_fixed_output: bool = True
     # output_json_schema: str = Field(
@@ -133,20 +136,27 @@ class ToolCallNode(BaseNode):
                 user_message = Template(self.config.user_message).render(**raw_input_dict)
         except Exception as e:
             print(f"[ERROR] Failed to render user_message in {self.name}")
-            print(
-                f"[ERROR] user_message: {self.config.user_message} with input: {raw_input_dict}"
-            )
+            print(f"[ERROR] user_message: {self.config.user_message} with input: {raw_input_dict}")
             raise e
 
         # # Filter tools if specified in the config
         # if self.config.tool_names:
         #     client.filter_tools(self.config.tool_names)
+        # messages = create_messages(
+        #     system_message=self.config.system_message,
+        #     user_message=user_message,
+        #     few_shot_examples=self.config.few_shot_examples,
+        # )
 
         # Process the user message
-        response = await client.process_query(user_message)
-        response_dict = {
-            "output": response,
-        }
+        response_str = await client.process_query(
+            query=user_message,
+            max_tokens=self.config.llm_info.max_tokens,
+            temperature=self.config.llm_info.temperature,
+            output_json_schema=self.config.output_json_schema,
+            json_mode=True,
+        )
+        response_dict = {"output": response_str}
         # Return the response
         output = self.output_model.model_validate(response_dict)
         return output

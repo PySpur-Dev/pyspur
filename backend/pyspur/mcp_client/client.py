@@ -129,8 +129,12 @@ class MCPClient:
     async def _get_claude_response(
         self,
         messages: List[MessageParam],
-        available_tools: List[Dict[str, Any]],
         conversation_turn: int,
+        available_tools: List[Dict[str, Any]],
+        max_tokens: int = 1638,
+        temperature: float = 0.5,
+        output_json_schema: Optional[str] = None,
+        json_mode: bool = False,
     ) -> Any:
         """Get a response from Claude API."""
         try:
@@ -148,10 +152,11 @@ class MCPClient:
                     debug_messages.append(f"{msg['role']}: text")
 
             logger.info(f"Sending messages to Claude: {debug_messages}")
+            logger.info(f"Available tools: {available_tools}")
 
             response = self.anthropic.messages.create(
                 model="claude-3-5-sonnet-20241022",
-                max_tokens=1000,
+                max_tokens=max_tokens,
                 messages=messages,
                 tools=available_tools,  # type: ignore
             )
@@ -248,7 +253,14 @@ class MCPClient:
                     messages.append(tool_result_message)
                     logger.info(f"Added tool result for tool_use_id={tool_id}")
 
-    async def process_query(self, query: str) -> str:
+    async def process_query(
+        self,
+        query: str,
+        max_tokens: int = 16384,
+        temperature: float = 0.5,
+        output_json_schema: Optional[str] = None,
+        json_mode: bool = False,
+    ) -> str:
         """Process a query using Claude and available tools, supporting dependent tool calls."""
         # Initialize conversation with user query
         messages: List[MessageParam] = [{"role": "user", "content": query}]
@@ -273,7 +285,15 @@ class MCPClient:
                 logger.info(f"Message {i}: role={msg['role']}, content_type={type(msg['content'])}")
 
             # Get Claude's response
-            response = await self._get_claude_response(messages, available_tools, conversation_turn)
+            response = await self._get_claude_response(
+                messages,
+                conversation_turn,
+                available_tools,
+                max_tokens,
+                temperature,
+                output_json_schema,
+                json_mode,
+            )
 
             # Process the response content
             assistant_message, tool_called = await self._process_response_content(
