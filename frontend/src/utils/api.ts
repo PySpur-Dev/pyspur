@@ -8,6 +8,12 @@ import { OutputFileResponse } from '@/types/api_types/outputFileSchemas'
 import { RunResponse } from '@/types/api_types/runSchemas'
 import { PauseHistoryResponse, PausedWorkflowResponse, ResumeActionRequest } from '@/types/api_types/pausedWorkflowSchemas'
 import {
+    MessageGenerationRequest,
+    MessageGenerationResponse,
+    SchemaGenerationRequest,
+    SchemaGenerationResponse
+} from '@/types/api_types/aiGenerationSchemas'
+import {
     DocumentChunkSchema,
     DocumentWithChunksSchema,
     ChunkPreviewSchema,
@@ -1054,3 +1060,31 @@ export const cancelWorkflow = async (runId: string): Promise<RunResponse> => {
         throw error;
     }
 };
+
+export const generateSchema = async (
+    description: string,
+    existingSchema?: string
+): Promise<SchemaGenerationResponse> => {
+    try {
+        const response = await axios.post(`${API_BASE_URL}/ai/generate_schema/`, {
+            description,
+            existing_schema: existingSchema
+        })
+        return response.data
+    } catch (error) {
+        console.error('Error generating schema:', error)
+        throw error
+    }
+}
+
+export const generateMessage = async (
+    request: MessageGenerationRequest
+): Promise<MessageGenerationResponse> => {
+    try {
+        const response = await axios.post(`${API_BASE_URL}/ai/generate_message/`, request)
+        return response.data
+    } catch (error) {
+        console.error('Error generating message:', error)
+        throw error
+    }
+}

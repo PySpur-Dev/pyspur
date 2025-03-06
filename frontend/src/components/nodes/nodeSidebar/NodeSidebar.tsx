@@ -42,6 +42,7 @@ import TextEditor from '../../textEditor/TextEditor'
 import NodeOutput from '../NodeOutputDisplay'
 import OutputSchemaEditor from './OutputSchemaEditor'
 import SchemaEditor from './SchemaEditor'
+import MessageGenerator from './MessageGenerator'
 
 import { extractSchemaFromJsonSchema, generateJsonSchemaFromSchema } from '@/utils/schemaUtils'
 import { convertToPythonVariableName } from '@/utils/variableNameUtils'
@@ -825,18 +826,32 @@ const NodeSidebar: React.FC<NodeSidebarProps> = ({ nodeID, readOnly }) => {
                             </Tooltip>
                         )}
                     </div>
-                    <TextEditor
-                        key={`text-editor-${nodeID}-${key}`}
-                        nodeID={nodeID}
-                        fieldName={key}
-                        inputSchema={incomingSchema}
-                        fieldTitle={key}
-                        content={currentNodeConfig[key] || ''}
-                        setContent={(value) => handleInputChange(key, value)}
-                        disableFormatting={key.endsWith('_template')} // Disable formatting for pure template fields
-                        isTemplateEditor={true} // This is a template editor in NodeSidebar
-                        readOnly={readOnly} // Pass through the readOnly prop
-                    />
+                    <div className="flex flex-col gap-2">
+                        {(key === 'system_message' || key === 'user_message') && !readOnly && (
+                            <div className="flex justify-end mb-1">
+                                <MessageGenerator
+                                    nodeID={nodeID}
+                                    messageType={key === 'system_message' ? 'system' : 'user'}
+                                    currentMessage={currentNodeConfig[key] || ''}
+                                    onMessageGenerated={(newMessage) => handleInputChange(key, newMessage)}
+                                    readOnly={readOnly}
+                                    incomingSchema={incomingSchema}
+                                />
+                            </div>
+                        )}
+                        <TextEditor
+                            key={`text-editor-${nodeID}-${key}-${currentNodeConfig[key]}`}
+                            nodeID={nodeID}
+                            fieldName={key}
+                            inputSchema={incomingSchema}
+                            fieldTitle={key}
+                            content={currentNodeConfig[key] || ''}
+                            setContent={(value) => handleInputChange(key, value)}
+                            disableFormatting={key.endsWith('_template')} // Disable formatting for pure template fields
+                            isTemplateEditor={true} // This is a template editor in NodeSidebar
+                            readOnly={readOnly} // Pass through the readOnly prop
+                        />
+                    </div>
                     {key === 'user_message' && renderFewShotExamples()}
                     {!isLast && <hr className="my-2" />}
                 </div>
