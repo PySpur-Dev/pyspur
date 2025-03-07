@@ -5,26 +5,22 @@ from pydantic import BaseModel, field_validator, model_validator
 
 
 class WorkflowNodeCoordinatesSchema(BaseModel):
-    """
-    Coordinates for a node in a workflow.
-    """
+    """Coordinates for a node in a workflow."""
 
     x: float
     y: float
 
 
 class WorkflowNodeDimensionsSchema(BaseModel):
-    """
-    Dimensions for a node in a workflow.
-    """
+    """Dimensions for a node in a workflow."""
 
     width: float
     height: float
 
 
 class WorkflowNodeSchema(BaseModel):
-    """
-    A node represents a single step in a workflow.
+    """A node represents a single step in a workflow.
+
     Each node receives a dictionary mapping predecessor node IDs to their outputs.
     For dynamic schema nodes, the output schema is defined in the config dictionary.
     For static schema nodes, the output schema is defined in the node class implementation.
@@ -69,8 +65,8 @@ class WorkflowNodeSchema(BaseModel):
 
 
 class WorkflowLinkSchema(BaseModel):
-    """
-    A link simply connects a source node to a target node.
+    """A link simply connects a source node to a target node.
+
     The target node will receive the source node's output in its input dictionary.
     """
 
@@ -81,9 +77,7 @@ class WorkflowLinkSchema(BaseModel):
 
 
 class WorkflowDefinitionSchema(BaseModel):
-    """
-    A workflow is a DAG of nodes.
-    """
+    """A workflow is a graph of nodes."""
 
     nodes: List[WorkflowNodeSchema]
     links: List[WorkflowLinkSchema]
@@ -116,8 +110,8 @@ class WorkflowDefinitionSchema(BaseModel):
 
     @model_validator(mode="after")
     def validate_router_node_links(self):
-        """
-        Validates that links connected to RouterNodes have correctly formatted target handles.
+        """Ensure links connected to RouterNodes have correctly formatted target handles.
+
         For RouterNodes, the target handle should match the format: source_node_id.handle_id
         """
         for link in self.links:
@@ -142,9 +136,7 @@ class WorkflowDefinitionSchema(BaseModel):
 
 
 class WorkflowCreateRequestSchema(BaseModel):
-    """
-    A request to create a new workflow.
-    """
+    """A request to create a new workflow."""
 
     name: str
     description: str = ""
@@ -152,9 +144,7 @@ class WorkflowCreateRequestSchema(BaseModel):
 
 
 class WorkflowResponseSchema(BaseModel):
-    """
-    A response containing the details of a workflow.
-    """
+    """A response containing the details of a workflow."""
 
     id: str
     name: str
@@ -168,9 +158,7 @@ class WorkflowResponseSchema(BaseModel):
 
 
 class WorkflowVersionResponseSchema(BaseModel):
-    """
-    A response containing the details of a workflow version.
-    """
+    """A response containing the details of a workflow version."""
 
     version: int
     name: str

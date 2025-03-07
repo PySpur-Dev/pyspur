@@ -1,4 +1,4 @@
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, Type
 
 from pydantic import BaseModel, create_model
 
@@ -7,12 +7,28 @@ from ...schemas.router_schemas import (
     RouteConditionGroupSchema,
     RouteConditionRuleSchema,
 )
-from ..base import BaseNode, BaseNodeConfig, BaseNodeInput, BaseNodeOutput
+from ..base import Tool
 
 
-class RouterNodeConfig(BaseNodeConfig):
-    """Configuration for the router node."""
+class RouterNodeOutput(BaseModel):
+    """Output model for the router node."""
 
+    class Config:
+        arbitrary_types_allowed = True
+
+    pass
+
+
+class RouterNode(Tool):
+    """A routing node that directs input data to different routes
+    based on the evaluation of conditions. The first route acts as the default
+    if no other conditions match.
+    """
+
+    name: str = "router_node"
+    output_model: Type[BaseModel] = RouterNodeOutput
+
+    # Configuration fields moved from RouterNodeConfig
     route_map: Dict[str, RouteConditionGroupSchema] = {
         "route1": RouteConditionGroupSchema(
             conditions=[
@@ -23,33 +39,11 @@ class RouterNodeConfig(BaseNodeConfig):
         )
     }
 
-
-class RouterNodeInput(BaseNodeInput):
-    """Input model for the router node."""
-
-    pass
-
-
-class RouterNodeOutput(BaseNodeOutput):
-    """Output model for the router node."""
-
-    class Config:
-        arbitrary_types_allowed = True
-
-    pass
-
-
-class RouterNode(BaseNode):
-    """
-    A routing node that directs input data to different routes
-    based on the evaluation of conditions. The first route acts as the default
-    if no other conditions match.
-    """
-
-    name = "router_node"
-    display_name = "Router"
-    input_model = RouterNodeInput
-    config_model = RouterNodeConfig
+    def model_post_init(self, _: Any) -> None:
+        """Initialize after Pydantic model initialization."""
+        super().model_post_init(_)
+        # Set display name
+        self.display_name = "Router"
 
     def _evaluate_single_condition(
         self, input: BaseModel, condition: RouteConditionRuleSchema
@@ -127,8 +121,7 @@ class RouterNode(BaseNode):
         return result
 
     async def run(self, input: BaseModel) -> BaseModel:
-        """
-        Evaluates conditions for each route in order. The first route that matches
+        """Evaluates conditions for each route in order. The first route that matches
         gets the input data. If no routes match, the first route acts as a default.
         """
         output_model = create_model(
@@ -147,7 +140,7 @@ class RouterNode(BaseNode):
         # Create fields for each route with Optional[input type]
         route_fields = {
             route_name: (Optional[output_model], None)
-            for route_name in self.config.route_map.keys()
+            for route_name in self.route_map.keys()
         }
         new_output_model = create_model(
             f"{self.name}CompositeOutput",
@@ -163,7 +156,7 @@ class RouterNode(BaseNode):
 
         output: Dict[str, Optional[BaseModel]] = {}
 
-        for route_name, route in self.config.route_map.items():
+        for route_name, route in self.route_map.items():
             if self._evaluate_route_conditions(input, route):
                 output[route_name] = output_model(**input.model_dump())
 
@@ -176,13 +169,15 @@ if __name__ == "__main__":
 
     from pydantic import BaseModel
 
-    class TestInput(RouterNodeInput):
+    class TestInput(BaseModel):
         name: str
         age: int
         is_student: bool
         grade: str
 
-    config = RouterNodeConfig(
+    # Create the router node with proper configuration
+    node = RouterNode(
+        name="router_node",
         route_map={
             "route1": RouteConditionGroupSchema(
                 conditions=[
@@ -209,8 +204,6 @@ if __name__ == "__main__":
             ),
         }
     )
-
-    node = RouterNode(config=config, name="router_node")
 
     input_data = TestInput(name="Alice", age=20, is_student=True, grade="B")
     output = asyncio.run(node(input_data))

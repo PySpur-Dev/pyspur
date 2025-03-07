@@ -1,11 +1,11 @@
-from typing import Any, Dict, List, Optional, Type
+from typing import Any, Dict, List, Optional, Sequence, Type, TypeVar
 
 from pydantic import BaseModel, Field, create_model
 
+T = TypeVar("T", bound=BaseModel)
 
 def get_nested_field(field_name_with_dots: str, model: BaseModel) -> Any:
-    """
-    Get the value of a nested field from a Pydantic model.
+    """Get the value of a nested field from a Pydantic model.
     """
     field_names = field_name_with_dots.split(".")
     value = model
@@ -18,8 +18,7 @@ def get_nested_field(field_name_with_dots: str, model: BaseModel) -> Any:
 
 
 def get_jinja_template_for_model(model: BaseModel) -> str:
-    """
-    Generate a Jinja template for a Pydantic model.
+    """Generate a Jinja template for a Pydantic model.
     """
     template = "{\n"
     for field_name, _field in model.model_fields.items():
@@ -31,18 +30,19 @@ def get_jinja_template_for_model(model: BaseModel) -> str:
 def json_schema_to_model(
     json_schema: Dict[str, Any],
     model_class_name: str = "Output",
-    base_class: Type[BaseModel] = BaseModel,
-) -> Type[BaseModel]:
-    """
-    Converts a JSON schema to a Pydantic BaseModel class.
+    base_class: Type[T] = BaseModel,
+) -> Type[T]:
+    """Convert a JSON schema to a Pydantic BaseModel class.
 
     Args:
         json_schema: The JSON schema to convert.
+        model_class_name: The name of the model class.
+        base_class: The base class for the model.
 
     Returns:
         A Pydantic BaseModel class.
-    """
 
+    """
     # Extract the model name from the schema title.
     model_name = model_class_name
 
@@ -59,8 +59,7 @@ def json_schema_to_model(
 def json_schema_to_pydantic_field(
     name: str, json_schema: Dict[str, Any], required: List[str]
 ) -> Any:
-    """
-    Converts a JSON schema property to a Pydantic field definition.
+    """Converts a JSON schema property to a Pydantic field definition.
 
     Args:
         name: The field name.
@@ -68,8 +67,8 @@ def json_schema_to_pydantic_field(
 
     Returns:
         A Pydantic field definition.
-    """
 
+    """
     # Get the field type.
     type_ = json_schema_to_pydantic_type(json_schema)
 
@@ -92,16 +91,15 @@ def json_schema_to_pydantic_field(
 
 
 def json_schema_to_pydantic_type(json_schema: Dict[str, Any]) -> Any:
-    """
-    Converts a JSON schema type to a Pydantic type.
+    """Converts a JSON schema type to a Pydantic type.
 
     Args:
         json_schema: The JSON schema to convert.
 
     Returns:
         A Pydantic type.
-    """
 
+    """
     type_ = json_schema.get("type")
 
     if type_ == "string":
@@ -134,14 +132,14 @@ def json_schema_to_pydantic_type(json_schema: Dict[str, Any]) -> Any:
 
 
 def json_schema_to_simple_schema(json_schema: Dict[str, Any]) -> Dict[str, str]:
-    """
-    Converts a JSON schema to a simple schema.
+    """Converts a JSON schema to a simple schema.
 
     Args:
         json_schema: The JSON schema to convert.
 
     Returns:
         A simple schema.
+
     """
     simple_schema: Dict[str, str] = {}
 
@@ -162,3 +160,32 @@ def json_schema_to_simple_schema(json_schema: Dict[str, Any]) -> Dict[str, str]:
         else:
             simple_schema[prop] = "Any"
     return simple_schema
+
+
+def create_composite_model_instance(
+        model_name: str,
+        instances: Sequence[BaseModel],
+        base_class: Type[T] = BaseModel
+    ) -> Type[T]:
+        """Create a new Pydantic model that combines all the given models based on their instances.
+
+        Args:
+            model_name: The name of the new model.
+            instances: A sequence of Pydantic model instances.
+            base_class: The base class for the new model.
+
+        Returns:
+            A new Pydantic model with fields named after the class names of the instances.
+
+        """
+        # Create the new model class
+        return create_model(
+            model_name,
+            **{instance.__class__.__name__: (instance.__class__, ...) for instance in instances},
+            __base__=base_class,
+            __config__=None,
+            __doc__="",
+            __module__="",
+            __validators__=None,
+            __cls_kwargs__=None,
+        )
