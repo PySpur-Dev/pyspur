@@ -1,6 +1,6 @@
 import json
 import re
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Literal, Optional
 
 from fastapi import APIRouter, HTTPException
 from loguru import logger
@@ -18,7 +18,7 @@ class SchemaGenerationRequest(BaseModel):
 
 class MessageGenerationRequest(BaseModel):
     description: str
-    message_type: Literal['system', 'user']  # "system" or "user"
+    message_type: Literal["system", "user"]  # "system" or "user"
     existing_message: Optional[str] = None
     context: Optional[str] = None
     available_variables: Optional[List[str]] = None

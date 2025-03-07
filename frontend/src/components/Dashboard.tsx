@@ -154,7 +154,11 @@ const Dashboard: React.FC = () => {
                         return map
                     }
                 )
-                setWorkflows(workflows as WorkflowResponse[])
+                // Sort workflows by updated_at in descending order (newest first)
+                const sortedWorkflows = [...workflows].sort((a, b) =>
+                    new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()
+                )
+                setWorkflows(sortedWorkflows as WorkflowResponse[])
                 setShowWelcome(!hasSeenWelcome && workflows.length === 0)
                 setWorkflowRuns(runsMap)
                 setHasMoreWorkflows(workflows.length === 10)
@@ -366,7 +370,13 @@ const Dashboard: React.FC = () => {
                     }
                 )
 
-                setWorkflows((prev) => [...prev, ...moreWorkflows])
+                setWorkflows((prev) => {
+                    // Merge previous and new workflows, then sort by updated_at
+                    const combined = [...prev, ...moreWorkflows];
+                    return combined.sort((a, b) =>
+                        new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()
+                    );
+                })
                 setWorkflowRuns((prev) => ({ ...prev, ...runsMap }))
                 setWorkflowPage(nextPage)
                 setHasMoreWorkflows(moreWorkflows.length === 10)
