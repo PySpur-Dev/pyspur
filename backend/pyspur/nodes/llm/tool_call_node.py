@@ -52,6 +52,11 @@ class ToolCallNodeConfig(BaseNodeConfig):
         description="The user message for the LLM, serialized from input_schema",
     )
 
+    tool_names: Optional[List[str]] = Field(
+        None,
+        description="List of tool names to enable for this node. If None, all tools will be used.",
+    )
+
     few_shot_examples: Optional[List[Dict[str, str]]] = None
     url_variables: Optional[Dict[str, str]] = Field(
         None,
@@ -124,6 +129,13 @@ class ToolCallNode(BaseNode):
         # Get the MCP client
         client = await get_mcp_client()
 
+        # Enable specific tools if configured
+        if self.config.tool_names is not None:
+            client.filter_tools(self.config.tool_names)
+        else:
+            # Enable all tools if none specified
+            client.filter_tools()
+
         # Grab the entire dictionary from the input
         raw_input_dict = input.model_dump()
 
@@ -138,15 +150,6 @@ class ToolCallNode(BaseNode):
             print(f"[ERROR] Failed to render user_message in {self.name}")
             print(f"[ERROR] user_message: {self.config.user_message} with input: {raw_input_dict}")
             raise e
-
-        # # Filter tools if specified in the config
-        # if self.config.tool_names:
-        #     client.filter_tools(self.config.tool_names)
-        # messages = create_messages(
-        #     system_message=self.config.system_message,
-        #     user_message=user_message,
-        #     few_shot_examples=self.config.few_shot_examples,
-        # )
 
         # Process the user message
         response_str = await client.process_query(

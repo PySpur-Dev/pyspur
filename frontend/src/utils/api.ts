@@ -901,6 +901,24 @@ export const listVectorIndices = async (): Promise<VectorIndexResponseSchema[]> 
     }
 }
 
+export interface ToolListResponse {
+    available_tools: string[];
+    enabled_tools: string[];
+}
+
+export const listTools = async (): Promise<ToolListResponse> => {
+    try {
+        const response = await axios.get(`${API_BASE_URL}/mcp/tools`)
+        return {
+            available_tools: response.data.available_tools || [],
+            enabled_tools: response.data.enabled_tools || []
+        }
+    } catch (error) {
+        console.error('Error listing tools:', error)
+        throw error
+    }
+}
+
 export const getVectorIndex = async (id: string): Promise<VectorIndexResponseSchema> => {
     try {
         const response = await axios.get(`${API_BASE_URL}/rag/indices/${id}/`)

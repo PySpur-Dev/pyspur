@@ -13,6 +13,10 @@ import {
     Switch,
     Textarea,
     Tooltip,
+    Dropdown,
+    DropdownTrigger,
+    DropdownMenu,
+    DropdownItem,
 } from '@heroui/react'
 import { Icon } from '@iconify/react'
 import { cloneDeep, debounce, set } from 'lodash'
@@ -34,7 +38,7 @@ import {
 } from '../../../store/nodeTypesSlice'
 import { RootState } from '../../../store/store'
 import { FieldMetadata, ModelConstraints } from '../../../types/api_types/modelMetadataSchemas'
-import { listVectorIndices } from '../../../utils/api'
+import { listVectorIndices, listTools } from '../../../utils/api'
 import CodeEditor from '../../CodeEditor'
 import NumberInput from '../../NumberInput'
 import FewShotExamplesEditor from '../../textEditor/FewShotExamplesEditor'
@@ -242,8 +246,15 @@ const NodeSidebar: React.FC<NodeSidebarProps> = ({ nodeID, readOnly }) => {
     const [vectorIndices, setVectorIndices] = useState<VectorIndexOption[]>([])
     const [isLoadingIndices, setIsLoadingIndices] = useState(false)
 
+    // Add state for available tools
+    const [availableTools, setAvailableTools] = useState<string[]>([])
+    const [isLoadingTools, setIsLoadingTools] = useState(false)
+
     // Add this near other state variables (e.g., after currentNodeConfig state)
     const [currentModelConstraints, setCurrentModelConstraints] = useState<ModelConstraints | null>(null)
+
+    // Add state for selected tools
+    const [selectedToolKeys, setSelectedToolKeys] = useState<Set<string>>(new Set([]))
 
     const collectIncomingSchema = (nodeID: string): string[] => {
         const incomingEdges = edges.filter((edge) => edge.target === nodeID)
@@ -562,6 +573,19 @@ const NodeSidebar: React.FC<NodeSidebarProps> = ({ nodeID, readOnly }) => {
         }
     }
 
+    // Update function to fetch available tools (function calling)
+    const fetchAvailableTools = async () => {
+        try {
+            setIsLoadingTools(true)
+            const response = await listTools()
+            setAvailableTools(response.available_tools)
+        } catch (error) {
+            console.error('Error fetching available tools:', error)
+        } finally {
+            setIsLoadingTools(false)
+        }
+    }
+
     // Add effect to fetch indices when node type is RetrieverNode
     useEffect(() => {
         if (node?.type === 'RetrieverNode') {
@@ -575,6 +599,20 @@ const NodeSidebar: React.FC<NodeSidebarProps> = ({ nodeID, readOnly }) => {
             debouncedValidate(currentNodeConfig.output_json_schema)
         }
     }, [currentNodeConfig?.output_json_schema])
+
+    // Add effect to fetch tools when node type is ToolCallNode
+    useEffect(() => {
+        if (node?.type === 'ToolCallNode') {
+            fetchAvailableTools()
+        }
+    }, [node?.type])
+
+    // Add useEffect to sync selected tools with node config
+    useEffect(() => {
+        if (node?.type === 'ToolCallNode' && currentNodeConfig?.tool_names) {
+            setSelectedToolKeys(new Set(currentNodeConfig.tool_names))
+        }
+    }, [node?.type, currentNodeConfig?.tool_names])
 
     // Update renderField to handle vector index selection
     const renderField = (key: string, field: any, value: any, parentPath: string = '', isLast: boolean = false) => {
@@ -650,6 +688,65 @@ const NodeSidebar: React.FC<NodeSidebarProps> = ({ nodeID, readOnly }) => {
                     {vectorIndices.length === 0 && !isLoadingIndices && (
                         <p className="text-sm text-default-500 mt-2">
                             No vector indices available. Please create one first.
+                        </p>
+                    )}
+                    {!isLast && <hr className="my-2" />}
+                </div>
+            )
+        }
+
+        // Handle tool selection
+        if (key === 'tool_names' && node?.type === 'ToolCallNode') {
+            const selectedValue = React.useMemo(
+                () => Array.from(selectedToolKeys).join(", ") || "Select Tools",
+                [selectedToolKeys]
+            )
+
+            return (
+                <div key={key} className="my-4">
+                    <div className="flex items-center gap-2 mb-2">
+                        <h3 className="font-semibold">Available Tools</h3>
+                        <Tooltip
+                            content="Select which tools should be available for this node. If none selected, all tools will be used."
+                            placement="left-start"
+                            showArrow={true}
+                            className="max-w-xs"
+                        >
+                            <Icon
+                                icon="solar:question-circle-linear"
+                                className="text-default-400 cursor-help"
+                                width={20}
+                            />
+                        </Tooltip>
+                    </div>
+                    <Dropdown isDisabled={readOnly || isLoadingTools}>
+                        <DropdownTrigger>
+                            <Button 
+                                className="w-full justify-start text-left"
+                                variant="bordered"
+                                isDisabled={readOnly || isLoadingTools}
+                            >
+                                {isLoadingTools ? "Loading tools..." : selectedValue}
+                            </Button>
+                        </DropdownTrigger>
+                        <DropdownMenu
+                            aria-label="Select tools"
+                            closeOnSelect={false}
+                            selectedKeys={selectedToolKeys}
+                            selectionMode="multiple"
+                            onSelectionChange={(keys) => {
+                                setSelectedToolKeys(keys)
+                                handleInputChange(key, Array.from(keys))
+                            }}
+                        >
+                            {availableTools.map((tool) => (
+                                <DropdownItem key={tool}>{tool}</DropdownItem>
+                            ))}
+                        </DropdownMenu>
+                    </Dropdown>
+                    {availableTools.length === 0 && !isLoadingTools && (
+                        <p className="text-sm text-default-500 mt-2">
+                            No tools available.
                         </p>
                     )}
                     {!isLast && <hr className="my-2" />}
