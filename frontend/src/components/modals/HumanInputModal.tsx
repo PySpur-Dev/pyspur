@@ -38,15 +38,16 @@ const HumanInputModal: React.FC<HumanInputModalProps> = ({ isOpen, onClose, work
     }, [workflow]);
 
     const handleSubmit = () => {
-        // Here's the key change - we need to structure the data correctly for downstream nodes
-        // Instead of just passing inputData, we structure it to match the expected format
-        // so that HumanInterventionNode_1.input_1 can be accessed in templates
         onSubmit(action, inputData, comments)
         onClose()
     }
 
     const getInputSchema = () => {
-        const node = workflow.workflow.nodes.find(n => n.id === workflow.current_pause.node_id)
+        const workflowDef = 'definition' in workflow.workflow
+            ? workflow.workflow.definition
+            : workflow.workflow
+
+        const node = workflowDef.nodes.find(n => n.id === workflow.current_pause.node_id)
         return node?.config?.input_schema || {}
     }
 
@@ -112,7 +113,7 @@ const HumanInputModal: React.FC<HumanInputModalProps> = ({ isOpen, onClose, work
                     <div className="flex items-center gap-2 text-sm text-default-500">
                         <Chip size="sm" color="warning">Paused</Chip>
                         <span>•</span>
-                        <span>Workflow: {workflow.workflow.name}</span>
+                        <span>Workflow: {'name' in workflow.workflow ? workflow.workflow.name : 'Unnamed'}</span>
                         <span>•</span>
                         <span>Run ID: {workflow.run.id}</span>
                     </div>
@@ -166,7 +167,7 @@ const HumanInputModal: React.FC<HumanInputModalProps> = ({ isOpen, onClose, work
                             <div>
                                 <h4 className="font-medium mb-2">Required Inputs</h4>
                                 <div className="space-y-3">
-                                    {Object.entries(getInputSchema()).map(([key, type]) => renderInputField(key, type))}
+                                    {Object.entries(getInputSchema()).map(([key, type]) => renderInputField(key, type as string))}
                                 </div>
                             </div>
                         )}

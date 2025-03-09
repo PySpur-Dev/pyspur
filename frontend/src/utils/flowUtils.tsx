@@ -659,7 +659,7 @@ export const useNodesWithStatus = ({ nodes, nodeOutputs }: NodesWithStatusOption
             }
 
             // If node has outputs in nodeOutputs, check if it's completed or paused
-            if (nodeOutputs && nodeOutputs[nodeTitle]) {
+            if (nodeOutputs && typeof nodeTitle === 'string' && nodeTitle in nodeOutputs) {
                 // If this is a paused node (like human intervention)
                 if (nodeOutputs[nodeTitle].__paused) {
                     return {
