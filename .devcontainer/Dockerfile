@@ -9,10 +9,10 @@ RUN apt-get update && apt-get install -y \
     vim \
     && rm -rf /var/lib/apt/lists/*
 
-RUN pip install uv
+RUN pip install --system uv
 
 COPY backend/ backend/
-RUN uv pip install --system -e /pyspur/backend/
+RUN uv pip install --system -e "/pyspur/backend/[dev]"
 
 # Install Node.js for frontend development
 RUN curl -fsSL https://deb.nodesource.com/setup_23.x | bash - \

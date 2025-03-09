@@ -77,7 +77,10 @@
         "dev": "next dev",
         "build": "next build",
         "start": "next start",
-        "lint": "next lint"
+        "lint": "next lint",
+        "format": "prettier --write .",
+        "lint-fix": "next lint --fix",
+        "prepare": "husky install"
     },
     "eslintConfig": {
         "extends": [
@@ -106,12 +109,29 @@
         "autoprefixer": "^10.x",
         "eslint": "^8.57.1",
         "eslint-config-next": "^15.1.5",
+        "husky": "^9.1.7",
+        "lint-staged": "^15.4.3",
         "postcss": "^8.x",
         "prettier-plugin-organize-imports": "^4.1.0",
         "tailwindcss": "^3.x",
+        "tsc-files": "^1.1.4",
         "typescript": "^5.7.2"
     },
     "resolutions": {
         "@codemirror/state": "^6.2.0"
+    },
+    "lint-staged": {
+        "src/**/*.{ts,tsx}": [
+            "tsc-files --noEmit --project tsconfig.check.json",
+            "eslint --fix",
+            "prettier --write"
+        ],
+        "src/**/*.{js,jsx}": [
+            "eslint --fix",
+            "prettier --write"
+        ],
+        "*.{json,css,scss,md}": [
+            "prettier --write"
+        ]
     }
 }

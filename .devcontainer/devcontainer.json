@@ -51,6 +51,10 @@
                 "typescript.preferences.projectRoot": "/pyspur/frontend",
                 "npm.packageManager": "npm",
 
+                // Editor formatting settings
+                "editor.formatOnSave": true,
+                "editor.defaultFormatter": "esbenp.prettier-vscode",
+
                 // Language specific editor settings
                 "[python]": {
                     "editor.formatOnType": true,
@@ -59,6 +63,38 @@
                     "editor.codeActionsOnSave": {
                         "source.organizeImports": "always",
                         "source.fixAll.ruff": "always"
+                    }
+                },
+                "[typescript]": {
+                    "editor.defaultFormatter": "esbenp.prettier-vscode",
+                    "editor.formatOnSave": true,
+                    "editor.codeActionsOnSave": {
+                        "source.fixAll.eslint": "explicit",
+                        "source.organizeImports": "explicit"
+                    }
+                },
+                "[typescriptreact]": {
+                    "editor.defaultFormatter": "esbenp.prettier-vscode",
+                    "editor.formatOnSave": true,
+                    "editor.codeActionsOnSave": {
+                        "source.fixAll.eslint": "explicit",
+                        "source.organizeImports": "explicit"
+                    }
+                },
+                "[javascript]": {
+                    "editor.defaultFormatter": "esbenp.prettier-vscode",
+                    "editor.formatOnSave": true,
+                    "editor.codeActionsOnSave": {
+                        "source.fixAll.eslint": "explicit",
+                        "source.organizeImports": "explicit"
+                    }
+                },
+                "[javascriptreact]": {
+                    "editor.defaultFormatter": "esbenp.prettier-vscode",
+                    "editor.formatOnSave": true,
+                    "editor.codeActionsOnSave": {
+                        "source.fixAll.eslint": "explicit",
+                        "source.organizeImports": "explicit"
                     }
                 },
                 "[json]": {
@@ -72,14 +108,6 @@
                 "[shellscript]": {
                     "editor.formatOnSave": true,
                     "editor.defaultFormatter": "esbenp.prettier-vscode"
-                },
-                "[typescriptreact]": {
-                    "editor.defaultFormatter": "esbenp.prettier-vscode",
-                    "editor.formatOnSave": true
-                },
-                "[typescript]": {
-                    "editor.defaultFormatter": "esbenp.prettier-vscode",
-                    "editor.formatOnSave": true
                 },
                 "[yaml]": {
                     "editor.insertSpaces": true,

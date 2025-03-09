@@ -91,8 +91,6 @@ pyspur = "pyspur.cli:main"
 dev = [
     "pytest>=7.0",
     "pytest-cov>=4.0",
-    "black>=23.0",
-    "isort>=5.0",
     "ruff>=0.1.0",
 ]
 
@@ -112,6 +110,7 @@ target-version = "py312"
 [tool.ruff.lint]
 select = ["E", "F", "I", "N", "W", "B", "C", "D", "PYI"]
 ignore = [
+    "B008",  # Do not perform function call `Depends` in argument defaults
     "D100",  # Missing docstring in public module
     "D101",  # Missing docstring in public class
     "D102",  # Missing docstring in public method
