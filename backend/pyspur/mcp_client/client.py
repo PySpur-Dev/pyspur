@@ -100,9 +100,7 @@ class MCPClient:
         else:
             # Filter tools by name
             self.enabled_tools = [
-                tool
-                for tool in self.all_tools
-                if tool.name in tool_names  # type: ignore
+                tool for tool in self.all_tools if tool.name in tool_names  # type: ignore
             ]
 
         return [tool.name for tool in self.enabled_tools]  # type: ignore
@@ -169,7 +167,14 @@ class MCPClient:
             #     json.dump(messages, f, indent=2)
             raise
 
-    async def _process_tool_use(
+    async def tool_call(self, tool_name: str, tool_args: Dict[str, Any]) -> Dict[str, Any]:
+        """Call a tool."""
+        assert self.session is not None, "Session should be initialized at this point"
+        # tool_call_info = f"[Calling tool {tool_name} with args {json.dumps(tool_args, indent=2)}]"
+        # print(tool_call_info)
+        return await self.session.call_tool(tool_name, tool_args)
+
+    async def process_tool_use(
         self, content: Any, all_outputs: List[str], tool_results: Dict[str, Any]
     ) -> str:
         """Process a tool use content block and return the tool ID."""
@@ -215,7 +220,7 @@ class MCPClient:
 
             elif content.type == "tool_use":
                 tool_called = True
-                tool_id = await self._process_tool_use(content, all_outputs, tool_results)
+                tool_id = await self.process_tool_use(content, all_outputs, tool_results)
 
                 # Add the tool use to the assistant message
                 if isinstance(assistant_message["content"], list):

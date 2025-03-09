@@ -1,5 +1,5 @@
 import json
-from typing import ClassVar, Dict, List, Optional
+from typing import ClassVar, Dict, List, Optional, Any
 
 from jinja2 import Template
 from pydantic import BaseModel, Field
@@ -7,7 +7,12 @@ from pydantic import BaseModel, Field
 from ...api.mcp_management import get_mcp_client
 from ...utils.pydantic_utils import json_schema_to_model
 from ..base import BaseNode, BaseNodeConfig, BaseNodeInput, BaseNodeOutput
-from ._utils import LLMModels, ModelInfo
+from ._utils import (
+    LLMModels,
+    ModelInfo,
+    create_messages,
+    generate_text_with_tools,
+)
 
 
 class ToolCallNodeInput(BaseNodeInput):
@@ -19,19 +24,15 @@ class ToolCallNodeInput(BaseNodeInput):
         extra = "allow"
 
 
+class ToolCall(BaseModel):
+    name: str = Field(..., description="Name of the tool called")
+    arguments: Dict[str, Any] = Field(..., description="Arguments passed to the tool")
+    result: Any = Field(..., description="Result returned by the tool")
+
+
 class ToolCallNodeOutput(BaseNodeOutput):
     """Output for the MCP Tool node."""
-
     pass
-    # response: str = Field(..., description="The response from the MCP client")
-
-
-# This will be dynamically populated with available tools
-# class MCPToolEnum(str, Enum):
-#     """Enum of available MCP tools."""
-
-#     # Default value to ensure the enum is never empty
-#     DEFAULT = "get_alerts"
 
 
 class ToolCallNodeConfig(BaseNodeConfig):
@@ -58,21 +59,7 @@ class ToolCallNodeConfig(BaseNodeConfig):
     )
 
     few_shot_examples: Optional[List[Dict[str, str]]] = None
-    url_variables: Optional[Dict[str, str]] = Field(
-        None,
-        description="Optional mapping of URL types to input schema variables for Gemini models",
-    )
-    # tool names is enum
-    # tool_names: MCPToolEnum = Field(
-    #     MCPToolEnum.DEFAULT,
-    #     description="The tool names to use for this user message. "
-    #                   If empty, all tools will be used.",
-    # )
-    # has_fixed_output: bool = True
-    # output_json_schema: str = Field(
-    #     default=json.dumps(MCPToolNodeOutput.model_json_schema()),
-    #     description="The JSON schema for the output of the node",
-    # )
+
 
 
 class ToolCallNode(BaseNode):
@@ -89,32 +76,8 @@ class ToolCallNode(BaseNode):
     input_model = ToolCallNodeInput
     output_model = ToolCallNodeOutput
 
-    # Store available tools for the UI to use
     _available_tools: ClassVar[List[str]] = []
-    # _tool_enum: ClassVar[Type[Enum]] = MCPToolEnum
-
-    # def setup(self) -> None:
-    #     """Setup method to initialize the node."""
-    #     super().setup()
-
-    # @classmethod
-    # async def update_tool_enum(cls) -> Type[Enum]:
-    #     """Update the tool enum with available tools."""
-    #     try:
-    #         # Get available tools
-    #         client = await get_mcp_client()
-    #         available_tools = client.get_available_tool_names()
-
-    #         # Create a new enum with available tools
-    #         if available_tools:
-    #             enum_dict = {tool.upper().replace("-", "_"): tool for tool in available_tools}
-    #             cls._tool_enum = Enum("MCPToolEnum", enum_dict)
-
-    #         return cls._tool_enum
-    #     except Exception:
-    #         # Return the default enum if there's an error
-    #         return MCPToolEnum
-
+   
     def setup(self) -> None:
         super().setup()
         if self.config.output_json_schema:
@@ -125,8 +88,8 @@ class ToolCallNode(BaseNode):
             )  # type: ignore
 
     async def run(self, input: BaseModel) -> BaseModel:
-        """Process user message using the MCP client with the configured tools."""
-        # Get the MCP client
+        """Process user message using litellm with the configured tools."""
+        # Get the MCP client for tool definitions
         client = await get_mcp_client()
 
         # Enable specific tools if configured
@@ -135,6 +98,19 @@ class ToolCallNode(BaseNode):
         else:
             # Enable all tools if none specified
             client.filter_tools()
+
+        # Get available tools in the format litellm expects
+        tools = [
+            {
+                "type": "function",
+                "function": {
+                    "name": tool.name,
+                    "description": tool.description,
+                    "parameters": tool.inputSchema,
+                },
+            }
+            for tool in client.enabled_tools
+        ]
 
         # Grab the entire dictionary from the input
         raw_input_dict = input.model_dump()
@@ -151,24 +127,27 @@ class ToolCallNode(BaseNode):
             print(f"[ERROR] user_message: {self.config.user_message} with input: {raw_input_dict}")
             raise e
 
-        # Process the user message
-        response_str = await client.process_query(
-            query=user_message,
-            max_tokens=self.config.llm_info.max_tokens,
-            temperature=self.config.llm_info.temperature,
-            output_json_schema=self.config.output_json_schema,
-            json_mode=True,
+        # Create messages for the LLM
+        messages = create_messages(
+            system_message=self.config.system_message,
+            user_message=user_message,
+            few_shot_examples=self.config.few_shot_examples,
         )
-        response_dict = {"output": response_str}
-        # Return the response
-        output = self.output_model.model_validate(response_dict)
-        return output
 
-    # @classmethod
-    # async def get_available_tools(cls) -> List[str]:
-    #     """Get the list of available tools from the MCP client."""
-    #     try:
-    #         client = await get_mcp_client()
-    #         return client.get_available_tool_names()
-    #     except Exception:
-    #         return []
+        # Process the user message using generate_text
+        response_str = await generate_text_with_tools(
+            messages=messages,
+            model_name=self.config.llm_info.model.value,
+            temperature=self.config.llm_info.temperature or 0.7,
+            max_tokens=self.config.llm_info.max_tokens or 16384,
+            output_json_schema=self.config.output_json_schema,
+            functions=tools if tools else None,
+            function_call="auto",
+        )
+
+        # Parse the response
+        response_dict = json.loads(response_str)
+
+        # Validate and return
+        assistant_message = self.output_model.model_validate(response_dict)
+        return assistant_message
