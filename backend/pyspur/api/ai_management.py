@@ -298,7 +298,7 @@ async def generate_message(request: MessageGenerationRequest) -> Dict[str, str]:
         # Generate the message using OpenAI
         response = await generate_text(
             messages=messages,
-            model_name="openai/gpt-3.5-turbo",
+            model_name="openai/o3-mini",
             temperature=0.7,
             max_tokens=1000,
         )

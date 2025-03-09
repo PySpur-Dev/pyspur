@@ -228,13 +228,13 @@ const OutputSchemaEditor: React.FC<OutputSchemaEditorProps> = ({
 
             <Tabs
                 aria-label="Schema Editor Options"
-                disabledKeys={readOnly ? ['simple', 'json'] : error ? ['simple'] : []}
+                disabledKeys={readOnly ? ['simple', 'json'] : []}
                 selectedKey={selectedTab}
                 onSelectionChange={(key) => {
-                    if ((error && key === 'simple') || readOnly) {
-                        return // Prevent switching tabs when there are errors or in readOnly mode
+                    if (readOnly) {
+                        return; // Prevent switching in readOnly mode
                     }
-                    setSelectedTab(key as string)
+                    setSelectedTab(key as string);
                 }}
             >
                 <Tab key="simple" title="Simple Editor">

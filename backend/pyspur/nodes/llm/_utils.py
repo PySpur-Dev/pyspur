@@ -160,8 +160,7 @@ def async_retry(*dargs, **dkwargs):
     ),
 )
 async def completion_with_backoff(**kwargs) -> str:
-    """
-    Calls the LLM completion endpoint with backoff.
+    """Calls the LLM completion endpoint with backoff.
     Supports Azure OpenAI, standard OpenAI, or Ollama based on the model name.
     """
     try:
@@ -206,8 +205,7 @@ async def completion_with_backoff(**kwargs) -> str:
 
 
 def sanitize_json_schema(schema: Dict[str, Any]) -> Dict[str, Any]:
-    """
-    Makes a JSON schema compatible with the LLM providers.
+    """Makes a JSON schema compatible with the LLM providers.
     * sets "additionalProperties" to False
     * adds all properties to the "required" list recursively
     """
@@ -234,6 +232,7 @@ async def generate_text(
     output_json_schema: Optional[str] = None,
     functions: Optional[List[Dict[str, Any]]] = None,
     function_call: Optional[str] = None,
+    thinking: Optional[Dict[str, Any]] = None,
 ) -> str:
     kwargs = {
         "model": model_name,
@@ -248,11 +247,17 @@ async def generate_text(
         if function_call:
             kwargs["function_call"] = function_call
 
+    # Get model info to check capabilities
+    model_info = LLMModels.get_model_info(model_name)
+
+    # Only add thinking parameters if explicitly requested and supported by the model
+    if thinking and model_info and model_info.constraints.supports_thinking:
+        kwargs["thinking"] = thinking
+
     if model_name == "deepseek/deepseek-reasoner":
         kwargs.pop("temperature")
 
     # Get model info to check if it supports JSON output
-    model_info = LLMModels.get_model_info(model_name)
     if model_info and not model_info.constraints.supports_temperature:
         kwargs.pop("temperature", None)
     if model_info and not model_info.constraints.supports_max_tokens:
@@ -264,9 +269,7 @@ async def generate_text(
         if output_json_schema is None:
             output_json_schema = {
                 "type": "object",
-                "properties": {
-                    "output": {"type": "string"}
-                },
+                "properties": {"output": {"type": "string"}},
                 "required": ["output"],
             }
         elif output_json_schema.strip() != "":
@@ -379,7 +382,7 @@ async def generate_text(
         if model_name.startswith("ollama"):
             if api_base is None:
                 api_base = os.getenv("OLLAMA_BASE_URL")
-            kwargs['api_base'] = api_base
+            kwargs["api_base"] = api_base
         raw_response = await completion_with_backoff(**kwargs)
         response = raw_response
 
@@ -388,7 +391,7 @@ async def generate_text(
         sanitized_response = response.replace('"', '\\"').replace("\n", "\\n")
         if model_info and model_info.constraints.supports_reasoning:
             separator = model_info.constraints.reasoning_separator
-            sanitized_response = re.sub(separator, '', sanitized_response, flags=re.DOTALL)
+            sanitized_response = re.sub(separator, "", sanitized_response, flags=re.DOTALL)
 
         # Check for provider-specific fields
         if hasattr(raw_response, "choices") and len(raw_response.choices) > 0:
@@ -441,8 +444,7 @@ async def generate_text(
 def convert_output_schema_to_json_schema(
     output_schema: Dict[str, Any],
 ) -> Dict[str, Any]:
-    """
-    Convert a simple output schema to a JSON schema.
+    """Convert a simple output schema to a JSON schema.
     Simple output schema is a dictionary with field names and types.
     Types can be one of 'str', 'int', 'float' or 'bool'.
     """
@@ -478,8 +480,7 @@ async def ollama_with_backoff(
     options: Optional[OllamaOptions] = None,
     api_base: Optional[str] = None,
 ) -> str:
-    """
-    Make an async Ollama API call with exponential backoff retry logic.
+    """Make an async Ollama API call with exponential backoff retry logic.
 
     Args:
         model: The name of the Ollama model to use
@@ -491,6 +492,7 @@ async def ollama_with_backoff(
 
     Returns:
         Either a string response or a validated Pydantic model instance
+
     """
     client = AsyncClient(host=api_base)
     response = await client.chat(
@@ -503,12 +505,13 @@ async def ollama_with_backoff(
 
 
 def convert_docx_to_xml(file_path: str) -> str:
-    """
-    Convert a DOCX file to XML format.
+    """Convert a DOCX file to XML format.
+
     Args:
         file_path: Path to the DOCX file
     Returns:
         XML string representation of the DOCX file
+
     """
     try:
         with docx2python(file_path) as docx_content:

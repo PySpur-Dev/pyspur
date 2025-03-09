@@ -25,6 +25,7 @@ interface CodeEditorProps {
     mode?: 'json' | 'python' | 'javascript' // Add mode prop to determine which language to use
     readOnly?: boolean
     height?: string
+    modalSize?: 'xs' | 'sm' | 'md' | 'lg' | 'xl' | '2xl' | '3xl' | '4xl' | '5xl' | 'full' // Add modalSize prop
 }
 
 const CodeEditor: React.FC<CodeEditorProps> = ({
@@ -35,6 +36,7 @@ const CodeEditor: React.FC<CodeEditorProps> = ({
     label = 'Code Editor',
     readOnly = false,
     height = '200px',
+    modalSize = '5xl',
 }) => {
     const [value, setValue] = useState<string>('')
     const { isOpen, onOpen, onOpenChange } = useDisclosure()
@@ -157,7 +159,7 @@ const CodeEditor: React.FC<CodeEditorProps> = ({
                 className={`border ${readOnly ? 'cursor-not-allowed opacity-75' : ''}`}
                 editable={!readOnly}
             />
-            <Modal isOpen={isOpen} onOpenChange={onOpenChange} size="5xl" scrollBehavior="inside" placement="center">
+            <Modal isOpen={isOpen} onOpenChange={onOpenChange} size={modalSize} scrollBehavior="inside" placement="center">
                 <ModalContent>
                     {(onClose) => (
                         <>
@@ -165,7 +167,7 @@ const CodeEditor: React.FC<CodeEditorProps> = ({
                             <ModalBody>
                                 <CodeMirror
                                     value={modalValue}
-                                    height="60vh"
+                                    height="90vh"
                                     theme={oneDark}
                                     extensions={getExtensions()}
                                     onChange={handleModalEditorChange}

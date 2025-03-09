@@ -186,7 +186,7 @@ const RunModal: React.FC<RunModalProps> = ({ isOpen, onOpenChange, onRun, onSave
                 <div className="flex items-center gap-2">
                     <Icon icon="material-symbols:file-present" className="text-primary" />
                     <Tooltip content={content} showArrow={true}>
-                        <span className="max-w-[200px] truncate">{fileName}</span>
+                        <span className="truncate">{fileName}</span>
                     </Tooltip>
                 </div>
             )
@@ -222,7 +222,7 @@ const RunModal: React.FC<RunModalProps> = ({ isOpen, onOpenChange, onRun, onSave
         return (
             <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
                 <Tooltip content={content} showArrow={true}>
-                    <span className="max-w-[200px] truncate">{content}</span>
+                    <span className="truncate">{content}</span>
                 </Tooltip>
                 <Button isIconOnly size="sm" variant="light" onPress={() => handleDoubleClick(row.id, field)}>
                     <Icon icon="solar:pen-linear" />
@@ -311,7 +311,7 @@ const RunModal: React.FC<RunModalProps> = ({ isOpen, onOpenChange, onRun, onSave
             isOpen={isOpen}
             onOpenChange={onOpenChange}
             scrollBehavior="inside"
-            size="5xl"
+            size="full"
             classNames={{
                 base: 'overflow-hidden',
                 body: 'p-0',
@@ -327,12 +327,12 @@ const RunModal: React.FC<RunModalProps> = ({ isOpen, onOpenChange, onRun, onSave
                         )}
                         <ModalHeader className="flex flex-col gap-1">Run Test Cases</ModalHeader>
                         <ModalBody>
-                            <div className="flex flex-col gap-4 p-4 overflow-y-auto">
-                                <div className="border rounded-lg">
+                            <div className="flex flex-col gap-4 p-4 overflow-y-auto w-full">
+                                <div className="border rounded-lg w-full">
                                     <div className="p-4 border-b bg-default-50">
                                         <h3 className="text-lg font-semibold">Test Cases</h3>
                                     </div>
-                                    <div className="p-4 overflow-x-auto">
+                                    <div className="p-4 overflow-x-auto w-full">
                                         <Table
                                             aria-label="Test cases table"
                                             selectionMode="single"
@@ -345,17 +345,19 @@ const RunModal: React.FC<RunModalProps> = ({ isOpen, onOpenChange, onRun, onSave
                                                 dispatch(setSelectedTestInputId(selectedKey))
                                             }}
                                             classNames={{
-                                                base: 'min-w-[800px]',
-                                                table: 'min-w-full',
+                                                base: 'w-full',
+                                                table: 'table-fixed w-full',
+                                                thead: 'w-full',
+                                                tbody: 'w-full',
                                             }}
                                         >
                                             <TableHeader>
                                                 {[
-                                                    <TableColumn key="id">ID</TableColumn>,
+                                                    <TableColumn key="id" width={60}>ID</TableColumn>,
                                                     ...workflowInputVariableNames.map((field) => (
-                                                        <TableColumn key={field}>{field}</TableColumn>
+                                                        <TableColumn key={field} className="flex-1">{field}</TableColumn>
                                                     )),
-                                                    <TableColumn key="actions">Actions</TableColumn>,
+                                                    <TableColumn key="actions" width={80}>Actions</TableColumn>,
                                                 ]}
                                             </TableHeader>
                                             <TableBody>
@@ -364,7 +366,7 @@ const RunModal: React.FC<RunModalProps> = ({ isOpen, onOpenChange, onRun, onSave
                                                         {[
                                                             <TableCell key="id">{row.id}</TableCell>,
                                                             ...workflowInputVariableNames.map((field) => (
-                                                                <TableCell key={field}>
+                                                                <TableCell key={field} className="break-words">
                                                                     {renderCell(row, field)}
                                                                 </TableCell>
                                                             )),

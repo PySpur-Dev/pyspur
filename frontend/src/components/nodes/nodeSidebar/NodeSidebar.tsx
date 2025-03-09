@@ -46,7 +46,6 @@ import TextEditor from '../../textEditor/TextEditor'
 import NodeOutput from '../NodeOutputDisplay'
 import OutputSchemaEditor from './OutputSchemaEditor'
 import SchemaEditor from './SchemaEditor'
-import MessageGenerator from './MessageGenerator'
 
 import { extractSchemaFromJsonSchema, generateJsonSchemaFromSchema } from '@/utils/schemaUtils'
 import { convertToPythonVariableName } from '@/utils/variableNameUtils'
@@ -241,6 +240,7 @@ const NodeSidebar: React.FC<NodeSidebarProps> = ({ nodeID, readOnly }) => {
     const [fewShotIndex, setFewShotIndex] = useState<number | null>(null)
     const [showTitleError, setShowTitleError] = useState(false)
     const [jsonSchemaError, setJsonSchemaError] = useState<string>('')
+    const [messageVersions, setMessageVersions] = useState<Record<string, number>>({})
 
     // Add state for vector indices
     const [vectorIndices, setVectorIndices] = useState<VectorIndexOption[]>([])
@@ -370,6 +370,18 @@ const NodeSidebar: React.FC<NodeSidebarProps> = ({ nodeID, readOnly }) => {
         } else {
             dispatch(updateNodeConfigOnly({ id: nodeID, data: updatedModel }))
         }
+    }
+
+    // Function to handle message generation specifically
+    const handleMessageGenerated = (key: string, newMessage: string) => {
+        // Update the message version for this field
+        setMessageVersions(prev => ({
+            ...prev,
+            [key]: (prev[key] || 0) + 1
+        }))
+
+        // Call the regular input change handler
+        handleInputChange(key, newMessage)
     }
 
     // Simplify the title change handlers into a single function
@@ -924,20 +936,8 @@ const NodeSidebar: React.FC<NodeSidebarProps> = ({ nodeID, readOnly }) => {
                         )}
                     </div>
                     <div className="flex flex-col gap-2">
-                        {(key === 'system_message' || key === 'user_message') && !readOnly && (
-                            <div className="flex justify-end mb-1">
-                                <MessageGenerator
-                                    nodeID={nodeID}
-                                    messageType={key === 'system_message' ? 'system' : 'user'}
-                                    currentMessage={currentNodeConfig[key] || ''}
-                                    onMessageGenerated={(newMessage) => handleInputChange(key, newMessage)}
-                                    readOnly={readOnly}
-                                    incomingSchema={incomingSchema}
-                                />
-                            </div>
-                        )}
                         <TextEditor
-                            key={`text-editor-${nodeID}-${key}-${currentNodeConfig[key]}`}
+                            key={`text-editor-${nodeID}-${key}-${messageVersions[key] || 0}`}
                             nodeID={nodeID}
                             fieldName={key}
                             inputSchema={incomingSchema}
@@ -947,6 +947,8 @@ const NodeSidebar: React.FC<NodeSidebarProps> = ({ nodeID, readOnly }) => {
                             disableFormatting={key.endsWith('_template')} // Disable formatting for pure template fields
                             isTemplateEditor={true} // This is a template editor in NodeSidebar
                             readOnly={readOnly} // Pass through the readOnly prop
+                            enableAIGeneration={key === 'system_message' || key === 'user_message'}
+                            messageType={key === 'system_message' ? 'system' : 'user'}
                         />
                     </div>
                     {key === 'user_message' && renderFewShotExamples()}
@@ -1199,7 +1201,16 @@ const NodeSidebar: React.FC<NodeSidebarProps> = ({ nodeID, readOnly }) => {
             .filter((key) => key.includes('template') || key.includes('message') || key.includes('prompt'))
             .filter((key) => !priorityFields.includes(key))
 
-        const remainingKeys = keys.filter((key) => !priorityFields.includes(key) && !templateFields.includes(key))
+        // Filter out thinking-related fields if not using Claude 3.7 Sonnet
+        const isClaudeSonnet37 = currentNodeConfig?.llm_info?.model === 'anthropic/claude-3-7-sonnet-latest'
+        const remainingKeys = keys
+            .filter((key) => !priorityFields.includes(key) && !templateFields.includes(key))
+            .filter((key) => {
+                if (!isClaudeSonnet37 && (key === 'enable_thinking' || key === 'thinking_budget_tokens')) {
+                    return false
+                }
+                return true
+            })
 
         const orderedKeys = [...priorityFields.filter((key) => keys.includes(key)), ...templateFields, ...remainingKeys]
 

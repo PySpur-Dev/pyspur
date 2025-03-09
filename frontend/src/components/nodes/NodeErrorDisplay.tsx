@@ -23,7 +23,7 @@ const NodeErrorDisplay: React.FC<NodeErrorDisplayProps> = ({ error }) => {
             <div className="my-2 flex flex-col items-start">
                 <label className="text-sm font-semibold mb-1 text-danger block">Error:</label>
                 <div className="ml-2 mt-auto w-full">
-                    <CodeEditor code={error} onChange={() => {}} disabled={true} mode="python" label="" />
+                    <CodeEditor code={error} onChange={() => {}} disabled={true} mode="python" label="" modalSize="full" />
                 </div>
             </div>
         </div>
