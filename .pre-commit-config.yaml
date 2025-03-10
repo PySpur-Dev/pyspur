@@ -1,0 +1,26 @@
+repos:
+  - repo: local
+    hooks:
+      - id: backend-hooks
+        name: Backend Hooks
+        entry: pre-commit run --config backend/.pre-commit-config.yaml
+        language: system
+        pass_filenames: false
+        always_run: true
+        files: ^backend/
+
+      - id: frontend-hooks
+        name: Frontend Hooks
+        entry: bash -c 'cd frontend && npx lint-staged'
+        language: system
+        pass_filenames: false
+        always_run: true
+        files: ^frontend/
+      
+      - id: frontend-hooks-cleanup
+        name: Cleanup files created by frontend hooks
+        entry: bash -c 'cd frontend && rm -f tsconfig.*.tsbuildinfo'
+        language: system
+        pass_filenames: false
+        always_run: true
+        files: ^frontend/

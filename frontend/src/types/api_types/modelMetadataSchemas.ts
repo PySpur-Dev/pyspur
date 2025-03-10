@@ -18,6 +18,8 @@ export interface ModelConstraints {
     supports_JSON_output: boolean
     supports_max_tokens: boolean
     supports_temperature: boolean
+    supports_thinking?: boolean
+    thinking_budget_tokens?: number
 }
 
 export interface ModelConstraintsMap {

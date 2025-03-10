@@ -1,11 +1,14 @@
 import asyncio
 import traceback
-from datetime import datetime
-from typing import Any, Dict, Iterator, List, Optional, Set, Tuple, TYPE_CHECKING, Union
 from collections import defaultdict, deque
+from datetime import datetime
+from typing import TYPE_CHECKING, Any, Dict, Iterator, List, Optional, Set, Tuple, Union
 
 from pydantic import ValidationError
 
+from ..models.run_model import RunModel, RunStatus
+from ..models.task_model import TaskStatus
+from ..models.workflow_model import WorkflowModel
 from ..nodes.base import BaseNode, BaseNodeOutput
 from ..nodes.factory import NodeFactory
 from ..nodes.logic.human_intervention import PauseException
@@ -14,9 +17,6 @@ from ..schemas.workflow_schemas import (
     WorkflowNodeSchema,
 )
 from .task_recorder import TaskRecorder, TaskStatus
-from ..models.task_model import TaskStatus
-from ..models.workflow_model import WorkflowModel
-from ..models.run_model import RunModel, RunStatus
 from .workflow_execution_context import WorkflowExecutionContext
 
 if TYPE_CHECKING:
@@ -32,9 +32,7 @@ class UnconnectedNode(Exception):
 
 
 class WorkflowExecutor:
-    """
-    Handles the execution of a workflow.
-    """
+    """Handles the execution of a workflow."""
 
     def __init__(
         self,
@@ -168,9 +166,10 @@ class WorkflowExecutor:
             self.task_recorder.create_task(node_id, {})
         return task
 
-    def get_blocked_nodes(self, workflow_definition: Dict[str, Any], paused_node_id: str) -> Set[str]:
-        """
-        Find all nodes that are blocked by the paused node.
+    def get_blocked_nodes(
+        self, workflow_definition: Dict[str, Any], paused_node_id: str
+    ) -> Set[str]:
+        """Find all nodes that are blocked by the paused node.
         These are nodes that directly or indirectly depend on the paused node.
 
         Args:
@@ -179,6 +178,7 @@ class WorkflowExecutor:
 
         Returns:
             Set of node IDs that are blocked by the paused node
+
         """
         blocked_nodes: Set[str] = set()
 
@@ -205,14 +205,14 @@ class WorkflowExecutor:
         return blocked_nodes
 
     def is_downstream_of_pause(self, node_id: str) -> bool:
-        """
-        Check if a node is downstream of any paused node
+        """Check if a node is downstream of any paused node
 
         Args:
             node_id: The ID of the node to check
 
         Returns:
             True if the node is downstream of a paused node, False otherwise
+
         """
         # If this node is being resumed, it's not considered downstream of a pause
         if node_id in self._resumed_node_ids:
@@ -241,9 +241,11 @@ class WorkflowExecutor:
 
     def _get_workflow_definition(self) -> Dict[str, Any]:
         """Get workflow definition from context"""
-        return getattr(self.context, 'workflow_definition', {}) or {}
+        return getattr(self.context, "workflow_definition", {}) or {}
 
-    def _mark_node_as_paused(self, node_id: str, pause_output: Optional[BaseNodeOutput] = None) -> None:
+    def _mark_node_as_paused(
+        self, node_id: str, pause_output: Optional[BaseNodeOutput] = None
+    ) -> None:
         """Mark a node as paused and store its output"""
         # Store the output
         self._outputs[node_id] = pause_output
@@ -274,7 +276,7 @@ class WorkflowExecutor:
                     node_id=blocked_node_id,
                     status=TaskStatus.PENDING,
                     end_time=current_time,
-                    is_downstream_of_pause=True
+                    is_downstream_of_pause=True,
                 )
 
                 # Remove from failed nodes if necessary
@@ -288,15 +290,17 @@ class WorkflowExecutor:
         if self.context is None:
             return
 
-        if not hasattr(self.context, 'db_session') or self.context.db_session is None:
+        if not hasattr(self.context, "db_session") or self.context.db_session is None:
             return
 
-        if not hasattr(self.context, 'run_id') or self.context.run_id is None:
+        if not hasattr(self.context, "run_id") or self.context.run_id is None:
             return
 
-        run = self.context.db_session.query(RunModel).filter(
-            RunModel.id == self.context.run_id
-        ).first()
+        run = (
+            self.context.db_session.query(RunModel)
+            .filter(RunModel.id == self.context.run_id)
+            .first()
+        )
 
         if run:
             run.status = RunStatus.PAUSED
@@ -314,7 +318,11 @@ class WorkflowExecutor:
         self._update_run_status_to_paused()
 
         # Commit all changes at once
-        if self.context is not None and hasattr(self.context, 'db_session') and self.context.db_session is not None:
+        if (
+            self.context is not None
+            and hasattr(self.context, "db_session")
+            and self.context.db_session is not None
+        ):
             self.context.db_session.commit()
 
     def _fix_canceled_tasks_after_pause(self, paused_node_id: str) -> None:
@@ -325,15 +333,17 @@ class WorkflowExecutor:
         if self.context is None:
             return
 
-        if not hasattr(self.context, 'run_id') or self.context.run_id is None:
+        if not hasattr(self.context, "run_id") or self.context.run_id is None:
             return
 
-        if not hasattr(self.context, 'db_session') or self.context.db_session is None:
+        if not hasattr(self.context, "db_session") or self.context.db_session is None:
             return
 
-        run = self.context.db_session.query(RunModel).filter(
-            RunModel.id == self.context.run_id
-        ).first()
+        run = (
+            self.context.db_session.query(RunModel)
+            .filter(RunModel.id == self.context.run_id)
+            .first()
+        )
 
         if not run:
             return
@@ -361,7 +371,7 @@ class WorkflowExecutor:
                     node_id=node_id,
                     status=TaskStatus.PENDING,
                     end_time=current_time,
-                    is_downstream_of_pause=True
+                    is_downstream_of_pause=True,
                 )
 
             # Commit all changes at once
@@ -397,9 +407,7 @@ class WorkflowExecutor:
             if self.is_downstream_of_pause(node_id):
                 if self.task_recorder:
                     self.task_recorder.update_task(
-                        node_id=node_id,
-                        status=TaskStatus.PENDING,
-                        end_time=datetime.now()
+                        node_id=node_id, status=TaskStatus.PENDING, end_time=datetime.now()
                     )
                 return None
 
@@ -441,7 +449,7 @@ class WorkflowExecutor:
                         node_id=node_id,
                         status=TaskStatus.PENDING,
                         end_time=datetime.now(),
-                        is_downstream_of_pause=True
+                        is_downstream_of_pause=True,
                     )
                 return None
 
@@ -463,7 +471,7 @@ class WorkflowExecutor:
                             node_id=node_id,
                             status=TaskStatus.PENDING,
                             end_time=datetime.now(),
-                            is_downstream_of_pause=True
+                            is_downstream_of_pause=True,
                         )
                     else:
                         self.task_recorder.update_task(
@@ -477,33 +485,41 @@ class WorkflowExecutor:
             source_handles = self._get_source_handles()
 
             # Build node input, handling router outputs specially
-            for dep_id, output in zip(dependency_ids, predecessor_outputs):
+            for dep_id, output in zip(dependency_ids, predecessor_outputs, strict=False):
                 if output is None:
                     continue
                 predecessor_node = self._node_dict[dep_id]
                 if predecessor_node.node_type == "RouterNode":
+                    # For router nodes, we must have a source handle
                     source_handle = source_handles.get((dep_id, node_id))
                     if not source_handle:
                         raise ValueError(
                             f"Missing source_handle in link from router node {dep_id} to {node_id}"
                         )
+                    # Get the specific route's output from the router
                     route_output = getattr(output, source_handle, None)
                     if route_output is not None:
                         node_input[dep_id] = route_output
-                else:
-                    node_input[dep_id] = output
-
-                # Additional handling for HumanInterventionNode outputs
-                # Ensure inputs are keyed by node_id rather than output model name
-                if predecessor_node.node_type == "HumanInterventionNode":
+                    else:
+                        self._outputs[node_id] = None
+                        if self.task_recorder:
+                            self.task_recorder.update_task(
+                                node_id=node_id,
+                                status=TaskStatus.CANCELED,
+                                end_time=datetime.now(),
+                            )
+                        return None
+                elif predecessor_node.node_type == "HumanInterventionNode":
                     # Ensure the output is stored with the correct node ID
-                    if hasattr(output, 'model_dump'):
+                    if hasattr(output, "model_dump"):
                         # Get a dictionary representation of the output to examine its structure
                         output_dict = output.model_dump()
                         # Special transformation for HumanInterventionNode - modify node_input directly
                         # This ensures downstream nodes can access by node ID like {{HumanInterventionNode_1.input_node.input_1}}
                         # Store the raw output data directly in the node_input using dep_id as the key
                         node_input[dep_id] = output_dict
+                else:
+                    node_input[dep_id] = output
 
             # Special handling for InputNode - use initial inputs
             if node.node_type == "InputNode":
@@ -526,7 +542,7 @@ class WorkflowExecutor:
                     node_id=node_id,
                     status=TaskStatus.RUNNING,
                     inputs={
-                        dep_id: output.model_dump() if hasattr(output, 'model_dump') else output
+                        dep_id: output.model_dump() if hasattr(output, "model_dump") else output
                         for dep_id, output in node_input.items()
                         if node.node_type != "InputNode"
                     },
@@ -545,14 +561,14 @@ class WorkflowExecutor:
             self.node_instances[node_id] = node_instance
 
             # Set workflow definition in node context if available
-            if hasattr(node_instance, 'context'):
+            if hasattr(node_instance, "context"):
                 node_instance.context = WorkflowExecutionContext(
                     workflow_id=self.context.workflow_id if self.context else "",
                     run_id=self.context.run_id if self.context else "",
                     parent_run_id=self.context.parent_run_id if self.context else None,
                     run_type=self.context.run_type if self.context else "interactive",
                     db_session=self.context.db_session if self.context else None,
-                    workflow_definition=self.workflow.model_dump()
+                    workflow_definition=self.workflow.model_dump(),
                 )
 
             try:
@@ -585,7 +601,7 @@ class WorkflowExecutor:
 
                 # Check if this node is downstream of a paused node
                 has_paused_upstream = False
-                if hasattr(self, 'context') and self.context:
+                if hasattr(self, "context") and self.context:
                     workflow_definition = getattr(self.context, "workflow_definition", {})
 
                     # Find any paused nodes
@@ -607,7 +623,7 @@ class WorkflowExecutor:
                         status=TaskStatus.PENDING,
                         end_time=current_time,
                         error=None,
-                        is_downstream_of_pause=True
+                        is_downstream_of_pause=True,
                     )
                 else:
                     self.task_recorder.update_task(
@@ -733,7 +749,7 @@ class WorkflowExecutor:
         # Process results to handle any exceptions
         paused_node_id: Optional[str] = None
         paused_exception: Optional[PauseException] = None
-        for node_id, result in zip(self._node_tasks.keys(), results):
+        for node_id, result in zip(self._node_tasks.keys(), results, strict=False):
             if isinstance(result, PauseException):
                 # Handle pause state - don't mark as failed
                 paused_node_id = result.node_id
@@ -763,7 +779,7 @@ class WorkflowExecutor:
                             node_id=node_id,
                             status=TaskStatus.PENDING,
                             end_time=datetime.now(),
-                            is_downstream_of_pause=True
+                            is_downstream_of_pause=True,
                         )
                         continue
 
@@ -782,7 +798,11 @@ class WorkflowExecutor:
         if paused_node_id is not None:
             self._update_run_status_to_paused()
             # Commit all database changes
-            if self.context is not None and hasattr(self.context, 'db_session') and self.context.db_session is not None:
+            if (
+                self.context is not None
+                and hasattr(self.context, "db_session")
+                and self.context.db_session is not None
+            ):
                 self.context.db_session.commit()
 
         # If we have a paused node, re-raise the pause exception
@@ -799,8 +819,7 @@ class WorkflowExecutor:
         node_ids: List[str] = [],
         precomputed_outputs: Dict[str, Dict[str, Any] | List[Dict[str, Any]]] = {},
     ) -> Dict[str, BaseNodeOutput]:
-        """
-        Execute the workflow with the given input data.
+        """Execute the workflow with the given input data.
         input: input for the input node of the workflow. Dict[<field_name>: <value>]
         node_ids: list of node_ids to run. If empty, run all nodes.
         precomputed_outputs: precomputed outputs for the nodes. These nodes will not be executed again.
@@ -810,9 +829,7 @@ class WorkflowExecutor:
     async def run_batch(
         self, input_iterator: Iterator[Dict[str, Any]], batch_size: int = 100
     ) -> List[Dict[str, BaseNodeOutput]]:
-        """
-        Run the workflow on a batch of inputs.
-        """
+        """Run the workflow on a batch of inputs."""
         results: List[Dict[str, BaseNodeOutput]] = []
         batch_tasks: List[asyncio.Task[Dict[str, BaseNodeOutput]]] = []
         for input in input_iterator:

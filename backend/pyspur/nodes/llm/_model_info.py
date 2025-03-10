@@ -1,5 +1,5 @@
 from enum import Enum
-from typing import Set
+from typing import Optional, Set
 
 from pydantic import BaseModel
 
@@ -28,7 +28,9 @@ class ModelConstraints(BaseModel):
     supports_temperature: bool = True
     supported_mime_types: Set[RecognisedMimeType] = set()  # Empty set means no multimodal support
     supports_reasoning: bool = False
-    reasoning_separator: str = r'<think>.*?</think>'
+    reasoning_separator: str = r"<think>.*?</think>"
+    supports_thinking: bool = False
+    thinking_budget_tokens: Optional[int] = None
 
     def add_mime_categories(self, categories: Set[MimeCategory]) -> "ModelConstraints":
         """Add MIME type support for entire categories.
@@ -39,6 +41,7 @@ class ModelConstraints(BaseModel):
 
         Returns:
             self: Returns self for method chaining.
+
         """
         for category in categories:
             self.supported_mime_types.update(MIME_TYPES_BY_CATEGORY[category])
@@ -52,6 +55,7 @@ class ModelConstraints(BaseModel):
 
         Returns:
             self: Returns self for method chaining.
+
         """
         self.supported_mime_types.update(mime_types)
         return self
@@ -64,6 +68,7 @@ class ModelConstraints(BaseModel):
 
         Returns:
             bool: True if the MIME type is supported, False otherwise.
+
         """
         return mime_type in self.supported_mime_types
 
@@ -97,6 +102,7 @@ class LLMModels(str, Enum):
     CLAUDE_3_5_SONNET_LATEST = "anthropic/claude-3-5-sonnet-latest"
     CLAUDE_3_5_HAIKU_LATEST = "anthropic/claude-3-5-haiku-latest"
     CLAUDE_3_OPUS_LATEST = "anthropic/claude-3-opus-latest"
+    CLAUDE_3_7_SONNET_LATEST = "anthropic/claude-3-7-sonnet-latest"
 
     # Google Models
     GEMINI_2_0_FLASH_EXP = "gemini/gemini-2.0-flash-exp"
@@ -280,6 +286,17 @@ class LLMModels(str, Enum):
                     max_tokens=4096,
                     max_temperature=1.0,
                 ).add_mime_categories({MimeCategory.IMAGES}),
+            ),
+            cls.CLAUDE_3_7_SONNET_LATEST.value: LLMModel(
+                id=cls.CLAUDE_3_7_SONNET_LATEST.value,
+                provider=LLMProvider.ANTHROPIC,
+                name="Claude 3.7 Sonnet Latest",
+                constraints=ModelConstraints(
+                    max_tokens=8192,
+                    max_temperature=1.0,
+                    supports_thinking=True,
+                    thinking_budget_tokens=1024,
+                ).add_mime_categories({MimeCategory.IMAGES, MimeCategory.DOCUMENTS}),
             ),
             # Google Models
             cls.GEMINI_1_5_PRO.value: LLMModel(
@@ -470,8 +487,8 @@ class LLMModels(str, Enum):
                     max_temperature=2.0,
                     supports_JSON_output=False,
                     supports_max_tokens=False,
-                    supports_reasoning=True
-                )
+                    supports_reasoning=True,
+                ),
             ),
             cls.OLLAMA_MISTRAL_SMALL.value: LLMModel(
                 id=cls.OLLAMA_MISTRAL_SMALL.value,

@@ -106,7 +106,7 @@ const OutputSchemaEditor: React.FC<OutputSchemaEditorProps> = ({
                 variant="light"
                 startContent={<Icon icon="solar:magic-stick-linear" width={20} />}
                 onClick={onOpen}
-                isDisabled={!hasOpenAIKey}
+                isDisabled={!hasOpenAIKey || readOnly}
             >
                 AI Generate
             </Button>
@@ -150,6 +150,8 @@ const OutputSchemaEditor: React.FC<OutputSchemaEditorProps> = ({
                 isOpen={isOpen}
                 onClose={resetModalState}
                 size="2xl"
+                isDismissable={!isGenerating}
+                hideCloseButton={isGenerating}
             >
                 <ModalContent>
                     <ModalHeader className="flex flex-col gap-1">
@@ -160,11 +162,12 @@ const OutputSchemaEditor: React.FC<OutputSchemaEditorProps> = ({
                             value={generationType}
                             onValueChange={(value) => setGenerationType(value as 'new' | 'enhance')}
                             className="mb-4"
+                            isDisabled={isGenerating}
                         >
                             <Radio value="new">Create New Schema</Radio>
                             <Radio
                                 value="enhance"
-                                isDisabled={!schema}
+                                isDisabled={!schema || isGenerating}
                                 description={!schema ? "No existing schema to enhance" : undefined}
                             >
                                 Enhance Existing Schema
@@ -198,6 +201,7 @@ const OutputSchemaEditor: React.FC<OutputSchemaEditorProps> = ({
                             value={description}
                             onChange={(e) => setDescription(e.target.value)}
                             className="mb-2"
+                            isDisabled={isGenerating}
                         />
                     </ModalBody>
                     <ModalFooter>
@@ -205,6 +209,7 @@ const OutputSchemaEditor: React.FC<OutputSchemaEditorProps> = ({
                             size="sm"
                             variant="light"
                             onClick={resetModalState}
+                            isDisabled={isGenerating}
                         >
                             Cancel
                         </Button>
@@ -213,6 +218,7 @@ const OutputSchemaEditor: React.FC<OutputSchemaEditorProps> = ({
                             color="primary"
                             onClick={handleGenerateSchema}
                             isLoading={isGenerating}
+                            isDisabled={isGenerating}
                         >
                             Generate
                         </Button>
@@ -222,13 +228,13 @@ const OutputSchemaEditor: React.FC<OutputSchemaEditorProps> = ({
 
             <Tabs
                 aria-label="Schema Editor Options"
-                disabledKeys={readOnly ? ['simple', 'json'] : error ? ['simple'] : []}
+                disabledKeys={readOnly ? ['simple', 'json'] : []}
                 selectedKey={selectedTab}
                 onSelectionChange={(key) => {
-                    if (error && key === 'simple') {
-                        return // Prevent switching to simple editor when there are errors
+                    if (readOnly) {
+                        return; // Prevent switching in readOnly mode
                     }
-                    setSelectedTab(key as string)
+                    setSelectedTab(key as string);
                 }}
             >
                 <Tab key="simple" title="Simple Editor">

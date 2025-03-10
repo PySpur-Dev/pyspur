@@ -19,7 +19,7 @@ import {
 import { Icon } from '@iconify/react'
 import Head from 'next/head'
 import { useRouter } from 'next/router'
-import React, { useEffect, useState } from 'react'
+import React, { useCallback, useEffect, useState } from 'react'
 import { useSelector } from 'react-redux'
 import { RootState } from '../store/store'
 import { Template } from '../types/workflow'
@@ -43,6 +43,8 @@ import WelcomeModal from './modals/WelcomeModal'
 import HumanInputModal from './modals/HumanInputModal'
 import AIWorkflowWizard from './modals/AIWorkflowWizard'
 import { formatDistanceToNow } from 'date-fns'
+import { useDropzone } from 'react-dropzone'
+import { Upload } from 'lucide-react'
 
 // Calendly Widget Component
 const CalendlyWidget: React.FC = () => {
@@ -156,7 +158,11 @@ const Dashboard: React.FC = () => {
                         return map
                     }
                 )
-                setWorkflows(workflows as WorkflowResponse[])
+                // Sort workflows by updated_at in descending order (newest first)
+                const sortedWorkflows = [...workflows].sort((a, b) =>
+                    new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()
+                )
+                setWorkflows(sortedWorkflows as WorkflowResponse[])
                 setShowWelcome(!hasSeenWelcome && workflows.length === 0)
                 setWorkflowRuns(runsMap)
                 setHasMoreWorkflows(workflows.length === 10)
@@ -368,7 +374,13 @@ const Dashboard: React.FC = () => {
                     }
                 )
 
-                setWorkflows((prev) => [...prev, ...moreWorkflows])
+                setWorkflows((prev) => {
+                    // Merge previous and new workflows, then sort by updated_at
+                    const combined = [...prev, ...moreWorkflows];
+                    return combined.sort((a, b) =>
+                        new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()
+                    );
+                })
                 setWorkflowRuns((prev) => ({ ...prev, ...runsMap }))
                 setWorkflowPage(nextPage)
                 setHasMoreWorkflows(moreWorkflows.length === 10)
@@ -518,8 +530,48 @@ const Dashboard: React.FC = () => {
         }, 3000)
     }
 
+    const onJSONDrop = useCallback((acceptedFiles: File[]) => {
+        const file = acceptedFiles[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = async (e) => {
+            try {
+                const result = e.target?.result;
+                if (typeof result !== 'string') return;
+                const jsonContent = JSON.parse(result);
+                const uniqueName = `Imported Spur ${new Date().toLocaleString()}`;
+                const newWorkflow: WorkflowCreateRequest = {
+                    name: uniqueName,
+                    description: jsonContent.description,
+                    definition: jsonContent.definition as WorkflowDefinition,
+                };
+                const createdWorkflow = await createWorkflow(newWorkflow);
+                router.push(`/workflows/${createdWorkflow.id}`);
+            } catch (error) {
+                console.error('Error processing dropped JSON file:', error);
+                alert('Failed to import workflow. Please ensure the file is a valid JSON.');
+            }
+        };
+        reader.readAsText(file);
+    }, [router]);
+
+    const { getRootProps, getInputProps, isDragActive } = useDropzone({
+        onDrop: onJSONDrop,
+        accept: { 'application/json': ['.json'] },
+        noClick: true,
+        noKeyboard: true,
+    });
+
     return (
-        <div className="flex flex-col gap-2 max-w-7xl w-full mx-auto pt-2 px-6">
+        <div {...getRootProps()} className="relative flex flex-col gap-2 max-w-7xl w-full mx-auto pt-2 px-6">
+            <input {...getInputProps()} />
+            {isDragActive && (
+                <div className="absolute inset-0 flex flex-col items-center justify-center bg-primary/10 backdrop-blur-sm border-2 border-dashed border-primary rounded-lg z-50 transition-all duration-300 animate-in fade-in">
+                    <Upload className="w-16 h-16 text-primary mb-4" />
+                    <p className="text-primary text-xl font-bold">Drop workflow JSON file here</p>
+                    <p className="text-primary/80 text-sm mt-2">Release to import your workflow</p>
+                </div>
+            )}
             <Head>
                 <link href="https://assets.calendly.com/assets/external/widget.css" rel="stylesheet" />
             </Head>
@@ -583,7 +635,7 @@ const Dashboard: React.FC = () => {
                                 }
                                 onPress={handleImportWorkflowClick}
                             >
-                                Import Spur
+                                Import Spur (or drop JSON file)
                             </Button>
                         </div>
                     </div>

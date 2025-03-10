@@ -444,7 +444,7 @@ const RunViewFlowCanvasContent: React.FC<RunViewFlowCanvasProps> = ({
                         className="absolute top-0 right-0 h-full bg-white border-l border-gray-200"
                         style={{ zIndex: 2 }}
                     >
-                        <NodeSidebar nodeID={selectedNodeID} key={`node-sidebar-${selectedNodeID}`} />
+                        <NodeSidebar nodeID={selectedNodeID} key={`node-sidebar-${selectedNodeID}`} readOnly={true} />
                     </div>
                 )}
             </div>

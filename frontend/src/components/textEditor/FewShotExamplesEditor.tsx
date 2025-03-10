@@ -10,6 +10,8 @@ const FewShotExamplesEditor: React.FC<FewShotExamplesEditorProps> = ({ nodeID, e
     const [jsonError, setJsonError] = useState<string>('')
 
     const handleJsonChange = (jsonContent: string) => {
+        if (readOnly) return;
+
         try {
             const parsedContent = JSON.parse(jsonContent)
             if (!Array.isArray(parsedContent)) {
@@ -50,7 +52,10 @@ const FewShotExamplesEditor: React.FC<FewShotExamplesEditorProps> = ({ nodeID, e
                 <Tabs
                     aria-label="Few Shot Editor Options"
                     selectedKey={editorMode}
-                    onSelectionChange={(key) => setEditorMode(key as 'visual' | 'json')}
+                    onSelectionChange={(key) => {
+                        if (readOnly) return;
+                        setEditorMode(key as 'visual' | 'json')
+                    }}
                     size="sm"
                     disabledKeys={readOnly ? ['visual', 'json'] : []}
                 >
@@ -64,6 +69,7 @@ const FewShotExamplesEditor: React.FC<FewShotExamplesEditorProps> = ({ nodeID, e
                     nodeID={nodeID}
                     examples={examples}
                     onChange={onChange}
+                    readOnly={readOnly}
                 />
             ) : (
                 <Card>

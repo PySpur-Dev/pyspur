@@ -329,7 +329,7 @@ async def get_multiple_text_embeddings(
             # Log the request details
             logging.debug(f"[DEBUG] Requesting embeddings for batch of size {len(batch)}")
             logging.debug(f"[DEBUG] First text in batch (truncated): {batch[0][:100]}...")
-            logging.debug(f"[DEBUG] Using model: {model} with kwargs: {kwargs}")
+            logging.debug(f"[DEBUG] Using model: {model}")
 
             response: EmbeddingResponse = await aembedding(**kwargs)
             batch_embeddings: List[List[float]] = [item["embedding"] for item in response.data]

@@ -21,6 +21,7 @@ interface ExampleEditorModalProps {
     onSave: () => void
     onDiscard: () => void
     onContentChange: (content: string, tab: 'input' | 'output') => void
+    readOnly?: boolean
 }
 
 const ExampleEditorModal: React.FC<ExampleEditorModalProps> = ({
@@ -30,6 +31,7 @@ const ExampleEditorModal: React.FC<ExampleEditorModalProps> = ({
     onSave,
     onDiscard,
     onContentChange,
+    readOnly = false
 }) => {
     const [activeTab, setActiveTab] = useState<'input' | 'output'>('input')
 
@@ -41,6 +43,7 @@ const ExampleEditorModal: React.FC<ExampleEditorModalProps> = ({
                         aria-label="Input/Output Options"
                         selectedKey={activeTab}
                         onSelectionChange={(key) => setActiveTab(key as 'input' | 'output')}
+                        disabledKeys={readOnly ? ['input', 'output'] : []}
                     >
                         <Tab key="input" title="Input" />
                         <Tab key="output" title="Output" />
@@ -55,41 +58,47 @@ const ExampleEditorModal: React.FC<ExampleEditorModalProps> = ({
                 key={`${activeTab}-${exampleIndex}`}
                 content={example[activeTab] || ''}
                 setContent={(content) => onContentChange(content, activeTab)}
-                isEditable={true}
+                isEditable={!readOnly}
                 fieldTitle={`Example ${exampleIndex + 1} ${activeTab}`}
                 nodeID={nodeID}
                 fieldName={`few_shot_examples[${exampleIndex}][${activeTab}]`}
+                readOnly={readOnly}
             />
 
-            <div className="mt-4 flex gap-2">
-                <Button onPress={onDiscard} color="primary" variant="flat">
-                    Discard
-                </Button>
-                <Button onPress={onSave} color="primary" variant="solid">
-                    Save
-                </Button>
-            </div>
+            {!readOnly && (
+                <div className="mt-4 flex gap-2">
+                    <Button onPress={onDiscard} color="primary" variant="flat">
+                        Discard
+                    </Button>
+                    <Button onPress={onSave} color="primary" variant="solid">
+                        Save
+                    </Button>
+                </div>
+            )}
         </div>
     )
 }
 
 // Main Few Shot Examples Component
-const FewShotExamples: React.FC<FewShotExamplesProps> = ({ nodeID, examples, onChange }) => {
+const FewShotExamples: React.FC<FewShotExamplesProps & { readOnly?: boolean }> = ({ nodeID, examples, onChange, readOnly = false }) => {
     const [expandedExampleIndex, setExpandedExampleIndex] = useState<number | null>(null)
 
     const handleAddExample = () => {
+        if (readOnly) return;
         const updatedExamples = [...examples, { input: '', output: '', isExpanded: true }]
         onChange(updatedExamples)
         setExpandedExampleIndex(examples.length) // Expand the newly added example
     }
 
     const handleDeleteExample = (index: number) => {
+        if (readOnly) return;
         const updatedExamples = examples.filter((_, idx) => idx !== index)
         onChange(updatedExamples)
         setExpandedExampleIndex(null)
     }
 
     const handleContentChange = (content: string, tab: 'input' | 'output', index: number) => {
+        if (readOnly) return;
         const updatedExamples = _.cloneDeep(examples)
         if (!updatedExamples[index]) {
             updatedExamples[index] = {}
@@ -113,6 +122,7 @@ const FewShotExamples: React.FC<FewShotExamplesProps> = ({ nodeID, examples, onC
                                     isIconOnly
                                     variant="light"
                                     onPress={() => toggleExample(index)}
+                                    isDisabled={readOnly}
                                 >
                                     <Icon
                                         icon={expandedExampleIndex === index ? "solar:alt-arrow-up-linear" : "solar:alt-arrow-down-linear"}
@@ -121,14 +131,16 @@ const FewShotExamples: React.FC<FewShotExamplesProps> = ({ nodeID, examples, onC
                                 </Button>
                                 <span className="font-medium">Example {index + 1}</span>
                             </div>
-                            <Button
-                                isIconOnly
-                                color="danger"
-                                variant="light"
-                                onPress={() => handleDeleteExample(index)}
-                            >
-                                <Icon icon="solar:trash-bin-trash-linear" width={20} />
-                            </Button>
+                            {!readOnly && (
+                                <Button
+                                    isIconOnly
+                                    color="danger"
+                                    variant="light"
+                                    onPress={() => handleDeleteExample(index)}
+                                >
+                                    <Icon icon="solar:trash-bin-trash-linear" width={20} />
+                                </Button>
+                            )}
                         </div>
 
                         {/* Preview when collapsed */}
@@ -148,25 +160,27 @@ const FewShotExamples: React.FC<FewShotExamplesProps> = ({ nodeID, examples, onC
                         {/* Expanded editor */}
                         {expandedExampleIndex === index && (
                             <div className="mt-4">
-                                <Tabs aria-label="Input/Output Options">
+                                <Tabs aria-label="Input/Output Options" disabledKeys={readOnly ? ['input', 'output'] : []}>
                                     <Tab key="input" title="Input">
                                         <TextEditor
                                             content={example.input || ''}
                                             setContent={(content) => handleContentChange(content, 'input', index)}
-                                            isEditable={true}
+                                            isEditable={!readOnly}
                                             fieldTitle={`Example ${index + 1} Input`}
                                             nodeID={nodeID}
                                             fieldName={`few_shot_examples[${index}][input]`}
+                                            readOnly={readOnly}
                                         />
                                     </Tab>
                                     <Tab key="output" title="Output">
                                         <TextEditor
                                             content={example.output || ''}
                                             setContent={(content) => handleContentChange(content, 'output', index)}
-                                            isEditable={true}
+                                            isEditable={!readOnly}
                                             fieldTitle={`Example ${index + 1} Output`}
                                             nodeID={nodeID}
                                             fieldName={`few_shot_examples[${index}][output]`}
+                                            readOnly={readOnly}
                                         />
                                     </Tab>
                                 </Tabs>
@@ -176,16 +190,18 @@ const FewShotExamples: React.FC<FewShotExamplesProps> = ({ nodeID, examples, onC
                 </Card>
             ))}
 
-            <Card
-                isPressable
-                onPress={handleAddExample}
-                className="bg-content2 dark:bg-content2 border-2 border-dashed"
-            >
-                <CardBody className="flex justify-center items-center p-4">
-                    <Icon icon="solar:add-circle-linear" width={24} />
-                    <span className="ml-2">Add Example</span>
-                </CardBody>
-            </Card>
+            {!readOnly && (
+                <Card
+                    isPressable
+                    onPress={handleAddExample}
+                    className="bg-content2 dark:bg-content2 border-2 border-dashed"
+                >
+                    <CardBody className="flex justify-center items-center p-4">
+                        <Icon icon="solar:add-circle-linear" width={24} />
+                        <span className="ml-2">Add Example</span>
+                    </CardBody>
+                </Card>
+            )}
         </div>
     )
 }

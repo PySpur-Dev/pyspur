@@ -16,6 +16,7 @@ from ._utils import LLMModels, ModelInfo, create_messages, generate_text
 
 load_dotenv()
 
+
 def repair_json(broken_json_str: str) -> str:
     import re
     from re import Match
@@ -51,32 +52,32 @@ def repair_json(broken_json_str: str) -> str:
         repaired = repaired.replace(key, value)
 
     # Remove trailing commas before closing brackets/braces
-    repaired = re.sub(r",\s*([}\]])", r'\1', repaired)
+    repaired = re.sub(r",\s*([}\]])", r"\1", repaired)
 
     # Add missing commas between elements
-    repaired = re.sub(r"([}\"])\s*([{\[])", r'\1,\2', repaired)
+    repaired = re.sub(r"([}\"])\s*([{\[])", r"\1,\2", repaired)
 
     # Fix unquoted string values
-    repaired = re.sub(r'([{,]\s*)(\w+)(\s*:)', r'\1"\2"\3', repaired)
+    repaired = re.sub(r"([{,]\s*)(\w+)(\s*:)", r'\1"\2"\3', repaired)
 
     # Remove any extra whitespace around colons
-    repaired = re.sub(r'\s*:\s*', ':', repaired)
+    repaired = re.sub(r"\s*:\s*", ":", repaired)
 
     # If the string is wrapped in extra quotes, remove them
     if repaired.startswith('"') and repaired.endswith('"'):
         repaired = repaired[1:-1]
 
     # Extract the substring from the first { to the last }
-    start = repaired.find('{')
-    end = repaired.rfind('}')
+    start = repaired.find("{")
+    end = repaired.rfind("}")
     if start != -1 and end != -1:
-        repaired = repaired[start:end+1]
+        repaired = repaired[start : end + 1]
     else:
         # If no valid JSON object found, return empty object
         return "{}"
 
     # Final cleanup of whitespace
-    repaired = re.sub(r'\s+', ' ', repaired)
+    repaired = re.sub(r"\s+", " ", repaired)
 
     return repaired
 
@@ -99,11 +100,18 @@ class SingleLLMCallNodeConfig(BaseNodeConfig):
         None,
         description="Optional mapping of URL types (image, video, pdf) to input schema variables for Gemini models",
     )
+    enable_thinking: bool = Field(
+        False,
+        description="Whether to enable thinking mode for supported models",
+    )
+    thinking_budget_tokens: Optional[int] = Field(
+        None,
+        description="Budget tokens for thinking mode when enabled",
+    )
 
 
 class SingleLLMCallNodeInput(BaseNodeInput):
-    """
-    We allow any/all extra fields, so that the entire dictionary passed in
+    """We allow any/all extra fields, so that the entire dictionary passed in
     is available in `input.model_dump()`.
     """
 
@@ -116,9 +124,7 @@ class SingleLLMCallNodeOutput(BaseNodeOutput):
 
 
 class SingleLLMCallNode(BaseNode):
-    """
-    Node type for calling an LLM with structured i/o and support for params in system prompt and user_input.
-    """
+    """Node type for calling an LLM with structured i/o and support for params in system prompt and user_input."""
 
     name = "single_llm_call_node"
     display_name = "Single LLM Call"
@@ -172,6 +178,18 @@ class SingleLLMCallNode(BaseNode):
                 # Always use image_url format regardless of file type
                 url_vars["image"] = file_value
 
+        # Prepare thinking parameters if enabled
+        thinking_params = None
+        if self.config.enable_thinking:
+            model_info = LLMModels.get_model_info(model_name)
+            if model_info and model_info.constraints.supports_thinking:
+                thinking_params = {
+                    "type": "enabled",
+                    "budget_tokens": self.config.thinking_budget_tokens
+                    or model_info.constraints.thinking_budget_tokens
+                    or 1024,
+                }
+
         try:
             assistant_message_str = await generate_text(
                 messages=messages,
@@ -181,6 +199,7 @@ class SingleLLMCallNode(BaseNode):
                 json_mode=True,
                 url_variables=url_vars,
                 output_json_schema=self.config.output_json_schema,
+                thinking=thinking_params,
             )
         except Exception as e:
             error_str = str(e)
@@ -231,22 +250,26 @@ class SingleLLMCallNode(BaseNode):
 
         try:
             assistant_message_dict = json.loads(assistant_message_str)
-        except Exception as e:
+        except Exception:
             try:
                 repaired_str = repair_json(assistant_message_str)
                 assistant_message_dict = json.loads(repaired_str)
             except Exception as inner_e:
                 error_str = str(inner_e)
-                error_message = "An error occurred while parsing and repairing the assistant message"
+                error_message = (
+                    "An error occurred while parsing and repairing the assistant message"
+                )
                 error_type = "json_parse_error"
                 raise Exception(
-                    json.dumps({
-                        "type": "parsing_error",
-                        "error_type": error_type,
-                        "message": error_message,
-                        "original_error": error_str,
-                        "assistant_message_str": assistant_message_str,
-                    })
+                    json.dumps(
+                        {
+                            "type": "parsing_error",
+                            "error_type": error_type,
+                            "message": error_message,
+                            "original_error": error_str,
+                            "assistant_message_str": assistant_message_str,
+                        }
+                    )
                 )
 
         # Validate and return
@@ -268,6 +291,8 @@ if __name__ == "__main__":
                 system_message="You are a helpful assistant.",
                 user_message="Hello, my name is {{ name }}. I want to ask: {{ question }}",
                 url_variables=None,
+                enable_thinking=False,
+                thinking_budget_tokens=None,
                 output_json_schema=json.dumps(
                     {
                         "type": "object",

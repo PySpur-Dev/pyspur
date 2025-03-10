@@ -5,23 +5,6 @@ from .registry import NodeRegistry
 
 # Simple lists of supported and deprecated node types
 
-LOGIC = [
-    {
-        "node_type_name": "RouterNode",
-        "module": ".nodes.logic.router",
-        "class_name": "RouterNode",
-    },
-    {
-        "node_type_name": "CoalesceNode",
-        "module": ".nodes.logic.coalesce",
-        "class_name": "CoalesceNode",
-    },
-    {
-        "node_type_name": "MergeNode",
-        "module": ".nodes.logic.merge",
-        "class_name": "MergeNode",
-    },
-]
 
 SUPPORTED_NODE_TYPES = {
     "Input/Output": [
@@ -55,7 +38,28 @@ SUPPORTED_NODE_TYPES = {
             "class_name": "PythonFuncNode",
         },
     ],
-    "Logic": LOGIC,
+    "Logic": [
+        {
+            "node_type_name": "RouterNode",
+            "module": ".nodes.logic.router",
+            "class_name": "RouterNode",
+        },
+        {
+            "node_type_name": "CoalesceNode",
+            "module": ".nodes.logic.coalesce",
+            "class_name": "CoalesceNode",
+        },
+        {
+            "node_type_name": "MergeNode",
+            "module": ".nodes.logic.merge",
+            "class_name": "MergeNode",
+        },
+        {
+            "node_type_name": "StaticValueNode",
+            "module": ".nodes.primitives.static_value",
+            "class_name": "StaticValueNode",
+        },
+    ],
     "Experimental": [
         {
             "node_type_name": "ForLoopNode",
@@ -146,11 +150,6 @@ SUPPORTED_NODE_TYPES = {
 
 DEPRECATED_NODE_TYPES = [
     {
-        "node_type_name": "StaticValueNode",
-        "module": ".nodes.primitives.static_value",
-        "class_name": "StaticValueNode",
-    },
-    {
         "node_type_name": "MCTSNode",
         "module": ".nodes.llm.mcts",
         "class_name": "MCTSNode",
@@ -199,9 +198,7 @@ DEPRECATED_NODE_TYPES = [
 
 
 def get_all_node_types() -> Dict[str, List[NodeTypeSchema]]:
-    """
-    Returns a dictionary of all available node types grouped by category.
-    """
+    """Returns a dictionary of all available node types grouped by category."""
     node_type_groups: Dict[str, List[NodeTypeSchema]] = {}
     for group_name, node_types in SUPPORTED_NODE_TYPES.items():
         node_type_groups[group_name] = []
@@ -212,9 +209,7 @@ def get_all_node_types() -> Dict[str, List[NodeTypeSchema]]:
 
 
 def is_valid_node_type(node_type_name: str) -> bool:
-    """
-    Checks if a node type is valid (supported, deprecated, or registered via decorator).
-    """
+    """Checks if a node type is valid (supported, deprecated, or registered via decorator)."""
     # Check configured nodes first
     for node_types in SUPPORTED_NODE_TYPES.values():
         for node_type in node_types:
