@@ -385,7 +385,7 @@ async def main():
     logger.info("Starting MCP Client")
     client = MCPClient()
     try:
-        await client.connect_to_server("./weather/weather.py")
+        await client.connect_to_server("../tools/server.py")
         await client.chat_loop()
     finally:
         await client.cleanup()

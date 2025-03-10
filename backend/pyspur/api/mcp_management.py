@@ -58,7 +58,7 @@ async def initialize_mcp_client():
 
     # Default to the weather server
     # TODO: Once server is written, update this path
-    server_script_path = "pyspur/mcp_client/weather/weather.py"
+    server_script_path = "pyspur/tools/server.py"
 
     mcp_client = MCPClient()
     try:
