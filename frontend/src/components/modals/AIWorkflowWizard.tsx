@@ -23,7 +23,7 @@ interface AIWorkflowWizardProps {
     onSuccess: (workflow: WorkflowResponse) => void
 }
 
-type WizardStep = 'purpose' | 'details' | 'inputs' | 'review' | 'generating'
+type WizardStep = 'purpose' | 'inputs' | 'review' | 'generating'
 
 const AIWorkflowWizard: React.FC<AIWorkflowWizardProps> = ({ isOpen, onClose, onSuccess }) => {
     // Wizard state
@@ -33,7 +33,6 @@ const AIWorkflowWizard: React.FC<AIWorkflowWizardProps> = ({ isOpen, onClose, on
 
     // Form data
     const [purpose, setPurpose] = useState('')
-    const [description, setDescription] = useState('')
     const [inputs, setInputs] = useState<Record<string, string>>({})
     const [outputs, setOutputs] = useState<Record<string, string>>({})
 
@@ -88,38 +87,32 @@ const AIWorkflowWizard: React.FC<AIWorkflowWizardProps> = ({ isOpen, onClose, on
         // Pre-fill form based on template
         switch (template) {
             case 'data_processing':
-                setPurpose('Data processing and transformation pipeline')
-                setDescription('Create a workflow that takes input data, processes it through multiple transformation steps, and outputs the processed results.')
+                setPurpose('Data processing and transformation pipeline to process and transform input data through multiple steps')
                 setInputs({ 'data_source': 'CSV or JSON data to process' })
                 setOutputs({ 'processed_data': 'Transformed and processed data' })
                 break;
             case 'content_generation':
-                setPurpose('AI-powered content generation')
-                setDescription('Generate creative content based on user prompts, refine it, and deliver it in the requested format.')
+                setPurpose('AI-powered content generation to create and refine content based on user prompts')
                 setInputs({ 'prompt': 'User instructions for content generation', 'style': 'Style/tone of content' })
                 setOutputs({ 'content': 'Generated content' })
                 break;
             case 'web_scraping':
-                setPurpose('Web scraping and content analysis')
-                setDescription('Scrape content from websites, process and analyze the data, and extract insights.')
+                setPurpose('Web scraping and content analysis to extract and analyze data from websites')
                 setInputs({ 'url': 'Website URL to scrape' })
                 setOutputs({ 'analysis': 'Analysis results and insights' })
                 break;
             case 'document_processing':
-                setPurpose('Document processing and information extraction')
-                setDescription('Process documents (PDF, DOCX, etc.), extract key information, and perform analysis.')
+                setPurpose('Document processing and information extraction to extract key information from documents')
                 setInputs({ 'document': 'Document to process' })
                 setOutputs({ 'extracted_info': 'Extracted information', 'summary': 'Document summary' })
                 break;
             case 'social_media':
-                setPurpose('Social media content generation and posting')
-                setDescription('Generate content for social media platforms and post it automatically.')
+                setPurpose('Social media content generation and posting to create and distribute content')
                 setInputs({ 'topic': 'Content topic', 'platform': 'Target social media platform' })
                 setOutputs({ 'post_status': 'Status of the post' })
                 break;
             case 'custom':
                 setPurpose('')
-                setDescription('')
                 setInputs({})
                 setOutputs({})
                 break;
@@ -131,14 +124,6 @@ const AIWorkflowWizard: React.FC<AIWorkflowWizardProps> = ({ isOpen, onClose, on
             case 'purpose':
                 if (!purpose.trim()) {
                     setError('Please enter a purpose for your workflow')
-                    return
-                }
-                setError(null)
-                setCurrentStep('details')
-                break;
-            case 'details':
-                if (!description.trim()) {
-                    setError('Please enter a description for your workflow')
                     return
                 }
                 setError(null)
@@ -156,11 +141,8 @@ const AIWorkflowWizard: React.FC<AIWorkflowWizardProps> = ({ isOpen, onClose, on
 
     const handleBack = () => {
         switch (currentStep) {
-            case 'details':
-                setCurrentStep('purpose')
-                break;
             case 'inputs':
-                setCurrentStep('details')
+                setCurrentStep('purpose')
                 break;
             case 'review':
                 setCurrentStep('inputs')
@@ -176,7 +158,7 @@ const AIWorkflowWizard: React.FC<AIWorkflowWizardProps> = ({ isOpen, onClose, on
         try {
             const request: WorkflowGenerationRequest = {
                 purpose,
-                description,
+                description: purpose, // Use purpose as description for the API call
                 inputs: Object.keys(inputs).length > 0 ? inputs : undefined,
                 outputs: Object.keys(outputs).length > 0 ? outputs : undefined
             }
@@ -210,7 +192,6 @@ const AIWorkflowWizard: React.FC<AIWorkflowWizardProps> = ({ isOpen, onClose, on
 
     const resetForm = () => {
         setPurpose('')
-        setDescription('')
         setInputs({})
         setOutputs({})
         setCurrentStep('purpose')
@@ -230,7 +211,6 @@ const AIWorkflowWizard: React.FC<AIWorkflowWizardProps> = ({ isOpen, onClose, on
                 <ModalHeader>
                     <div className="text-xl font-semibold">
                         {currentStep === 'purpose' && 'Create Workflow with AI - Purpose'}
-                        {currentStep === 'details' && 'Create Workflow with AI - Details'}
                         {currentStep === 'inputs' && 'Create Workflow with AI - Inputs & Outputs'}
                         {currentStep === 'review' && 'Create Workflow with AI - Review'}
                         {currentStep === 'generating' && 'Creating Your Workflow...'}
@@ -265,27 +245,10 @@ const AIWorkflowWizard: React.FC<AIWorkflowWizardProps> = ({ isOpen, onClose, on
                                     placeholder="e.g., Summarize blog posts and send highlights to Slack"
                                     value={purpose}
                                     onChange={(e) => setPurpose(e.target.value)}
-                                    rows={3}
+                                    rows={4}
                                 />
                                 <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-                                    Be specific about what you want the workflow to accomplish.
-                                </p>
-                            </div>
-                        </div>
-                    )}
-
-                    {currentStep === 'details' && (
-                        <div className="space-y-4">
-                            <div>
-                                <p className="mb-2">Please provide more details about how this workflow should operate:</p>
-                                <Textarea
-                                    placeholder="e.g., The workflow should scrape a provided blog post URL, summarize the key points using an LLM, and send the summary to a Slack channel."
-                                    value={description}
-                                    onChange={(e) => setDescription(e.target.value)}
-                                    rows={5}
-                                />
-                                <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-                                    Include specific steps, data transformations, or integrations you need.
+                                    Be specific about what you want the workflow to accomplish, including any specific steps or integrations needed.
                                 </p>
                             </div>
                         </div>
@@ -383,11 +346,6 @@ const AIWorkflowWizard: React.FC<AIWorkflowWizardProps> = ({ isOpen, onClose, on
                                 <div className="p-3 bg-gray-50 dark:bg-content1 rounded">
                                     <h4 className="font-semibold">Purpose</h4>
                                     <p>{purpose}</p>
-                                </div>
-
-                                <div className="p-3 bg-gray-50 dark:bg-content1 rounded">
-                                    <h4 className="font-semibold">Details</h4>
-                                    <p>{description}</p>
                                 </div>
 
                                 {Object.keys(inputs).length > 0 && (

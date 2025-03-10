@@ -15,8 +15,10 @@ class SchemaGenerationRequest(BaseModel):
     description: str
     existing_schema: Optional[str] = None
 
+
 class WorkflowGenerationRequest(BaseModel):
     """Workflow generation request schema."""
+
     purpose: str
     description: str
     inputs: Optional[Dict[str, str]] = None
@@ -173,6 +175,81 @@ async def generate_schema(request: SchemaGenerationRequest) -> Dict[str, Any]:
             )
         raise HTTPException(status_code=400, detail=str(e))
 
+
+WORKFLOW_JSON_SCHEMA = """{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "nodes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string" },
+          "title": { "type": "string" },
+          "parent_id": { "type": ["string", "null"] },
+          "node_type": { "type": "string" },
+          "coordinates": {
+            "type": "object",
+            "properties": {
+              "x": { "type": "number" },
+              "y": { "type": "number" }
+            },
+            "required": ["x", "y"],
+            "additionalProperties": false
+          },
+          "dimensions": {
+            "type": ["object", "null"],
+            "properties": {
+              "width": { "type": "number" },
+              "height": { "type": "number" }
+            },
+            "required": ["width", "height"],
+            "additionalProperties": false
+          },
+          "subworkflow": {
+            "type": ["object", "null"],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "parent_id",
+          "node_type",
+          "coordinates",
+          "dimensions",
+          "subworkflow"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "links": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "source_id": { "type": "string" },
+          "target_id": { "type": "string" },
+          "source_port": { "type": "string" },
+          "target_port": { "type": "string" }
+        },
+        "required": [
+          "source_id",
+          "target_id",
+          "source_port",
+          "target_port"
+        ],
+        "additionalProperties": false
+      }
+    }
+  },
+  "required": ["nodes", "links"],
+  "additionalProperties": false
+}
+"""
+
+
 @router.post("/generate_workflow/")
 async def generate_workflow(request: WorkflowGenerationRequest) -> Dict[str, Any]:
     """Generate a workflow definition using AI."""
@@ -180,6 +257,7 @@ async def generate_workflow(request: WorkflowGenerationRequest) -> Dict[str, Any
     try:
         # Get all available node types dynamically
         from .node_management import get_node_types
+
         available_node_types = await get_node_types()
 
         # Format node types for the prompt
@@ -190,7 +268,8 @@ async def generate_workflow(request: WorkflowGenerationRequest) -> Dict[str, Any
                 node_types_description += f"- {node['name']}: {node['config']['title']}\n"
 
         # Prepare system message with workflow creation instructions
-        system_message = """You are an AI workflow architect expert. Your task is to create a complete workflow definition based on the user's requirements.
+        system_message = (
+            """You are an AI workflow architect expert. Your task is to create a complete pyspur workflow definition based on the user's requirements.
 
 The workflow should follow the specific JSON structure with nodes and links.
 
@@ -319,7 +398,8 @@ Important guidelines:
 7. Provide a logical flow from inputs to outputs
 8. Choose appropriate LLM models for any AI-related tasks
 9. Consider error handling and edge cases
-""" + f"""
+"""
+            + f"""
 {node_types_description}
 
 IMPORTANT CONSTRAINTS:
@@ -327,13 +407,11 @@ IMPORTANT CONSTRAINTS:
 2. Each node must conform exactly to its schema as provided.
 3. The workflow must be valid and executable with the given node types.
 """
+        )
 
         # Prepare user message with user's requirements
         user_message = f"""Create a workflow for the following purpose:
 {request.purpose}
-
-Description:
-{request.description}
 """
 
         if request.inputs:
@@ -354,22 +432,23 @@ Description:
         # Call the LLM
         messages = [
             {"role": "system", "content": system_message},
-            {"role": "user", "content": user_message}
+            {"role": "user", "content": user_message},
         ]
 
+        logger.info(f"Generating workflow with messages: {messages}")
         response = await generate_text(
             messages=messages,
-            model_name="openai/chatgpt-4o-latest",
-            temperature=0.2,
-            max_tokens=16384,
-            json_mode=True
+            model_name="openai/o3-mini",
+            json_mode=True,
+            output_json_schema=WORKFLOW_JSON_SCHEMA,
         )
+        logger.info(f"Generated workflow: {response}")
 
         # Try to parse the response
         try:
             # Clean up the response to ensure we get valid JSON
             cleaned_response = response.strip()
-            json_match = re.search(r'```(?:json)?\s*(.*?)\s*```', cleaned_response, re.DOTALL)
+            json_match = re.search(r"```(?:json)?\s*(.*?)\s*```", cleaned_response, re.DOTALL)
             if json_match:
                 cleaned_response = json_match.group(1)
 
@@ -384,17 +463,21 @@ Description:
             return {
                 "name": f"AI Generated: {request.purpose[:30]}{'...' if len(request.purpose) > 30 else ''}",
                 "description": request.description,
-                "definition": workflow_definition
+                "definition": workflow_definition,
             }
         except json.JSONDecodeError as e:
-            raise HTTPException(status_code=400, detail=f"Failed to parse generated workflow JSON: {str(e)}")
+            raise HTTPException(
+                status_code=400, detail=f"Failed to parse generated workflow JSON: {str(e)}"
+            )
         except Exception as e:
-            raise HTTPException(status_code=400, detail=f"Error processing generated workflow: {str(e)}")
+            raise HTTPException(
+                status_code=400, detail=f"Error processing generated workflow: {str(e)}"
+            )
 
     except Exception as e:
         logger.error(f"Workflow generation failed: {str(e)}")
         if response:
-            truncated_response = response[:1000] + '...' if len(response) > 1000 else response
+            truncated_response = response[:1000] + "..." if len(response) > 1000 else response
             logger.error(f"Raw LLM response (truncated): {truncated_response}")
         raise HTTPException(status_code=500, detail=f"Workflow generation failed: {str(e)}")
 
