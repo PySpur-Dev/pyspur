@@ -46,9 +46,16 @@ class ToolRegistry:
             logging.debug(f"Registered tool {func.__name__}")
 
             @wraps(func)
-            def wrapper(*args: P.args, **kwargs: P.kwargs) -> Any:
+            async def async_wrapper(*args: P.args, **kwargs: P.kwargs) -> Any:
+                return await func(*args, **kwargs)
+
+            @wraps(func)
+            def sync_wrapper(*args: P.args, **kwargs: P.kwargs) -> Any:
                 return func(*args, **kwargs)
 
+            # Return the appropriate wrapper based on whether the function is async
+            wrapper = async_wrapper if tool_info["is_async"] else sync_wrapper
+            wrapper.__name__ = func.__name__  # Ensure the wrapper has the original function name
             return cast(F, wrapper)
 
         return decorator

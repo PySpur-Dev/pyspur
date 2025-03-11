@@ -906,6 +906,15 @@ export interface ToolListResponse {
     enabled_tools: string[];
 }
 
+export interface ToolFileResponse {
+    success: boolean;
+    message: string;
+    data?: {
+        filename: string;
+        content: string;
+    };
+}
+
 export const listTools = async (): Promise<ToolListResponse> => {
     try {
         const response = await axios.get(`${API_BASE_URL}/mcp/tools`)
@@ -915,6 +924,52 @@ export const listTools = async (): Promise<ToolListResponse> => {
         }
     } catch (error) {
         console.error('Error listing tools:', error)
+        throw error
+    }
+}
+
+export const listToolFiles = async (): Promise<string[]> => {
+    try {
+        const response = await axios.get(`${API_BASE_URL}/mcp/tools/files`)
+        return response.data || []
+    } catch (error) {
+        console.error('Error listing tool files:', error)
+        throw error
+    }
+}
+
+export const getToolFile = async (filename: string): Promise<ToolFileResponse> => {
+    try {
+        const response = await axios.get(`${API_BASE_URL}/mcp/tools/files/${filename}`)
+        return response.data
+    } catch (error) {
+        console.error('Error getting tool file:', error)
+        throw error
+    }
+}
+
+export const createToolFile = async (filename: string, content: string): Promise<ToolFileResponse> => {
+    try {
+        const response = await axios.post(`${API_BASE_URL}/mcp/tools/files`, {
+            filename,
+            content
+        })
+        return response.data
+    } catch (error) {
+        console.error('Error creating tool file:', error)
+        throw error
+    }
+}
+
+export const updateToolFile = async (filename: string, content: string): Promise<ToolFileResponse> => {
+    try {
+        const response = await axios.put(`${API_BASE_URL}/mcp/tools/files/${filename}`, {
+            filename,
+            content
+        })
+        return response.data
+    } catch (error) {
+        console.error('Error updating tool file:', error)
         throw error
     }
 }

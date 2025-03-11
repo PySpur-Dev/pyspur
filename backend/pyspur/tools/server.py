@@ -20,8 +20,9 @@ for tool_name, tool_info in ToolRegistry.get_all_tools().items():
         module = __import__(tool_info["module"], fromlist=[tool_name])
         # Get the actual function from the module
         func = getattr(module, tool_name)
-        # Register with MCP
-        mcp.tool()(func)
+        # Register with MCP and preserve the original name
+        wrapped_func = mcp.tool()(func)
+        wrapped_func.__name__ = tool_name  # Ensure the wrapped function keeps the original name
         logging.info(f"Successfully registered tool {tool_name}")
     except Exception as e:
         logging.error(f"Failed to register tool {tool_name}: {e}")

@@ -170,9 +170,14 @@ class MCPClient:
     async def tool_call(self, tool_name: str, tool_args: Dict[str, Any]) -> Dict[str, Any]:
         """Call a tool."""
         assert self.session is not None, "Session should be initialized at this point"
-        # tool_call_info = f"[Calling tool {tool_name} with args {json.dumps(tool_args, indent=2)}]"
-        # print(tool_call_info)
-        return await self.session.call_tool(tool_name, tool_args)
+        try:
+            logger.info(f"Calling tool {tool_name} with args {json.dumps(tool_args, indent=2)}")
+            result = await self.session.call_tool(tool_name, tool_args)
+            logger.info(f"Tool result: {result}")
+            return result
+        except Exception as e:
+            logger.error(f"Error calling tool {tool_name}: {str(e)}")
+            raise
 
     async def process_tool_use(
         self, content: Any, all_outputs: List[str], tool_results: Dict[str, Any]
