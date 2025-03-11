@@ -17,6 +17,11 @@ import {
     DropdownTrigger,
     DropdownMenu,
     DropdownItem,
+    Modal,
+    ModalContent,
+    ModalHeader,
+    ModalBody,
+    ModalFooter,
 } from '@heroui/react'
 import { Icon } from '@iconify/react'
 import { cloneDeep, debounce, set } from 'lodash'
@@ -38,7 +43,7 @@ import {
 } from '../../../store/nodeTypesSlice'
 import { RootState } from '../../../store/store'
 import { FieldMetadata, ModelConstraints } from '../../../types/api_types/modelMetadataSchemas'
-import { listVectorIndices, listTools } from '../../../utils/api'
+import { listVectorIndices, listTools, createToolFile, updateToolFile, getToolFile, listToolFiles } from '../../../utils/api'
 import CodeEditor from '../../CodeEditor'
 import NumberInput from '../../NumberInput'
 import FewShotExamplesEditor from '../../textEditor/FewShotExamplesEditor'
@@ -46,6 +51,7 @@ import TextEditor from '../../textEditor/TextEditor'
 import NodeOutput from '../NodeOutputDisplay'
 import OutputSchemaEditor from './OutputSchemaEditor'
 import SchemaEditor from './SchemaEditor'
+import ToolEditor, { defaultToolTemplate } from './ToolEditor'
 
 import { extractSchemaFromJsonSchema, generateJsonSchemaFromSchema } from '@/utils/schemaUtils'
 import { convertToPythonVariableName } from '@/utils/variableNameUtils'
@@ -215,6 +221,80 @@ const isTemplateField = (key: string, fieldMetadata?: FieldMetadata): boolean =>
     return templatePatterns.some((pattern) => key === pattern || key.endsWith(pattern))
 }
 
+// Add new interfaces for tool management
+interface ToolEditorModalProps {
+    isOpen: boolean
+    onClose: () => void
+    onSave: (filename: string, content: string) => Promise<void>
+    initialFilename?: string
+    initialContent?: string
+}
+
+const ToolEditorModal: React.FC<ToolEditorModalProps> = ({
+    isOpen,
+    onClose,
+    onSave,
+    initialFilename = '',
+    initialContent = '',
+}) => {
+    const [filename, setFilename] = useState(initialFilename)
+    const [content, setContent] = useState(initialContent)
+    const [isLoading, setIsLoading] = useState(false)
+
+    useEffect(() => {
+        setFilename(initialFilename)
+        setContent(initialContent)
+    }, [initialFilename, initialContent])
+
+    const handleSave = async () => {
+        try {
+            setIsLoading(true)
+            await onSave(filename, content)
+            onClose()
+        } catch (error) {
+            console.error('Error saving tool:', error)
+        } finally {
+            setIsLoading(false)
+        }
+    }
+
+    return (
+        <Modal isOpen={isOpen} onClose={onClose} size="4xl">
+            <ModalContent>
+                <ModalHeader>
+                    <div className="flex flex-col gap-1">
+                        <h2 className="text-lg font-semibold">Tool Editor</h2>
+                        <Input
+                            label="Tool Name"
+                            value={filename}
+                            onChange={(e) => setFilename(e.target.value)}
+                            placeholder="Enter tool name (without .py extension)"
+                        />
+                    </div>
+                </ModalHeader>
+                <ModalBody>
+                    <div className="h-[60vh]">
+                        <CodeEditor
+                            code={content}
+                            onChange={setContent}
+                            mode="python"
+                            readOnly={false}
+                        />
+                    </div>
+                </ModalBody>
+                <ModalFooter>
+                    <Button variant="light" onPress={onClose}>
+                        Cancel
+                    </Button>
+                    <Button color="primary" onPress={handleSave} isLoading={isLoading}>
+                        Save Tool
+                    </Button>
+                </ModalFooter>
+            </ModalContent>
+        </Modal>
+    )
+}
+
 const NodeSidebar: React.FC<NodeSidebarProps> = ({ nodeID, readOnly }) => {
     const dispatch = useDispatch()
     const nodes = useSelector((state: RootState) => state.flow.nodes, nodesComparator)
@@ -255,6 +335,11 @@ const NodeSidebar: React.FC<NodeSidebarProps> = ({ nodeID, readOnly }) => {
 
     // Add state for selected tools
     const [selectedToolKeys, setSelectedToolKeys] = useState<Set<string>>(new Set([]))
+
+    // Add to the NodeSidebar component's state variables
+    const [isToolEditorOpen, setIsToolEditorOpen] = useState(false)
+    const [editingTool, setEditingTool] = useState<{ filename: string; content: string } | null>(null)
+    const [toolFiles, setToolFiles] = useState<string[]>([])
 
     const collectIncomingSchema = (nodeID: string): string[] => {
         const incomingEdges = edges.filter((edge) => edge.target === nodeID)
@@ -716,20 +801,34 @@ const NodeSidebar: React.FC<NodeSidebarProps> = ({ nodeID, readOnly }) => {
 
             return (
                 <div key={key} className="my-4">
-                    <div className="flex items-center gap-2 mb-2">
-                        <h3 className="font-semibold">Available Tools</h3>
-                        <Tooltip
-                            content="Select which tools should be available for this node. If none selected, all tools will be used."
-                            placement="left-start"
-                            showArrow={true}
-                            className="max-w-xs"
+                    <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center gap-2">
+                            <h3 className="font-semibold">Available Tools</h3>
+                            <Tooltip
+                                content="Select which tools should be available for this node. If none selected, all tools will be used."
+                                placement="left-start"
+                                showArrow={true}
+                                className="max-w-xs"
+                            >
+                                <Icon
+                                    icon="solar:question-circle-linear"
+                                    className="text-default-400 cursor-help"
+                                    width={20}
+                                />
+                            </Tooltip>
+                        </div>
+                        <Button
+                            size="sm"
+                            variant="light"
+                            startContent={<Icon icon="solar:add-circle-linear" />}
+                            onPress={() => {
+                                setEditingTool(null)
+                                setIsToolEditorOpen(true)
+                            }}
+                            isDisabled={readOnly}
                         >
-                            <Icon
-                                icon="solar:question-circle-linear"
-                                className="text-default-400 cursor-help"
-                                width={20}
-                            />
-                        </Tooltip>
+                            New Tool
+                        </Button>
                     </div>
                     <Dropdown isDisabled={readOnly || isLoadingTools}>
                         <DropdownTrigger>
@@ -752,16 +851,43 @@ const NodeSidebar: React.FC<NodeSidebarProps> = ({ nodeID, readOnly }) => {
                             }}
                         >
                             {availableTools.map((tool) => (
-                                <DropdownItem key={tool}>{tool}</DropdownItem>
+                                <DropdownItem 
+                                    key={tool}
+                                    endContent={
+                                        <Button
+                                            isIconOnly
+                                            size="sm"
+                                            variant="light"
+                                            onPress={(e) => {
+                                                e.preventDefault()
+                                                handleEditTool(tool)
+                                            }}
+                                        >
+                                            <Icon icon="solar:pen-2-linear" />
+                                        </Button>
+                                    }
+                                >
+                                    {tool}
+                                </DropdownItem>
                             ))}
                         </DropdownMenu>
                     </Dropdown>
                     {availableTools.length === 0 && !isLoadingTools && (
                         <p className="text-sm text-default-500 mt-2">
-                            No tools available.
+                            No tools available. Click "New Tool" to create one.
                         </p>
                     )}
                     {!isLast && <hr className="my-2" />}
+                    <ToolEditor
+                        isOpen={isToolEditorOpen}
+                        onClose={() => {
+                            setIsToolEditorOpen(false)
+                            setEditingTool(null)
+                        }}
+                        onSave={handleSaveTool}
+                        initialFilename={editingTool?.filename || ''}
+                        initialContent={editingTool?.content || defaultToolTemplate}
+                    />
                 </div>
             )
         }
@@ -1407,6 +1533,61 @@ const NodeSidebar: React.FC<NodeSidebarProps> = ({ nodeID, readOnly }) => {
             setCurrentModelConstraints(null)
         }
     }, [currentNodeConfig?.llm_info?.model, nodeSchema])
+
+    // Add to useEffect section
+    useEffect(() => {
+        const fetchToolFiles = async () => {
+            try {
+                const files = await listToolFiles()
+                setToolFiles(files)
+            } catch (error) {
+                console.error('Error fetching tool files:', error)
+            }
+        }
+
+        if (node?.type === 'ToolCallNode') {
+            fetchToolFiles()
+        }
+    }, [node?.type])
+
+    // Add new handlers for tool management
+    const handleCreateTool = () => {
+        setEditingTool(null)
+        setIsToolEditorOpen(true)
+    }
+
+    const handleEditTool = async (filename: string) => {
+        try {
+            const response = await getToolFile(filename)
+            if (response.success && response.data) {
+                setEditingTool({
+                    filename: filename,
+                    content: response.data.content,
+                })
+                setIsToolEditorOpen(true)
+            }
+        } catch (error) {
+            console.error('Error fetching tool content:', error)
+        }
+    }
+
+    const handleSaveTool = async (filename: string, content: string) => {
+        try {
+            if (editingTool) {
+                await updateToolFile(filename, content)
+            } else {
+                await createToolFile(filename, content)
+            }
+            // Refresh tools list
+            const tools = await listTools()
+            setAvailableTools(tools.available_tools)
+            const files = await listToolFiles()
+            setToolFiles(files)
+        } catch (error) {
+            console.error('Error saving tool:', error)
+            throw error
+        }
+    }
 
     return (
         <Card
