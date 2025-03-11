@@ -44,7 +44,7 @@ import { throttle } from 'lodash'
 import { Icon } from '@iconify/react'
 import { toPng } from 'html-to-image'
 
-interface FlowCanvasProps {
+interface EditorCanvasProps {
     workflowData?: WorkflowCreateRequest
     workflowID?: string
     onDownloadImageInit?: (handler: () => void) => void
@@ -93,7 +93,7 @@ const groupNodesBySubcategory = (nodes: FlowWorkflowNodeType[]): GroupedNodes =>
 }
 
 // Create a wrapper component that includes ReactFlow logic
-const FlowCanvasContent: React.FC<FlowCanvasProps> = ({ workflowData, workflowID, onDownloadImageInit }) => {
+const EditorCanvasContent: React.FC<EditorCanvasProps> = ({ workflowData, workflowID, onDownloadImageInit }) => {
     const dispatch = useDispatch()
     const projectName = useSelector((state: RootState) => state.flow.projectName)
 
@@ -703,10 +703,10 @@ const FlowCanvasContent: React.FC<FlowCanvasProps> = ({ workflowData, workflowID
 }
 
 // Main component that provides the ReactFlow context
-const FlowCanvas: React.FC<FlowCanvasProps> = ({ workflowData, workflowID, onDownloadImageInit }) => {
+const EditorCanvas: React.FC<EditorCanvasProps> = ({ workflowData, workflowID, onDownloadImageInit }) => {
     return (
         <ReactFlowProvider>
-            <FlowCanvasContent
+            <EditorCanvasContent
                 workflowData={workflowData}
                 workflowID={workflowID}
                 onDownloadImageInit={onDownloadImageInit}
@@ -715,4 +715,4 @@ const FlowCanvas: React.FC<FlowCanvasProps> = ({ workflowData, workflowID, onDow
     )
 }
 
-export default FlowCanvas
+export default EditorCanvas

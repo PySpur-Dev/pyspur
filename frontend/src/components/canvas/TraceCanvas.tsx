@@ -46,7 +46,7 @@ import CustomEdge from './Edge'
 import Operator from './footer/Operator'
 import { TaskResponse } from '@/types/api_types/taskSchemas'
 
-interface RunViewFlowCanvasProps {
+interface TraceCanvasProps {
     workflowData?: { name: string; definition: WorkflowDefinition }
     workflowID?: string
     tasksData?: TaskResponse[]
@@ -59,7 +59,7 @@ interface HelperLines {
     vertical: number | null
 }
 
-const RunViewFlowCanvasContent: React.FC<RunViewFlowCanvasProps> = ({
+const TraceCanvasContent: React.FC<TraceCanvasProps> = ({
     workflowData,
     workflowID,
     tasksData,
@@ -452,7 +452,7 @@ const RunViewFlowCanvasContent: React.FC<RunViewFlowCanvasProps> = ({
     )
 }
 
-const RunViewFlowCanvas: React.FC<RunViewFlowCanvasProps> = ({
+const TraceCanvas: React.FC<TraceCanvasProps> = ({
     workflowData,
     workflowID,
     tasksData,
@@ -461,7 +461,7 @@ const RunViewFlowCanvas: React.FC<RunViewFlowCanvasProps> = ({
 }) => {
     return (
         <ReactFlowProvider>
-            <RunViewFlowCanvasContent
+            <TraceCanvasContent
                 key={`flow-content-${workflowID}`}
                 workflowData={workflowData}
                 workflowID={workflowID}
@@ -473,4 +473,4 @@ const RunViewFlowCanvas: React.FC<RunViewFlowCanvasProps> = ({
     )
 }
 
-export default RunViewFlowCanvas
+export default TraceCanvas

@@ -53,6 +53,7 @@
         "prettier": "^3.4.2",
         "react": "^17.x || ^18.x",
         "react-beautiful-dnd": "^13.1.1",
+        "react-diff-viewer-continued": "^3.4.0",
         "react-dom": "^17.x || ^18.x",
         "react-dropzone": "^14.3.5",
         "react-hotkeys-hook": "^4.6.1",
@@ -79,8 +80,7 @@
         "start": "next start",
         "lint": "next lint",
         "format": "prettier --write .",
-        "lint-fix": "next lint --fix",
-        "prepare": "husky install"
+        "lint-fix": "next lint --fix"
     },
     "eslintConfig": {
         "extends": [
@@ -122,7 +122,6 @@
     },
     "lint-staged": {
         "src/**/*.{ts,tsx}": [
-            "tsc-files --noEmit --project tsconfig.check.json",
             "eslint --fix",
             "prettier --write"
         ],

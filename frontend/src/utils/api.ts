@@ -1,30 +1,36 @@
-import axios from 'axios'
-import JSPydanticModel from './JSPydanticModel' // Import the JSPydanticModel class
-import { WorkflowCreateRequest, WorkflowDefinition, WorkflowResponse } from '@/types/api_types/workflowSchemas'
-import { DatasetResponse, DatasetListResponse } from '@/types/api_types/datasetSchemas'
-import { EvalRunRequest, EvalRunResponse } from '@/types/api_types/evalSchemas'
-import { NodeTypeSchema, MinimumNodeConfigSchema } from '@/types/api_types/nodeTypeSchemas'
-import { OutputFileResponse } from '@/types/api_types/outputFileSchemas'
-import { RunResponse } from '@/types/api_types/runSchemas'
-import { PauseHistoryResponse, PausedWorkflowResponse, ResumeActionRequest } from '@/types/api_types/pausedWorkflowSchemas'
 import {
     MessageGenerationRequest,
     MessageGenerationResponse,
-    SchemaGenerationRequest,
-    SchemaGenerationResponse
+    SchemaGenerationResponse,
 } from '@/types/api_types/aiGenerationSchemas'
+import { DatasetListResponse, DatasetResponse } from '@/types/api_types/datasetSchemas'
+import { EvalRunRequest, EvalRunResponse } from '@/types/api_types/evalSchemas'
+import { NodeTypeSchema } from '@/types/api_types/nodeTypeSchemas'
+import { OutputFileResponse } from '@/types/api_types/outputFileSchemas'
 import {
-    DocumentChunkSchema,
-    DocumentWithChunksSchema,
-    ChunkPreviewSchema,
+    PauseHistoryResponse,
+    PausedWorkflowResponse,
+    ResumeActionRequest,
+} from '@/types/api_types/pausedWorkflowSchemas'
+import {
     ChunkPreviewResponseSchema,
     ChunkTemplateSchema,
     DocumentCollectionCreateRequestSchema,
     DocumentCollectionResponseSchema,
+    DocumentWithChunksSchema,
+    ProcessingProgressSchema,
     VectorIndexCreateRequestSchema,
     VectorIndexResponseSchema,
-    ProcessingProgressSchema
 } from '@/types/api_types/ragSchemas'
+import { RunResponse } from '@/types/api_types/runSchemas'
+import {
+    WorkflowCreateRequest,
+    WorkflowDefinition,
+    WorkflowResponse,
+    WorkflowVersionResponse,
+} from '@/types/api_types/workflowSchemas'
+import axios from 'axios'
+import JSPydanticModel from './JSPydanticModel' // Import the JSPydanticModel class
 
 const API_BASE_URL =
     typeof window !== 'undefined'
@@ -485,6 +491,25 @@ export const getWorkflowOutputVariables = async (workflowId: string): Promise<an
         return response.data
     } catch (error) {
         console.error(`Error fetching output variables for workflow ${workflowId}:`, error)
+        throw error
+    }
+}
+
+export const getWorkflowVersions = async (
+    workflowId: string,
+    page: number = 1,
+    pageSize: number = 10
+): Promise<WorkflowVersionResponse[]> => {
+    try {
+        const response = await axios.get(`${API_BASE_URL}/wf/${workflowId}/versions/`, {
+            params: {
+                page,
+                page_size: pageSize,
+            },
+        })
+        return response.data
+    } catch (error) {
+        console.error(`Error fetching versions for workflow ${workflowId}:`, error)
         throw error
     }
 }
@@ -1084,55 +1109,49 @@ export const listPausedWorkflows = async (
     try {
         const response = await axios.get(`${API_BASE_URL}/wf/paused_workflows/`, {
             params: { page, page_size: pageSize },
-        });
-        return response.data;
+        })
+        return response.data
     } catch (error) {
-        console.error('Error listing paused workflows:', error);
-        throw error;
+        console.error('Error listing paused workflows:', error)
+        throw error
     }
 }
 
 export const getPauseHistory = async (runId: string): Promise<PauseHistoryResponse[]> => {
     try {
-        const response = await axios.get(`${API_BASE_URL}/wf/pause_history/${runId}/`);
-        return response.data;
+        const response = await axios.get(`${API_BASE_URL}/wf/pause_history/${runId}/`)
+        return response.data
     } catch (error) {
-        console.error('Error getting pause history:', error);
-        throw error;
+        console.error('Error getting pause history:', error)
+        throw error
     }
 }
 
 /**
  * Take action on a paused workflow
  */
-export const takePauseAction = async (
-    runId: string,
-    actionRequest: ResumeActionRequest
-): Promise<RunResponse> => {
+export const takePauseAction = async (runId: string, actionRequest: ResumeActionRequest): Promise<RunResponse> => {
     try {
-        const response = await axios.post(
-            `${API_BASE_URL}/wf/process_pause_action/${runId}/`,
-            actionRequest
-        );
-        return response.data;
+        const response = await axios.post(`${API_BASE_URL}/wf/process_pause_action/${runId}/`, actionRequest)
+        return response.data
     } catch (error) {
-        console.error('Error taking action on paused workflow:', error);
-        throw error;
+        console.error('Error taking action on paused workflow:', error)
+        throw error
     }
-};
+}
 
 /**
  * Cancel a workflow that is awaiting human approval
  */
 export const cancelWorkflow = async (runId: string): Promise<RunResponse> => {
     try {
-        const response = await axios.post(`${API_BASE_URL}/wf/cancel_workflow/${runId}/`);
-        return response.data;
+        const response = await axios.post(`${API_BASE_URL}/wf/cancel_workflow/${runId}/`)
+        return response.data
     } catch (error) {
-        console.error('Error canceling workflow:', error);
-        throw error;
+        console.error('Error canceling workflow:', error)
+        throw error
     }
-};
+}
 
 export const generateSchema = async (
     description: string,
@@ -1141,7 +1160,7 @@ export const generateSchema = async (
     try {
         const response = await axios.post(`${API_BASE_URL}/ai/generate_schema/`, {
             description,
-            existing_schema: existingSchema
+            existing_schema: existingSchema,
         })
         return response.data
     } catch (error) {
@@ -1150,9 +1169,7 @@ export const generateSchema = async (
     }
 }
 
-export const generateMessage = async (
-    request: MessageGenerationRequest
-): Promise<MessageGenerationResponse> => {
+export const generateMessage = async (request: MessageGenerationRequest): Promise<MessageGenerationResponse> => {
     try {
         const response = await axios.post(`${API_BASE_URL}/ai/generate_message/`, request)
         return response.data

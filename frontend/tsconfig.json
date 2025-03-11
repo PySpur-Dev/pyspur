@@ -27,6 +27,17 @@
         "noErrorTruncation": true,
         "preserveWatchOutput": true
     },
-    "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", "src/**/*", "postcss.config.js", "tailwind.config.js"],
+    "include": [
+        "next-env.d.ts",
+        "**/*.ts",
+        "**/*.tsx",
+        "src/**/*",
+        "postcss.config.js",
+        "tailwind.config.js",
+        "src/types/*.d.ts",
+        "**/*.css",
+        "**/*.module.css",
+        "src/types/**/*.d.ts"
+    ],
     "exclude": ["node_modules"]
 }

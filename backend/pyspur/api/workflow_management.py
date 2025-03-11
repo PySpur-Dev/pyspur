@@ -5,6 +5,7 @@ from typing import Dict, List
 
 from fastapi import (
     APIRouter,
+    BackgroundTasks,
     Depends,
     File,
     Form,
@@ -12,31 +13,33 @@ from fastapi import (
     Query,
     UploadFile,
     status,
-    BackgroundTasks,
 )
 from sqlalchemy.orm import Session
 
 from ..database import get_db
 from ..models.workflow_model import WorkflowModel as WorkflowModel
+from ..models.workflow_version_model import WorkflowVersionModel as WorkflowVersionModel
 from ..nodes.primitives.input import InputNodeConfig
-from ..schemas.workflow_schemas import (
-    WorkflowCreateRequestSchema,
-    WorkflowDefinitionSchema,
-    WorkflowNodeSchema,
-    WorkflowResponseSchema,
-)
 from ..schemas.pause_schemas import (
     PausedWorkflowResponseSchema,
     PauseHistoryResponseSchema,
 )
 from ..schemas.run_schemas import (
-    RunResponseSchema,
     ResumeRunRequestSchema,
+    RunResponseSchema,
+)
+from ..schemas.workflow_schemas import (
+    WorkflowCreateRequestSchema,
+    WorkflowDefinitionSchema,
+    WorkflowNodeSchema,
+    WorkflowResponseSchema,
+    WorkflowVersionResponseSchema,
 )
 from .workflow_run import get_paused_workflows, get_run_pause_history, process_pause_action
 
 # Main router for workflow management
 router = APIRouter()
+
 
 # Paused workflow endpoints
 @router.get(
@@ -52,14 +55,18 @@ def list_paused_workflows(
 ) -> List[PausedWorkflowResponseSchema]:
     return get_paused_workflows(db, page, page_size)
 
+
 @router.get(
     "/pause_history/{run_id}/",
     response_model=List[PauseHistoryResponseSchema],
     description="Get pause history for a run",
     tags=["workflows"],
 )
-def get_pause_history(run_id: str, db: Session = Depends(get_db)) -> List[PauseHistoryResponseSchema]:
+def get_pause_history(
+    run_id: str, db: Session = Depends(get_db)
+) -> List[PauseHistoryResponseSchema]:
     return get_run_pause_history(db, run_id)
+
 
 @router.post(
     "/process_pause_action/{run_id}/",
@@ -73,8 +80,7 @@ def take_pause_action(
     background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
 ) -> RunResponseSchema:
-    """
-    Process an action on a paused workflow.
+    """Process an action on a paused workflow.
 
     It allows approving, declining, or overriding a workflow that has been paused
     for human intervention.
@@ -87,6 +93,7 @@ def take_pause_action(
 
     Returns:
         Information about the resumed run
+
     """
     return process_pause_action(db, run_id, action_request, background_tasks)
 
@@ -257,7 +264,7 @@ def delete_workflow(workflow_id: str, db: Session = Depends(get_db)):
         raise HTTPException(
             status_code=500,
             detail=f"Error deleting workflow: {str(e)}",
-        )
+        ) from e
 
     return None
 
@@ -302,9 +309,7 @@ def duplicate_workflow(workflow_id: str, db: Session = Depends(get_db)) -> Workf
 def get_workflow_output_variables(
     workflow_id: str, db: Session = Depends(get_db)
 ) -> List[Dict[str, str]]:
-    """
-    Fetch the output variables (leaf nodes) of a workflow.
-    """
+    """Fetch the output variables (leaf nodes) of a workflow."""
     workflow = db.query(WorkflowModel).filter(WorkflowModel.id == workflow_id).first()
     if not workflow:
         raise HTTPException(status_code=404, detail="Workflow not found")
@@ -351,7 +356,7 @@ async def upload_test_files(
     node_id: str = Form(...),
     db: Session = Depends(get_db),
 ) -> Dict[str, List[str]]:
-    """Upload files for test inputs and return their paths"""
+    """Upload files for test inputs and return their paths."""
     try:
         # Get the workflow
         workflow = db.query(WorkflowModel).filter(WorkflowModel.id == workflow_id).first()
@@ -380,4 +385,50 @@ async def upload_test_files(
 
         return {node_id: saved_paths}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+@router.get(
+    "/{workflow_id}/versions/",
+    response_model=List[WorkflowVersionResponseSchema],
+    description="Get all versions of a workflow",
+    tags=["workflows"],
+)
+def get_workflow_versions(
+    workflow_id: str,
+    page: int = Query(default=1, ge=1),
+    page_size: int = Query(default=10, ge=1, le=100),
+    db: Session = Depends(get_db),
+) -> List[WorkflowVersionResponseSchema]:
+    """Retrieve all versions of a workflow, ordered by version number descending.
+
+    Args:
+        workflow_id: The ID of the workflow
+        page: Page number for pagination
+        page_size: Number of items per page
+        db: Database session
+
+    Returns:
+        List of workflow versions
+
+    """
+    # Check if workflow exists
+    workflow = db.query(WorkflowModel).filter(WorkflowModel.id == workflow_id).first()
+    if not workflow:
+        raise HTTPException(status_code=404, detail="Workflow not found")
+
+    # Calculate offset for pagination
+    offset = (page - 1) * page_size
+
+    # Query workflow versions
+    versions = (
+        db.query(WorkflowVersionModel)
+        .filter(WorkflowVersionModel.workflow_id == workflow_id)
+        .order_by(WorkflowVersionModel.version.desc())
+        .offset(offset)
+        .limit(page_size)
+        .all()
+    )
+
+    # Convert models to response schemas
+    return [WorkflowVersionResponseSchema.model_validate(version) for version in versions]

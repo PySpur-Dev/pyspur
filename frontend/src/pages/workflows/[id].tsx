@@ -13,7 +13,7 @@ import { AppDispatch } from '../../store/store'
 import { WorkflowCreateRequest, WorkflowResponse } from '@/types/api_types/workflowSchemas'
 
 // Use dynamic import for FlowCanvas to avoid SSR issues
-const FlowCanvas = dynamic(() => import('../../components/canvas/FlowCanvas'), {
+const EditorCanvas = dynamic(() => import('../../components/canvas/EditorCanvas'), {
     ssr: false,
 })
 
@@ -54,7 +54,7 @@ const WorkflowPage: React.FC = () => {
             <div style={{ height: '100vh', display: 'flex', flexDirection: 'column' }}>
                 <Header activePage="workflow" handleDownloadImage={handleDownloadImage} />
                 <div style={{ flexGrow: 1 }}>
-                    <FlowCanvas
+                    <EditorCanvas
                         workflowData={workflowData as WorkflowCreateRequest}
                         workflowID={id as string}
                         onDownloadImageInit={(handler) => setHandleDownloadImage(() => handler)}

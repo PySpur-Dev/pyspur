@@ -33,6 +33,10 @@
                 "ms-vscode.vscode-typescript-next"
             ],
             "settings": {
+                // Git settings
+                // bypass pre-commit hooks not allowed
+                "git.allowNoVerifyCommit": false,
+                
                 // Python analysis settings
                 "python.analysis.autoImportCompletions": true,
                 "python.analysis.autoImportUserSymbols": true,
