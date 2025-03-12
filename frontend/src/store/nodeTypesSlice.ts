@@ -1,7 +1,7 @@
-import { createSlice, createAsyncThunk, PayloadAction } from '@reduxjs/toolkit'
+import { createAsyncThunk, createSlice, PayloadAction } from '@reduxjs/toolkit'
+import { FieldMetadata, ModelConstraintsMap } from '../types/api_types/modelMetadataSchemas'
 import { getNodeTypes } from '../utils/api'
 import { RootState } from './store'
-import { ModelConstraintsMap, FieldMetadata } from '../types/api_types/modelMetadataSchemas'
 
 // Define the types for the conditional node
 type ComparisonOperator =
@@ -28,13 +28,6 @@ interface RouteCondition {
     conditions: Condition[]
 }
 
-interface RouterNodeConfig {
-    routes: RouteCondition[]
-    input_schema: Record<string, string>
-    output_schema: Record<string, string>
-    title?: string
-}
-
 // Update the NodeMetadata interface to include config fields
 export interface NodeMetadata {
     name: string
@@ -57,7 +50,6 @@ interface NodeTypesResponse {
     schema: Record<string, any>
     metadata: Record<string, NodeMetadata[]>
 }
-
 
 export interface FlowWorkflowNodeType {
     name: string
@@ -181,7 +173,7 @@ export const getNodeMissingRequiredFields = (
 ): string[] => {
     const categories = Object.keys(metadata)
     for (const category of categories) {
-        const nodeMetadata = metadata[category]?.find(md => md.name === nodeType)
+        const nodeMetadata = metadata[category]?.find((md) => md.name === nodeType)
         if (nodeMetadata) {
             const missingFields: string[] = []
 
@@ -206,9 +198,13 @@ export const getNodeMissingRequiredFields = (
                     // Regular field handling
                     if (fieldMetadata.required) {
                         const value = nodeConfig[field]
-                        if (value === undefined || value === null || value === '' ||
+                        if (
+                            value === undefined ||
+                            value === null ||
+                            value === '' ||
                             (typeof value === 'string' && value.trim() === '') ||
-                            (Array.isArray(value) && value.length === 0)) {
+                            (Array.isArray(value) && value.length === 0)
+                        ) {
                             missingFields.push(field)
                         }
                     }
@@ -220,12 +216,16 @@ export const getNodeMissingRequiredFields = (
                             if (nestedField.toLowerCase().includes('schema')) {
                                 return
                             }
-                            
+
                             if (nestedMetadata.required) {
                                 const nestedValue = nodeConfig[field]?.[nestedField]
-                                if (nestedValue === undefined || nestedValue === null || nestedValue === '' ||
+                                if (
+                                    nestedValue === undefined ||
+                                    nestedValue === null ||
+                                    nestedValue === '' ||
                                     (typeof nestedValue === 'string' && nestedValue.trim() === '') ||
-                                    (Array.isArray(nestedValue) && nestedValue.length === 0)) {
+                                    (Array.isArray(nestedValue) && nestedValue.length === 0)
+                                ) {
                                     missingFields.push(`${field}.${nestedField}`)
                                 }
                             }

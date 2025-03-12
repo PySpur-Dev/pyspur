@@ -1,13 +1,13 @@
-import React, { useState, useEffect } from 'react'
-import CodeMirror from '@uiw/react-codemirror'
-import { python } from '@codemirror/lang-python'
 import { json } from '@codemirror/lang-json'
-import { oneDark } from '@codemirror/theme-one-dark'
-import { Modal, ModalContent, ModalHeader, ModalBody, ModalFooter, Button, useDisclosure } from '@heroui/react'
-import { Icon } from '@iconify/react'
-import { linter, Diagnostic } from '@codemirror/lint'
-import { EditorView } from '@codemirror/view'
+import { python } from '@codemirror/lang-python'
 import { syntaxTree } from '@codemirror/language'
+import { linter } from '@codemirror/lint'
+import { oneDark } from '@codemirror/theme-one-dark'
+import { EditorView } from '@codemirror/view'
+import { Button, Modal, ModalBody, ModalContent, ModalFooter, ModalHeader, useDisclosure } from '@heroui/react'
+import { Icon } from '@iconify/react'
+import CodeMirror from '@uiw/react-codemirror'
+import React, { useEffect, useState } from 'react'
 
 // Add custom styling for JSON error highlighting
 const jsonErrorTheme = EditorView.baseTheme({
@@ -25,6 +25,7 @@ interface CodeEditorProps {
     mode?: 'json' | 'python' | 'javascript' // Add mode prop to determine which language to use
     readOnly?: boolean
     height?: string
+    modalSize?: 'xs' | 'sm' | 'md' | 'lg' | 'xl' | '2xl' | '3xl' | '4xl' | '5xl' | 'full' // Add modalSize prop
 }
 
 const CodeEditor: React.FC<CodeEditorProps> = ({
@@ -35,6 +36,7 @@ const CodeEditor: React.FC<CodeEditorProps> = ({
     label = 'Code Editor',
     readOnly = false,
     height = '200px',
+    modalSize = '5xl',
 }) => {
     const [value, setValue] = useState<string>('')
     const { isOpen, onOpen, onOpenChange } = useDisclosure()
@@ -157,7 +159,13 @@ const CodeEditor: React.FC<CodeEditorProps> = ({
                 className={`border ${readOnly ? 'cursor-not-allowed opacity-75' : ''}`}
                 editable={!readOnly}
             />
-            <Modal isOpen={isOpen} onOpenChange={onOpenChange} size="5xl" scrollBehavior="inside" placement="center">
+            <Modal
+                isOpen={isOpen}
+                onOpenChange={onOpenChange}
+                size={modalSize}
+                scrollBehavior="inside"
+                placement="center"
+            >
                 <ModalContent>
                     {(onClose) => (
                         <>
@@ -165,7 +173,7 @@ const CodeEditor: React.FC<CodeEditorProps> = ({
                             <ModalBody>
                                 <CodeMirror
                                     value={modalValue}
-                                    height="60vh"
+                                    height="90vh"
                                     theme={oneDark}
                                     extensions={getExtensions()}
                                     onChange={handleModalEditorChange}

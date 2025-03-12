@@ -1,22 +1,20 @@
-import React, { useState, Dispatch, SetStateAction } from 'react'
-import { useSelector } from 'react-redux'
-import {
-    Modal,
-    ModalContent,
-    ModalHeader,
-    ModalBody,
-    ModalFooter,
-    Button,
-    Tooltip,
-    Select,
-    SelectItem,
-    Switch,
-} from '@heroui/react'
-import { Icon } from '@iconify/react'
-import SyntaxHighlighter from 'react-syntax-highlighter/dist/cjs/prism'
-import { oneDark } from 'react-syntax-highlighter/dist/cjs/styles/prism'
 import { FlowState } from '@/types/api_types/flowStateSchema'
 import { TestInput } from '@/types/api_types/workflowSchemas'
+import {
+    Button,
+    Modal,
+    ModalBody,
+    ModalContent,
+    ModalFooter,
+    ModalHeader,
+    Select,
+    SelectItem,
+    Tooltip,
+} from '@heroui/react'
+import { Icon } from '@iconify/react'
+import React, { Dispatch, SetStateAction, useState } from 'react'
+import { useSelector } from 'react-redux'
+import SyntaxHighlighter, { oneDark } from 'react-syntax-highlighter'
 
 interface DeployModalProps {
     isOpen: boolean
@@ -252,7 +250,7 @@ int main() {
     }
 
     return (
-        <Modal isOpen={isOpen} onOpenChange={onOpenChange} size="2xl">
+        <Modal isOpen={isOpen} onOpenChange={onOpenChange} size="full">
             <ModalContent>
                 <ModalHeader>
                     <div>API Endpoint Information</div>

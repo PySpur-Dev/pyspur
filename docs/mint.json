@@ -7,12 +7,12 @@
   },
   "favicon": "/favicon.svg",
   "colors": {
-    "primary": "#0D9373",
-    "light": "#07C983",
-    "dark": "#0D9373",
+    "primary": "#333333",
+    "light": "#555555",
+    "dark": "#222222",
     "anchors": {
-      "from": "#0D9373",
-      "to": "#07C983"
+      "from": "#444444",
+      "to": "#666666"
     }
   },
   "topbarLinks": [
@@ -43,8 +43,7 @@
       "name": "Talk to founders",
       "icon": "calendar",
       "url": "https://calendly.com/d/cnf9-57m-bv3/pyspur-founders"
-    }
-  ,
+    },
     {
       "name": "Email",
       "icon": "envelope",
@@ -57,9 +56,44 @@
       "pages": [
         "introduction",
         "example",
-        "quickstart"
+        "quickstart",
+        "essentials/deployment"
+      ]
+    },
+    {
+      "group": "Chatbots",
+      "pages": [
+        "chatbots/concepts",
+        "chatbots/slack"
+      ]
+    },
+    {
+      "group": "RAG",
+      "pages": [
+        "rag/concepts"
+      ]
+    },
+    {
+      "group": "Evals",
+      "pages": [
+        "evals/concepts",
+        "evals/stock_benchmarks"
+      ]
+    },
+    {
+      "group": "API Reference",
+      "pages": [
+        "api-reference/introduction",
+        "api-reference/workflow-management",
+        "api-reference/workflow-execution",
+        "api-reference/run-management",
+        "api-reference/rag",
+        "api-reference/evaluations",
+        "api-reference/users",
+        "api-reference/sessions"
       ]
     }
+
   ],
   "footerSocials": {
     "x": "https://x.com/pyspurdev",

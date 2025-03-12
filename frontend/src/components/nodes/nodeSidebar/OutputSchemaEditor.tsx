@@ -1,11 +1,28 @@
-import { Alert, Button, Card, CardBody, Modal, ModalBody, ModalContent, ModalFooter, ModalHeader, Radio, RadioGroup, Tab, Tabs, Textarea, Tooltip, useDisclosure } from '@heroui/react'
+import {
+    Alert,
+    Button,
+    Card,
+    CardBody,
+    Modal,
+    ModalBody,
+    ModalContent,
+    ModalFooter,
+    ModalHeader,
+    Radio,
+    RadioGroup,
+    Tab,
+    Tabs,
+    Textarea,
+    Tooltip,
+    useDisclosure,
+} from '@heroui/react'
 import { Icon } from '@iconify/react'
-import React, { useState, useEffect } from 'react'
+import axios from 'axios'
+import React, { useEffect, useState } from 'react'
 import { jsonOptions } from '../../../constants/jsonOptions'
 import { extractSchemaFromJsonSchema, generateJsonSchemaFromSchema } from '../../../utils/schemaUtils'
 import CodeEditor from '../../CodeEditor'
 import SchemaEditor from './SchemaEditor'
-import axios from 'axios'
 
 interface OutputSchemaEditorProps {
     nodeID: string
@@ -83,7 +100,7 @@ const OutputSchemaEditor: React.FC<OutputSchemaEditorProps> = ({
         try {
             const response = await axios.post('/api/ai/generate_schema/', {
                 description: description,
-                existing_schema: generationType === 'enhance' ? schema : undefined
+                existing_schema: generationType === 'enhance' ? schema : undefined,
             })
 
             const newSchema = JSON.stringify(response.data, null, 2)
@@ -106,7 +123,7 @@ const OutputSchemaEditor: React.FC<OutputSchemaEditorProps> = ({
                 variant="light"
                 startContent={<Icon icon="solar:magic-stick-linear" width={20} />}
                 onClick={onOpen}
-                isDisabled={!hasOpenAIKey}
+                isDisabled={!hasOpenAIKey || readOnly}
             >
                 AI Generate
             </Button>
@@ -142,30 +159,29 @@ const OutputSchemaEditor: React.FC<OutputSchemaEditorProps> = ({
                     </div>
                 </Alert>
             )}
-            <div className="flex items-center gap-2 mb-2">
-                {renderGenerateButton()}
-            </div>
+            <div className="flex items-center gap-2 mb-2">{renderGenerateButton()}</div>
 
             <Modal
                 isOpen={isOpen}
                 onClose={resetModalState}
                 size="2xl"
+                isDismissable={!isGenerating}
+                hideCloseButton={isGenerating}
             >
                 <ModalContent>
-                    <ModalHeader className="flex flex-col gap-1">
-                        Generate Schema
-                    </ModalHeader>
+                    <ModalHeader className="flex flex-col gap-1">Generate Schema</ModalHeader>
                     <ModalBody>
                         <RadioGroup
                             value={generationType}
                             onValueChange={(value) => setGenerationType(value as 'new' | 'enhance')}
                             className="mb-4"
+                            isDisabled={isGenerating}
                         >
                             <Radio value="new">Create New Schema</Radio>
                             <Radio
                                 value="enhance"
-                                isDisabled={!schema}
-                                description={!schema ? "No existing schema to enhance" : undefined}
+                                isDisabled={!schema || isGenerating}
+                                description={!schema ? 'No existing schema to enhance' : undefined}
                             >
                                 Enhance Existing Schema
                             </Radio>
@@ -187,25 +203,24 @@ const OutputSchemaEditor: React.FC<OutputSchemaEditorProps> = ({
                         )}
 
                         <Textarea
-                            label={generationType === 'new'
-                                ? "Describe the schema you want to generate"
-                                : "Describe how you want to enhance the schema"
+                            label={
+                                generationType === 'new'
+                                    ? 'Describe the schema you want to generate'
+                                    : 'Describe how you want to enhance the schema'
                             }
-                            placeholder={generationType === 'new'
-                                ? "Example: A schema for a user profile with name, email, age, and a list of hobbies"
-                                : "Example: Add a phone number field and make email required"
+                            placeholder={
+                                generationType === 'new'
+                                    ? 'Example: A schema for a user profile with name, email, age, and a list of hobbies'
+                                    : 'Example: Add a phone number field and make email required'
                             }
                             value={description}
                             onChange={(e) => setDescription(e.target.value)}
                             className="mb-2"
+                            isDisabled={isGenerating}
                         />
                     </ModalBody>
                     <ModalFooter>
-                        <Button
-                            size="sm"
-                            variant="light"
-                            onClick={resetModalState}
-                        >
+                        <Button size="sm" variant="light" onClick={resetModalState} isDisabled={isGenerating}>
                             Cancel
                         </Button>
                         <Button
@@ -213,6 +228,7 @@ const OutputSchemaEditor: React.FC<OutputSchemaEditorProps> = ({
                             color="primary"
                             onClick={handleGenerateSchema}
                             isLoading={isGenerating}
+                            isDisabled={isGenerating}
                         >
                             Generate
                         </Button>
@@ -222,11 +238,11 @@ const OutputSchemaEditor: React.FC<OutputSchemaEditorProps> = ({
 
             <Tabs
                 aria-label="Schema Editor Options"
-                disabledKeys={readOnly ? ['simple', 'json'] : error ? ['simple'] : []}
+                disabledKeys={readOnly ? ['simple', 'json'] : []}
                 selectedKey={selectedTab}
                 onSelectionChange={(key) => {
-                    if (error && key === 'simple') {
-                        return // Prevent switching to simple editor when there are errors
+                    if (readOnly) {
+                        return // Prevent switching in readOnly mode
                     }
                     setSelectedTab(key as string)
                 }}

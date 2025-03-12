@@ -1,4 +1,4 @@
-import RunViewFlowCanvas from '@/components/canvas/RunViewFlowCanvas'
+import TraceCanvas from '@/components/canvas/TraceCanvas'
 import { useRouter } from 'next/router'
 import React, { useEffect, useState } from 'react'
 import { useDispatch, useSelector } from 'react-redux'
@@ -84,7 +84,7 @@ const TracePage: React.FC = () => {
                     handleDownloadImage={handleDownloadImage}
                 />
                 <div style={{ flexGrow: 1 }}>
-                    <RunViewFlowCanvas
+                    <TraceCanvas
                         workflowData={workflowData}
                         workflowID={workflowId}
                         tasksData={tasksData}

@@ -6,7 +6,7 @@ import {
     NodeTypesConfig,
     Position,
 } from '@/types/api_types/nodeTypeSchemas'
-import { TestInput, WorkflowDefinition } from '@/types/api_types/workflowSchemas'
+import { SpurType, TestInput, WorkflowDefinition } from '@/types/api_types/workflowSchemas'
 import { isTargetAncestorOfSource } from '@/utils/cyclicEdgeUtils'
 import { computeJsonSchemaIntersection } from '@/utils/schemaUtils'
 import { createSlice, PayloadAction } from '@reduxjs/toolkit'
@@ -16,10 +16,10 @@ import { v4 as uuidv4 } from 'uuid'
 import { createNode } from '../utils/nodeFactory'
 
 const initialState: FlowState = {
-    nodeTypes: {},
     nodes: [],
     edges: [],
     nodeConfigs: {},
+    nodeTypes: {},
     workflowID: null,
     selectedNode: null,
     selectedEdgeId: null,
@@ -34,6 +34,7 @@ const initialState: FlowState = {
         future: [],
     },
     isRunModalOpen: false,
+    spurType: SpurType.WORKFLOW, // Default to regular workflow
 }
 
 const saveToHistory = (state: FlowState) => {
@@ -131,9 +132,11 @@ const flowSlice = createSlice({
             state.workflowID = workflowID
             state.projectName = name
             state.nodeTypes = action.payload.nodeTypes
+            state.spurType = definition.spur_type || SpurType.WORKFLOW
             const { nodes, links } = definition
             state.nodes = nodes.map((node) => {
                 const { node: nodeObj } = createNode(
+                    // @ts-ignore - nodeTypes will be properly typed at runtime
                     state.nodeTypes,
                     node.node_type,
                     node.id,
@@ -248,18 +251,13 @@ const flowSlice = createSlice({
         updateNodeConfigOnly: (state, action: PayloadAction<{ id: string; data: any }>) => {
             const { id, data } = action.payload
             const currentConfig = state.nodeConfigs[id] || {}
-            if (data.few_shot_examples) {
-                const oldExamples = currentConfig.few_shot_examples || []
-                const newExamples = data.few_shot_examples
-                const maxLength = Math.max(oldExamples.length, newExamples.length)
-                const mergedExamples = []
-                for (let i = 0; i < maxLength; i++) {
-                    mergedExamples[i] = { ...(oldExamples[i] || {}), ...(newExamples[i] || {}) }
-                }
+
+            // Handle few_shot_examples directly without merging
+            if (data.few_shot_examples !== undefined) {
                 state.nodeConfigs[id] = {
                     ...currentConfig,
                     ...data,
-                    few_shot_examples: mergedExamples,
+                    few_shot_examples: data.few_shot_examples,
                 }
             } else {
                 state.nodeConfigs[id] = {
@@ -571,6 +569,7 @@ const flowSlice = createSlice({
 
             // Map over nodes and use createNode to generate both node and config
             const createdNodes = nodes.map((node) => {
+                // @ts-ignore - nodeTypes will be properly typed at runtime
                 const result = createNode(state.nodeTypes, node.node_type, node.id, {
                     x: node.coordinates.x,
                     y: node.coordinates.y,

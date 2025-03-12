@@ -14,7 +14,7 @@ import {
 import { RootState } from '../../store/store'
 import BaseNode from './BaseNode'
 import styles from './InputNode.module.css'
-import NodeOutputDisplay from './NodeOutputDisplay'
+import NodeOutputModal from './NodeOutputModal'
 
 interface InputNodeProps {
     id: string
@@ -30,6 +30,7 @@ const InputNode: React.FC<InputNodeProps> = ({ id, data, readOnly = false, ...pr
     const [newFieldValue, setNewFieldValue] = useState<string>('')
     const [isCollapsed, setIsCollapsed] = useState<boolean>(false)
     const [showKeyError, setShowKeyError] = useState<boolean>(false)
+    const [isModalOpen, setIsModalOpen] = useState<boolean>(false)
     const incomingEdges = useSelector(
         (state: RootState) => state.flow.edges.filter((edge) => edge.target === id),
         isEqual
@@ -290,7 +291,8 @@ const InputNode: React.FC<InputNodeProps> = ({ id, data, readOnly = false, ...pr
                     }}
                     classNames={{
                         input: 'text-default-900 dark:text-default-100 placeholder:text-default-500',
-                        inputWrapper: 'shadow-none bg-transparent border-default-200 dark:border-default-700 group-data-[hover=true]:border-default-200 dark:group-data-[hover=true]:border-default-600',
+                        inputWrapper:
+                            'shadow-none bg-transparent border-default-200 dark:border-default-700 group-data-[hover=true]:border-default-200 dark:group-data-[hover=true]:border-default-600',
                     }}
                     endContent={
                         <Button
@@ -335,6 +337,7 @@ const InputNode: React.FC<InputNodeProps> = ({ id, data, readOnly = false, ...pr
                 data={data}
                 style={baseNodeStyles}
                 className="hover:!bg-background"
+                handleOpenModal={setIsModalOpen}
                 {...props}
             >
                 <div className="flex flex-col gap-2">
@@ -346,6 +349,12 @@ const InputNode: React.FC<InputNodeProps> = ({ id, data, readOnly = false, ...pr
                     </div>
                 </div>
             </BaseNode>
+            <NodeOutputModal
+                isOpen={isModalOpen}
+                onOpenChange={setIsModalOpen}
+                title={data?.title || 'Input Node Output'}
+                data={data}
+            />
         </div>
     )
 }

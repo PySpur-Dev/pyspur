@@ -1,19 +1,22 @@
-import React, { useEffect, useState } from 'react'
-import { useRouter } from 'next/router'
+import { SpurType, WorkflowCreateRequest, WorkflowResponse } from '@/types/api_types/workflowSchemas'
 import dynamic from 'next/dynamic'
-import Header from '../../components/Header'
-import { PersistGate } from 'redux-persist/integration/react'
-import { persistor } from '../../store/store'
-import { getWorkflow } from '../../utils/api'
+import { useRouter } from 'next/router'
+import React, { useEffect, useState } from 'react'
 import { useDispatch } from 'react-redux'
+import { PersistGate } from 'redux-persist/integration/react'
+import Header from '../../components/Header'
 import LoadingSpinner from '../../components/LoadingSpinner'
-import { fetchNodeTypes } from '../../store/nodeTypesSlice'
 import { setTestInputs } from '../../store/flowSlice'
-import { AppDispatch } from '../../store/store'
-import { WorkflowCreateRequest, WorkflowResponse } from '@/types/api_types/workflowSchemas'
+import { fetchNodeTypes } from '../../store/nodeTypesSlice'
+import { AppDispatch, persistor } from '../../store/store'
+import { getWorkflow } from '../../utils/api'
 
-// Use dynamic import for FlowCanvas to avoid SSR issues
-const FlowCanvas = dynamic(() => import('../../components/canvas/FlowCanvas'), {
+// Use dynamic import for Canvas components to avoid SSR issues
+const EditorCanvas = dynamic(() => import('../../components/canvas/EditorCanvas'), {
+    ssr: false,
+})
+
+const ChatCanvas = dynamic(() => import('../../components/canvas/ChatCanvas'), {
     ssr: false,
 })
 
@@ -49,16 +52,27 @@ const WorkflowPage: React.FC = () => {
         return <LoadingSpinner />
     }
 
+    // Determine which canvas to show based on spur type
+    const isChatbot = workflowData.definition.spur_type === SpurType.CHATBOT
+
     return (
         <PersistGate loading={null} persistor={persistor}>
-            <div style={{ height: '100vh', display: 'flex', flexDirection: 'column' }}>
+            <div className="h-screen flex flex-col overflow-hidden">
                 <Header activePage="workflow" handleDownloadImage={handleDownloadImage} />
-                <div style={{ flexGrow: 1 }}>
-                    <FlowCanvas
-                        workflowData={workflowData as WorkflowCreateRequest}
-                        workflowID={id as string}
-                        onDownloadImageInit={(handler) => setHandleDownloadImage(() => handler)}
-                    />
+                <div className="flex-grow overflow-hidden">
+                    {isChatbot ? (
+                        <ChatCanvas
+                            workflowData={workflowData as WorkflowCreateRequest}
+                            workflowID={id as string}
+                            onDownloadImageInit={(handler) => setHandleDownloadImage(() => handler)}
+                        />
+                    ) : (
+                        <EditorCanvas
+                            workflowData={workflowData as WorkflowCreateRequest}
+                            workflowID={id as string}
+                            onDownloadImageInit={(handler) => setHandleDownloadImage(() => handler)}
+                        />
+                    )}
                 </div>
             </div>
         </PersistGate>

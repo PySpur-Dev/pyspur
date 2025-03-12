@@ -1,0 +1,120 @@
+---
+title: 'Concepts'
+description: 'Learn how PySpur helps you measure the performance of your AI workflows'
+---
+
+# Understanding Evaluations in PySpur
+
+Evaluation is the process of measuring how well your AI workflows perform against objective benchmarks. Instead of guessing if your workflow is doing a good job, evaluations provide quantitative metrics so you can:
+
+- Measure the accuracy of your workflow's outputs
+- Compare different versions of your workflows
+- Identify areas for improvement
+- Build trust in your AI systems
+
+## Why Evaluate?
+
+Without evaluation, it's difficult to know if your AI systems are performing as expected. Evaluations help you:
+
+- **Verify accuracy**: Ensure your workflows produce correct answers
+- **Track improvement**: Measure progress as you refine your workflows
+- **Compare approaches**: Determine which techniques work best
+- **Build confidence**: Provide evidence of your system's capabilities
+
+## How Evaluations Work in PySpur
+
+The evaluation process in PySpur has three main components:
+
+### 1. Evaluation Benchmarks
+
+PySpur includes pre-built benchmarks from academic and industry standards. Each benchmark:
+
+- Contains a dataset of problems with known correct answers
+- Specifies how to format inputs for your workflow
+- Defines how to extract and evaluate outputs from your workflow
+
+For demonstration purposes, we provide some stock benchmarks for:
+- Mathematical reasoning (GSM8K)
+- Graduate-level Question answering
+
+But the real power of evals will be unlocked when used with data matching your use cases.
+
+### 2. Your Workflow
+
+You connect your existing PySpur workflow to the evaluation system. The workflow:
+- Receives inputs from the evaluation dataset
+- Processes them through your custom logic and AI components
+- Returns outputs that will be compared against the ground truth
+
+### 3. Results and Metrics
+
+After running an evaluation, PySpur provides detailed metrics:
+
+- **Accuracy**: The percentage of correct answers
+- **Per-category breakdowns**: How performance varies across problem types
+- **Example-level results**: Which specific examples succeeded or failed
+- **Visualizations**: Charts and graphs to help interpret results
+
+## The Evaluation Workflow in PySpur
+
+Here's how to run an evaluation in PySpur:
+
+1. **Choose an Evaluation Benchmark**
+   - Browse the available evaluation benchmarks
+   - Review the description, problem type, and sample size
+
+2. **Select a Workflow to Evaluate**
+   - Choose which of your workflows to test
+   - Select the specific output variable to evaluate
+
+3. **Configure the Evaluation**
+   - Choose how many samples to evaluate (up to the max available)
+   - Launch the evaluation job
+
+4. **Review Results**
+   - Monitor the evaluation progress in real-time
+   - Once completed, view detailed accuracy metrics
+   - Analyze per-example results to identify patterns in errors
+
+## Example Evaluation Results
+
+Here's what evaluation results typically look like:
+
+<video
+controls
+  muted
+  loop
+  playsInline
+  className="block dark:hidden w-full aspect-video" src="/images/evals/evals.mp4" />
+<video
+controls
+  muted
+  loop
+  playsInline className="hidden dark:block w-full aspect-video" src="/images/evals/evals.mp4" />
+
+These results show:
+- Overall accuracy across all samples
+- A breakdown of performance by category
+- Individual examples with their outputs and correctness
+- Patterns in what your model gets right or wrong
+
+## Best Practices for Evaluation
+
+For reliable evaluation results in PySpur:
+
+- **Use appropriate benchmarks**: Choose evaluations that match your workflow's purpose
+- **Select enough samples**: Use more samples for more reliable results
+- **Choose the right output variable**: Make sure you're evaluating the right part of your workflow
+- **Iterate based on results**: Use the findings to improve your workflow
+- **Compare systematically**: When testing different approaches, keep other variables constant
+
+## Technical Details
+
+Behind the scenes, PySpur's evaluation system:
+
+1. Loads the evaluation dataset (typically from YAML configuration files)
+2. Runs your workflow on each example in the dataset
+3. Extracts answers from your workflow's output
+4. Compares the predicted answers to ground truth using task-specific criteria
+5. Calculates metrics like accuracy, both overall and by category
+6. Stores results for future reference

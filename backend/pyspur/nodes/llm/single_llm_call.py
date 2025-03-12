@@ -11,6 +11,7 @@ from ._utils import LLMModels, ModelInfo, create_messages, generate_text
 
 load_dotenv()
 
+
 def repair_json(broken_json_str: str) -> str:
     import re
     from re import Match
@@ -46,39 +47,39 @@ def repair_json(broken_json_str: str) -> str:
         repaired = repaired.replace(key, value)
 
     # Remove trailing commas before closing brackets/braces
-    repaired = re.sub(r",\s*([}\]])", r'\1', repaired)
+    repaired = re.sub(r",\s*([}\]])", r"\1", repaired)
 
     # Add missing commas between elements
-    repaired = re.sub(r"([}\"])\s*([{\[])", r'\1,\2', repaired)
+    repaired = re.sub(r"([}\"])\s*([{\[])", r"\1,\2", repaired)
 
     # Fix unquoted string values
-    repaired = re.sub(r'([{,]\s*)(\w+)(\s*:)', r'\1"\2"\3', repaired)
+    repaired = re.sub(r"([{,]\s*)(\w+)(\s*:)", r'\1"\2"\3', repaired)
 
     # Remove any extra whitespace around colons
-    repaired = re.sub(r'\s*:\s*', ':', repaired)
+    repaired = re.sub(r"\s*:\s*", ":", repaired)
 
     # If the string is wrapped in extra quotes, remove them
     if repaired.startswith('"') and repaired.endswith('"'):
         repaired = repaired[1:-1]
 
     # Extract the substring from the first { to the last }
-    start = repaired.find('{')
-    end = repaired.rfind('}')
+    start = repaired.find("{")
+    end = repaired.rfind("}")
     if start != -1 and end != -1:
-        repaired = repaired[start:end+1]
+        repaired = repaired[start : end + 1]
     else:
         # If no valid JSON object found, return empty object
         return "{}"
 
     # Final cleanup of whitespace
-    repaired = re.sub(r'\s+', ' ', repaired)
+    repaired = re.sub(r"\s+", " ", repaired)
 
     return repaired
 
 
 class SingleLLMCallNodeOutput(BaseModel):
     """Output model for SingleLLMCallNode.
-    
+
     This class will be used as a base for dynamically generated output models.
     """
 
@@ -112,9 +113,29 @@ class SingleLLMCallNode(Tool):
     few_shot_examples: Optional[List[Dict[str, str]]] = None
     url_variables: Optional[Dict[str, str]] = Field(
         None,
-        description="Optional mapping of URL types (image, video, pdf) to input schema variables for Gemini models",
+        description=(
+            "Optional mapping of URL types (image, video, pdf)"
+            " to input schema variables for Gemini models"
+        ),
     )
     output_json_schema: Optional[str] = None
+
+    enable_thinking: bool = Field(
+        False,
+        description="Whether to enable thinking mode for supported models",
+    )
+    thinking_budget_tokens: Optional[int] = Field(
+        None,
+        description="Budget tokens for thinking mode when enabled",
+    )
+    enable_message_history: bool = Field(
+        False,
+        description="Whether to include message history from input in the LLM request",
+    )
+    message_history_variable: Optional[str] = Field(
+        None,
+        description="Input variable containing message history (e.g., 'message_history')",
+    )
 
     def model_post_init(self, _: Any) -> None:
         """Initialize after Pydantic model initialization."""
@@ -154,10 +175,30 @@ class SingleLLMCallNode(Tool):
             print(f"[ERROR] user_message: {self.user_message} with input: {raw_input_dict}")
             raise e
 
+        # Extract message history from input if enabled
+        history: Optional[List[Dict[str, str]]] = None
+        if self.enable_message_history and self.message_history_variable:
+            try:
+                # Try to get history from the specified variable
+                history_var = self.message_history_variable
+                if "." in history_var:
+                    # Handle nested fields (e.g., "input_node.message_history")
+                    history = get_nested_field(history_var, input)
+                else:
+                    # Direct field access
+                    history = raw_input_dict.get(history_var)
+
+                assert isinstance(history, list) or history is None
+
+            except Exception as e:
+                print(f"[ERROR] Failed to extract message history: {e}")
+                history = None
+
         messages = create_messages(
             system_message=system_message,
             user_message=user_message,
             few_shot_examples=self.few_shot_examples,
+            history=history,
         )
 
         model_name = LLMModels(self.llm_info.model).value
@@ -173,9 +214,23 @@ class SingleLLMCallNode(Tool):
                 # Always use image_url format regardless of file type
                 url_vars["image"] = file_value
 
+        # Prepare thinking parameters if enabled
+        thinking_params = None
+        if self.enable_thinking:
+            model_info = LLMModels.get_model_info(model_name)
+            if model_info and model_info.constraints.supports_thinking:
+                thinking_params = {
+                    "type": "enabled",
+                    "budget_tokens": self.thinking_budget_tokens
+                    or model_info.constraints.thinking_budget_tokens
+                    or 1024,
+                }
+
         try:
             # Ensure temperature and max_tokens are not None
-            temperature = self.llm_info.temperature if self.llm_info.temperature is not None else 0.7
+            temperature = (
+                self.llm_info.temperature if self.llm_info.temperature is not None else 0.7
+            )
             max_tokens = self.llm_info.max_tokens if self.llm_info.max_tokens is not None else 1024
 
             assistant_message_str = await generate_text(
@@ -186,6 +241,7 @@ class SingleLLMCallNode(Tool):
                 json_mode=True,
                 url_variables=url_vars,
                 output_json_schema=self.output_json_schema,
+                thinking=thinking_params,
             )
         except Exception as e:
             error_str = str(e)
@@ -207,7 +263,10 @@ class SingleLLMCallNode(Tool):
                     error_message = "Rate limit exceeded. Please try again in a few minutes."
                 elif "context length" in error_str.lower() or "maximum token" in error_str.lower():
                     error_type = "context_length"
-                    error_message = "Input is too long for the model's context window. Please reduce the input length."
+                    error_message = (
+                        "Input is too long for the model's context"
+                        " window. Please reduce the input length."
+                    )
                 elif (
                     "invalid api key" in error_str.lower() or "authentication" in error_str.lower()
                 ):
@@ -231,7 +290,7 @@ class SingleLLMCallNode(Tool):
                             "original_error": error_str,
                         }
                     )
-                )
+                ) from e
             raise e
 
         try:
@@ -242,17 +301,21 @@ class SingleLLMCallNode(Tool):
                 assistant_message_dict = json.loads(repaired_str)
             except Exception as inner_e:
                 error_str = str(inner_e)
-                error_message = "An error occurred while parsing and repairing the assistant message"
+                error_message = (
+                    "An error occurred while parsing and repairing the assistant message"
+                )
                 error_type = "json_parse_error"
                 raise Exception(
-                    json.dumps({
-                        "type": "parsing_error",
-                        "error_type": error_type,
-                        "message": error_message,
-                        "original_error": error_str,
-                        "assistant_message_str": assistant_message_str,
-                    })
-                )
+                    json.dumps(
+                        {
+                            "type": "parsing_error",
+                            "error_type": error_type,
+                            "message": error_message,
+                            "original_error": error_str,
+                            "assistant_message_str": assistant_message_str,
+                        }
+                    )
+                ) from inner_e
 
         # Validate and return
         assistant_message = self._output_model.model_validate(assistant_message_dict)
@@ -261,7 +324,6 @@ class SingleLLMCallNode(Tool):
 
 if __name__ == "__main__":
     import asyncio
-
 
     async def test_llm_nodes():
         # Example 1: Simple test case with a basic user message
@@ -281,6 +343,10 @@ if __name__ == "__main__":
                     "required": ["answer", "name_of_user"],
                 }
             ),
+            enable_thinking=False,
+            thinking_budget_tokens=None,
+            enable_message_history=False,
+            message_history_variable=None,
         )
 
         # Create a simple input model
@@ -289,12 +355,54 @@ if __name__ == "__main__":
             question: str
 
         input_data = SimpleInput(
-            name="Alice",
-            question="What is the weather like in New York in January?"
+            name="Alice", question="What is the weather like in New York in January?"
         )
 
         print("[DEBUG] Testing simple_llm_node now...")
         simple_output = await simple_llm_node(input_data)
         print("[DEBUG] Test Output from single_llm_call:", simple_output)
+
+        # Example 2: Using message history
+        chat_llm_node = SingleLLMCallNode(
+            name="ChatBot",
+            llm_info=ModelInfo(model=LLMModels.GPT_4O, temperature=0.7, max_tokens=100),
+            system_message="You're a helpful and friendly assistant. Maintain conversation context",
+            user_message="{{ user_message }}",
+            url_variables=None,
+            enable_thinking=False,
+            thinking_budget_tokens=None,
+            enable_message_history=True,
+            message_history_variable="message_history",
+            output_json_schema=json.dumps(
+                {
+                    "type": "object",
+                    "properties": {"assistant_message": {"type": "string"}},
+                    "required": ["assistant_message"],
+                }
+            ),
+        )
+
+        # Create input with message history
+        class ChatInput(BaseModel):
+            user_message: str
+            message_history: List[Dict[str, str]]
+
+        chat_input = ChatInput.model_validate(
+            {
+                "user_message": "What's the capital of France?",
+                "message_history": [
+                    {"role": "user", "content": "Hello, can you help me with geography questions?"},
+                    {
+                        "role": "assistant",
+                        "content": "Of course! I'd be happy to help with geography questions. \
+                            What would you like to know?",
+                    },
+                ],
+            }
+        )
+
+        print("[DEBUG] Testing chat_llm_node with message history...")
+        chat_output = await chat_llm_node(chat_input)
+        print("[DEBUG] Test Output from chat with history:", chat_output)
 
     asyncio.run(test_llm_nodes())

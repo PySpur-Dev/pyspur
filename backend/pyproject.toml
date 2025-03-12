@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "pyspur"
-version = "0.1.5"
+version = "0.1.8"
 description = "PySpur is a Graph UI for building AI Agents in Python"
 requires-python = ">=3.11"
 license = "Apache-2.0"
@@ -32,6 +32,7 @@ dependencies = [
     "datasets==3.2.0",
     "docx2txt==0.8",
     "docx2python==3.3.0",
+    "exa-py==1.9.0",
     "fastapi==0.115.6",
     "genanki==0.13.1",
     "google-api-python-client==2.159.0",
@@ -89,8 +90,6 @@ pyspur = "pyspur.cli:main"
 dev = [
     "pytest>=7.0",
     "pytest-cov>=4.0",
-    "black>=23.0",
-    "isort>=5.0",
     "ruff>=0.1.0",
 ]
 
@@ -110,12 +109,16 @@ target-version = "py312"
 [tool.ruff.lint]
 select = ["E", "F", "I", "N", "W", "B", "C", "D", "PYI"]
 ignore = [
+    "B006",  # Do not use mutable default arguments
+    "B008",  # Do not perform function call `Depends` in argument defaults
+    "C901",  # Function is too complex
     "D100",  # Missing docstring in public module
     "D101",  # Missing docstring in public class
     "D102",  # Missing docstring in public method
     "D103",  # Missing docstring in public function
     "D104",  # Missing docstring in public package
     "D105",  # Missing docstring in magic method
+    "D106",  # Missing docstring in public nested class
     "D107",  # Missing docstring in __init__
     "I001",  # Import block is un-sorted or un-formatted
     "E402",  # Module level import not at top of file
@@ -135,4 +138,4 @@ check_untyped_defs = true
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 python_files = ["test_*.py"]
-addopts = "-v --cov=pyspur --cov-report=term-missing" 
+addopts = "-v --cov=pyspur --cov-report=term-missing"

@@ -119,8 +119,17 @@ https://github.com/user-attachments/assets/5bef7a16-ef9f-4650-b385-4ea70fa54c8a
 # 🛠️ PySpur 开发环境设置
 #### [ Unix 类系统开发指南。Windows/PC 开发不支持。 ]
 
-开发时，请按照以下步骤操作：
+我们推荐使用 Cursor/VS Code 和我们的开发容器（`.devcontainer/devcontainer.json`），它提供：
+- 预配置工具和扩展的一致开发环境
+- 针对 Python 和 TypeScript 开发的优化设置
+- 自动热重载和端口转发
 
+**选项 1：Cursor/VS Code 开发容器（推荐）**
+1. 安装 [Cursor](https://www.cursor.com/)/[VS Code](https://code.visualstudio.com/) 和 [Dev Containers 扩展](https://marketplace.visualstudio.com/items?itemName=ms-vscode-remote.remote-containers)
+2. 克隆并打开仓库
+3. 当提示时点击"在容器中重新打开"
+
+**选项 2：手动设置**
 1. **克隆仓库:**
     ```sh
     git clone https://github.com/PySpur-com/pyspur.git
@@ -131,10 +140,11 @@ https://github.com/user-attachments/assets/5bef7a16-ef9f-4650-b385-4ea70fa54c8a
     ```sh
     docker compose -f docker-compose.dev.yml up --build -d
     ```
-    这将启动一个本地 PySpur 实例，并启用热重载以便开发。
 
-3. **自定义你的设置:**
-    编辑 `.env` 文件以配置你的环境。默认情况下，PySpur 使用本地 PostgreSQL 数据库。若要使用外部数据库，请修改 `.env` 中的 `POSTGRES_*` 变量。
+3. **自定义设置:**
+    编辑 `.env` 配置环境（例如：PostgreSQL 设置）。
+
+注意：手动设置需要额外配置，可能无法包含开发容器提供的所有功能。
 
 # ⭐ 支持我们
 

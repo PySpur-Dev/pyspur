@@ -1,24 +1,24 @@
+import { deleteApiKey, getApiKey, listApiKeys, setApiKey } from '@/utils/api'
 import type { CardProps, SwitchProps } from '@heroui/react'
-import React, { useState, useEffect } from 'react'
 import {
+    Accordion,
+    AccordionItem,
+    Button,
     Card,
     CardBody,
     CardFooter,
+    Input,
     Modal,
+    ModalBody,
     ModalContent,
     ModalHeader,
-    ModalBody,
-    Button,
-    Input,
-    extendVariants,
     Switch,
     cn,
-    Accordion,
-    AccordionItem,
+    extendVariants,
 } from '@heroui/react'
 import { Icon } from '@iconify/react'
-import { listApiKeys, setApiKey, getApiKey, deleteApiKey } from '@/utils/api'
 import { useTheme } from 'next-themes'
+import React, { useEffect, useState } from 'react'
 
 // CellWrapper Component
 const CellWrapper = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>(
@@ -207,8 +207,8 @@ const APIKeys = (props: CardProps): React.ReactElement => {
             database: 'solar:database-bold',
 
             // Other Integrations
-            'solar:spider-bold': 'solar:spider-bold',  // For Firecrawl
-            'logos:slack-icon': 'logos:slack-icon',  // For Slack
+            'solar:spider-bold': 'solar:spider-bold', // For Firecrawl
+            'logos:slack-icon': 'logos:slack-icon', // For Slack
         }
         return iconMap[iconName] || iconMap.database
     }
@@ -237,9 +237,7 @@ const APIKeys = (props: CardProps): React.ReactElement => {
                                 onClear={() => handleDeleteKey(param.name)}
                                 onFocus={() =>
                                     setKeys((prevKeys) =>
-                                        prevKeys.map((key) =>
-                                            key.name === param.name ? { ...key, value: '' } : key
-                                        )
+                                        prevKeys.map((key) => (key.name === param.name ? { ...key, value: '' } : key))
                                     )
                                 }
                                 onChange={handleInputChange}
@@ -358,7 +356,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onOpenChange }) =
     const { theme, setTheme } = useTheme()
 
     return (
-        <Modal isOpen={isOpen} onOpenChange={onOpenChange} size="2xl" scrollBehavior="inside">
+        <Modal isOpen={isOpen} onOpenChange={onOpenChange} size="full" scrollBehavior="inside">
             <ModalContent>
                 {() => (
                     <>
@@ -408,7 +406,6 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onOpenChange }) =
                 )}
             </ModalContent>
         </Modal>
-
     )
 }
 

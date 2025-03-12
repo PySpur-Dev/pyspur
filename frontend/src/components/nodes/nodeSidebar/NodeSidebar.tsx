@@ -19,7 +19,6 @@ import { cloneDeep, debounce, set } from 'lodash'
 import isEqual from 'lodash/isEqual'
 import React, { useCallback, useEffect, useState } from 'react'
 import { useDispatch, useSelector } from 'react-redux'
-import { jsonOptions } from '../../../constants/jsonOptions'
 import {
     selectNodeById,
     setSelectedNode,
@@ -40,8 +39,8 @@ import NumberInput from '../../NumberInput'
 import FewShotExamplesEditor from '../../textEditor/FewShotExamplesEditor'
 import TextEditor from '../../textEditor/TextEditor'
 import NodeOutput from '../NodeOutputDisplay'
+import IOMapEditor from './IOMapEditor'
 import OutputSchemaEditor from './OutputSchemaEditor'
-import SchemaEditor from './SchemaEditor'
 
 import { extractSchemaFromJsonSchema, generateJsonSchemaFromSchema } from '@/utils/schemaUtils'
 import { convertToPythonVariableName } from '@/utils/variableNameUtils'
@@ -51,6 +50,7 @@ import { isReservedWord } from '../../../utils/schemaValidation'
 // Define types for props and state
 interface NodeSidebarProps {
     nodeID: string
+    readOnly?: boolean
 }
 
 // Update findNodeSchema to use imported types
@@ -210,7 +210,14 @@ const isTemplateField = (key: string, fieldMetadata?: FieldMetadata): boolean =>
     return templatePatterns.some((pattern) => key === pattern || key.endsWith(pattern))
 }
 
-const NodeSidebar: React.FC<NodeSidebarProps> = ({ nodeID }) => {
+interface JsonSchema {
+    type?: string
+    properties?: Record<string, any>
+    required?: string[]
+    items?: JsonSchema
+}
+
+const NodeSidebar: React.FC<NodeSidebarProps> = ({ nodeID, readOnly }) => {
     const dispatch = useDispatch()
     const nodes = useSelector((state: RootState) => state.flow.nodes, nodesComparator)
     const edges = useSelector((state: RootState) => state.flow.edges, isEqual)
@@ -235,6 +242,7 @@ const NodeSidebar: React.FC<NodeSidebarProps> = ({ nodeID }) => {
     const [fewShotIndex, setFewShotIndex] = useState<number | null>(null)
     const [showTitleError, setShowTitleError] = useState(false)
     const [jsonSchemaError, setJsonSchemaError] = useState<string>('')
+    const [messageVersions, setMessageVersions] = useState<Record<string, number>>({})
 
     // Add state for vector indices
     const [vectorIndices, setVectorIndices] = useState<VectorIndexOption[]>([])
@@ -277,19 +285,25 @@ const NodeSidebar: React.FC<NodeSidebarProps> = ({ nodeID }) => {
 
                         // Find nodes that feed into the HumanInterventionNode
                         const humanNodeInputEdges = edges.filter((edge) => edge.target === node.id)
-                        const humanNodeInputs = humanNodeInputEdges.map((edge) => nodes.find((n) => n.id === edge.source))
+                        const humanNodeInputs = humanNodeInputEdges.map((edge) =>
+                            nodes.find((n) => n.id === edge.source)
+                        )
 
                         // Collect the schema from those nodes as they will be passed through
-                        humanNodeInputs.forEach(inputNode => {
+                        humanNodeInputs.forEach((inputNode) => {
                             if (!inputNode) return
                             const inputConfig = allNodeConfigs[inputNode.id]
                             if (inputConfig?.output_json_schema) {
                                 const inputSchema = extractSchemaFromJsonSchema(inputConfig.output_json_schema)
-                                if (!inputSchema.error && inputSchema.schema && typeof inputSchema.schema === 'object') {
+                                if (
+                                    !inputSchema.error &&
+                                    inputSchema.schema &&
+                                    typeof inputSchema.schema === 'object'
+                                ) {
                                     Object.keys(inputSchema.schema).forEach((key) => {
                                         // Use the title of the predecessor node to suggest nested access, e.g., HumanInterventionNode_1.input_node.input_1
-                                        const predecessorTitle = inputNode.title || inputNode.id;
-                                        acc.push(`${nodeTitle}.${predecessorTitle}.${key}`);
+                                        const predecessorTitle = inputNode.title || inputNode.id
+                                        acc.push(`${nodeTitle}.${predecessorTitle}.${key}`)
                                     })
                                 }
                             }
@@ -338,7 +352,7 @@ const NodeSidebar: React.FC<NodeSidebarProps> = ({ nodeID }) => {
     // Update the input change handler to use local state immediately but debounce Redux updates for Slider
     const handleInputChange = (key: string, value: any, isSlider: boolean = false) => {
         let updatedModel: FlowWorkflowNodeConfig
-
+        if (readOnly) return
         if (key.includes('.')) {
             updatedModel = updateNestedModel(currentNodeConfig, key, value) as FlowWorkflowNodeConfig
         } else {
@@ -359,9 +373,28 @@ const NodeSidebar: React.FC<NodeSidebarProps> = ({ nodeID }) => {
         }
     }
 
+    // Function to handle message generation specifically
+    const handleMessageGenerated = (key: string, newMessage: string) => {
+        // Update the message version for this field
+        setMessageVersions((prev) => ({
+            ...prev,
+            [key]: (prev[key] || 0) + 1,
+        }))
+
+        // Call the regular input change handler
+        handleInputChange(key, newMessage)
+    }
+
     // Simplify the title change handlers into a single function
     const handleTitleChangeComplete = (value: string) => {
+        if (readOnly) return
+
         const validTitle = convertToPythonVariableName(value)
+        if (validTitle !== value) {
+            setShowTitleError(true)
+            // Hide the error message after 3 seconds
+            setTimeout(() => setShowTitleError(false), 3000)
+        }
         dispatch(updateNodeTitle({ nodeId: nodeID, newTitle: validTitle }))
     }
 
@@ -414,6 +447,7 @@ const NodeSidebar: React.FC<NodeSidebarProps> = ({ nodeID }) => {
                         key={`select-${nodeID}-${key}`}
                         label={label}
                         selectedKeys={[currentValue]}
+                        isDisabled={readOnly}
                         onChange={(e) => {
                             const selectedModelId = e.target.value
                             // Get constraints for the selected model
@@ -475,6 +509,7 @@ const NodeSidebar: React.FC<NodeSidebarProps> = ({ nodeID }) => {
                     key={`select-${nodeID}-${key}`}
                     label={key}
                     selectedKeys={[currentValue]}
+                    isDisabled={readOnly}
                     onChange={(e) => handleInputChange(key, e.target.value)}
                     fullWidth
                 >
@@ -616,6 +651,7 @@ const NodeSidebar: React.FC<NodeSidebarProps> = ({ nodeID }) => {
                                 </div>
                             )
                         }}
+                        isDisabled={readOnly}
                         onChange={(e) => handleInputChange(key, e.target.value)}
                         isLoading={isLoadingIndices}
                         fullWidth
@@ -661,6 +697,7 @@ const NodeSidebar: React.FC<NodeSidebarProps> = ({ nodeID }) => {
                         value={value || 'http://localhost:11434'}
                         onChange={(e) => handleInputChange(key, e.target.value)}
                         placeholder="Enter API base URL"
+                        isDisabled={readOnly}
                     />
                     {!isLast && <hr className="my-2" />}
                 </div>
@@ -683,6 +720,7 @@ const NodeSidebar: React.FC<NodeSidebarProps> = ({ nodeID }) => {
                 (currentNodeConfig?.llm_info?.model && !currentModelConstraints?.supports_JSON_output) ||
                 node.type === 'RouterNode' ||
                 node.type === 'CoalesceNode' ||
+                readOnly ||
                 false
             return (
                 <div key={key}>
@@ -771,6 +809,7 @@ const NodeSidebar: React.FC<NodeSidebarProps> = ({ nodeID }) => {
                     code={value}
                     mode="python"
                     onChange={(newValue: string) => handleInputChange(key, newValue)}
+                    readOnly={readOnly}
                 />
             )
         }
@@ -811,17 +850,22 @@ const NodeSidebar: React.FC<NodeSidebarProps> = ({ nodeID }) => {
                             </Tooltip>
                         )}
                     </div>
-                    <TextEditor
-                        key={`text-editor-${nodeID}-${key}`}
-                        nodeID={nodeID}
-                        fieldName={key}
-                        inputSchema={incomingSchema}
-                        fieldTitle={key}
-                        content={currentNodeConfig[key] || ''}
-                        setContent={(value) => handleInputChange(key, value)}
-                        disableFormatting={key.endsWith('_template')} // Disable formatting for pure template fields
-                        isTemplateEditor={true} // This is a template editor in NodeSidebar
-                    />
+                    <div className="flex flex-col gap-2">
+                        <TextEditor
+                            key={`text-editor-${nodeID}-${key}-${messageVersions[key] || 0}`}
+                            nodeID={nodeID}
+                            fieldName={key}
+                            inputSchema={incomingSchema}
+                            fieldTitle={key}
+                            content={currentNodeConfig[key] || ''}
+                            setContent={(value) => handleInputChange(key, value)}
+                            disableFormatting={key.endsWith('_template')} // Disable formatting for pure template fields
+                            isTemplateEditor={true} // This is a template editor in NodeSidebar
+                            readOnly={readOnly} // Pass through the readOnly prop
+                            enableAIGeneration={key === 'system_message' || key === 'user_message'}
+                            messageType={key === 'system_message' ? 'system' : 'user'}
+                        />
+                    </div>
                     {key === 'user_message' && renderFewShotExamples()}
                     {!isLast && <hr className="my-2" />}
                 </div>
@@ -851,6 +895,7 @@ const NodeSidebar: React.FC<NodeSidebarProps> = ({ nodeID }) => {
                             value={value}
                             onChange={(e) => handleInputChange(key, e.target.value)}
                             placeholder="Enter your input"
+                            isDisabled={readOnly}
                         />
                         {!isLast && <hr className="my-2" />}
                     </div>
@@ -973,6 +1018,7 @@ const NodeSidebar: React.FC<NodeSidebarProps> = ({ nodeID }) => {
                                 maxValue={max}
                                 step={fieldMetadata.type === 'integer' ? 1 : 0.1}
                                 className="w-full"
+                                isDisabled={readOnly}
                                 onChange={(newValue) => {
                                     const path = parentPath ? `${parentPath}.${key}` : key
                                     const lastTwoDots = path.split('.').slice(-2)
@@ -1004,6 +1050,7 @@ const NodeSidebar: React.FC<NodeSidebarProps> = ({ nodeID }) => {
                                 const newValue = parseFloat(e.target.value)
                                 handleInputChange(key, isNaN(newValue) ? 0 : newValue)
                             }}
+                            disabled={readOnly}
                         />
                         {!isLast && <hr className="my-2" />}
                     </div>
@@ -1024,6 +1071,7 @@ const NodeSidebar: React.FC<NodeSidebarProps> = ({ nodeID }) => {
                                 isSelected={value}
                                 onChange={(e) => handleInputChange(key, e.target.checked)}
                                 className={isMissingBooleanRequired ? 'border-warning' : ''}
+                                isDisabled={readOnly}
                             />
                         </div>
                         {isMissingBooleanRequired && (
@@ -1055,7 +1103,62 @@ const NodeSidebar: React.FC<NodeSidebarProps> = ({ nodeID }) => {
         }
     }
 
-    // Update renderConfigFields to include URL variable configuration
+    // Add this function after renderUrlVariableConfig but before renderConfigFields
+    const renderMessageHistoryConfig = () => {
+        // Only show for SingleLLMCallNode
+        if (nodeType !== 'SingleLLMCallNode') {
+            return null
+        }
+
+        const incomingSchemaVars = collectIncomingSchema(nodeID)
+
+        // Default to false if not defined
+        const enableMessageHistory = currentNodeConfig.enable_message_history ?? false
+        const messageHistoryVariable = currentNodeConfig.message_history_variable || ''
+
+        return (
+            <div className="my-4">
+                <div className="flex items-center gap-2 mb-2">
+                    <h3 className="font-semibold">Message History</h3>
+                    <Tooltip
+                        content="Select an input variable containing message history. This should be an array of objects with 'role' and 'content' properties."
+                        placement="left-start"
+                        showArrow={true}
+                        className="max-w-xs"
+                    >
+                        <Icon icon="solar:question-circle-linear" className="text-default-400 cursor-help" width={20} />
+                    </Tooltip>
+                </div>
+                <div className="mb-2">
+                    <Switch
+                        isSelected={enableMessageHistory}
+                        onValueChange={(checked) => handleInputChange('enable_message_history', checked)}
+                        size="sm"
+                    >
+                        Enable Message History
+                    </Switch>
+                </div>
+                {enableMessageHistory && (
+                    <div className="mb-2">
+                        <Select
+                            label="Message History Variable"
+                            selectedKeys={[messageHistoryVariable]}
+                            onChange={(e) => handleInputChange('message_history_variable', e.target.value)}
+                            isDisabled={!enableMessageHistory}
+                        >
+                            {['', ...incomingSchemaVars].map((variable) => (
+                                <SelectItem key={variable} value={variable}>
+                                    {variable || 'None'}
+                                </SelectItem>
+                            ))}
+                        </Select>
+                    </div>
+                )}
+            </div>
+        )
+    }
+
+    // Update renderConfigFields to include URL variable config and message history config
     const renderConfigFields = (): React.ReactNode => {
         if (!nodeSchema || !nodeSchema.config || !currentNodeConfig) return null
         const properties = nodeSchema.config
@@ -1068,7 +1171,20 @@ const NodeSidebar: React.FC<NodeSidebarProps> = ({ nodeID }) => {
             .filter((key) => key.includes('template') || key.includes('message') || key.includes('prompt'))
             .filter((key) => !priorityFields.includes(key))
 
-        const remainingKeys = keys.filter((key) => !priorityFields.includes(key) && !templateFields.includes(key))
+        // Filter out thinking-related fields if not using Claude 3.7 Sonnet
+        const isClaudeSonnet37 = currentNodeConfig?.llm_info?.model === 'anthropic/claude-3-7-sonnet-latest'
+        const remainingKeys = keys
+            .filter((key) => !priorityFields.includes(key) && !templateFields.includes(key))
+            .filter((key) => {
+                if (!isClaudeSonnet37 && (key === 'enable_thinking' || key === 'thinking_budget_tokens')) {
+                    return false
+                }
+                // Hide these fields as we'll render them separately
+                if (key === 'enable_message_history' || key === 'message_history_variable') {
+                    return false
+                }
+                return true
+            })
 
         const orderedKeys = [...priorityFields.filter((key) => keys.includes(key)), ...templateFields, ...remainingKeys]
 
@@ -1080,12 +1196,13 @@ const NodeSidebar: React.FC<NodeSidebarProps> = ({ nodeID }) => {
                     const isLast = index === orderedKeys.length - 1
                     const result = renderField(key, field, value, `${nodeType}.config`, isLast)
 
-                    // Insert URL variable config after template/message fields
+                    // Insert URL variable config and message history config after template/message fields
                     if (index === priorityFields.length + templateFields.length - 1) {
                         return (
                             <React.Fragment key={key}>
                                 {result}
                                 {renderUrlVariableConfig()}
+                                {renderMessageHistoryConfig()}
                             </React.Fragment>
                         )
                     }
@@ -1112,7 +1229,7 @@ const NodeSidebar: React.FC<NodeSidebarProps> = ({ nodeID }) => {
                         })
                     )
                 }}
-                readOnly={false}
+                readOnly={readOnly}
             />
         )
     }
@@ -1199,6 +1316,20 @@ const NodeSidebar: React.FC<NodeSidebarProps> = ({ nodeID }) => {
         incomingSchema: string[],
         handleInputChange: (key: string, value: any) => void
     ) => {
+        // Parse the output schema if it's a string
+        let outputSchemaProperties: string[] = []
+        try {
+            if (currentNodeConfig?.output_json_schema) {
+                const parsedSchema =
+                    typeof currentNodeConfig.output_json_schema === 'string'
+                        ? (JSON.parse(currentNodeConfig.output_json_schema) as JsonSchema)
+                        : (currentNodeConfig.output_json_schema as JsonSchema)
+                outputSchemaProperties = Object.keys(parsedSchema?.properties || {})
+            }
+        } catch (e) {
+            console.error('Failed to parse output schema:', e)
+        }
+
         return (
             <div key={key} className="my-2">
                 <div className="flex items-center gap-2 mb-2">
@@ -1212,13 +1343,14 @@ const NodeSidebar: React.FC<NodeSidebarProps> = ({ nodeID }) => {
                         <Icon icon="solar:question-circle-linear" className="text-default-400 cursor-help" width={20} />
                     </Tooltip>
                 </div>
-                <SchemaEditor
-                    key={`input-map-editor-${nodeID}`}
-                    jsonValue={value || {}}
+                <IOMapEditor
+                    leftOptions={incomingSchema}
+                    rightOptions={outputSchemaProperties}
+                    value={value || {}}
                     onChange={(newValue) => handleInputChange(key, newValue)}
-                    options={jsonOptions}
-                    nodeId={nodeID}
-                    availableFields={incomingSchema}
+                    readOnly={readOnly}
+                    leftLabel="Incoming Field"
+                    rightLabel="Input Field"
                 />
             </div>
         )
@@ -1230,6 +1362,20 @@ const NodeSidebar: React.FC<NodeSidebarProps> = ({ nodeID }) => {
         incomingSchema: string[],
         handleInputChange: (key: string, value: any) => void
     ) => {
+        // Parse the output schema if it's a string
+        let outputSchemaProperties: string[] = []
+        try {
+            if (currentNodeConfig?.output_json_schema) {
+                const parsedSchema =
+                    typeof currentNodeConfig.output_json_schema === 'string'
+                        ? (JSON.parse(currentNodeConfig.output_json_schema) as JsonSchema)
+                        : (currentNodeConfig.output_json_schema as JsonSchema)
+                outputSchemaProperties = Object.keys(parsedSchema?.properties || {})
+            }
+        } catch (e) {
+            console.error('Failed to parse output schema:', e)
+        }
+
         return (
             <div key={key} className="my-2">
                 <div className="flex items-center gap-2 mb-2">
@@ -1243,13 +1389,14 @@ const NodeSidebar: React.FC<NodeSidebarProps> = ({ nodeID }) => {
                         <Icon icon="solar:question-circle-linear" className="text-default-400 cursor-help" width={20} />
                     </Tooltip>
                 </div>
-                <SchemaEditor
-                    key={`output-map-editor-${nodeID}`}
-                    jsonValue={value || {}}
+                <IOMapEditor
+                    leftOptions={outputSchemaProperties}
+                    rightOptions={incomingSchema}
+                    value={value || {}}
                     onChange={(newValue) => handleInputChange(key, newValue)}
-                    options={jsonOptions}
-                    nodeId={nodeID}
-                    availableFields={incomingSchema}
+                    readOnly={readOnly}
+                    leftLabel="Output Field"
+                    rightLabel="Target Field"
                 />
             </div>
         )
@@ -1272,6 +1419,7 @@ const NodeSidebar: React.FC<NodeSidebarProps> = ({ nodeID }) => {
                 boxShadow: '0 4px 15px rgba(0, 0, 0, 0.2)',
                 borderRadius: '10px',
                 backdropFilter: 'blur(8px)',
+                zIndex: 20, // Higher z-index to ensure it overlays the chat
             }}
         >
             {showTitleError && (
@@ -1359,6 +1507,7 @@ const NodeSidebar: React.FC<NodeSidebarProps> = ({ nodeID }) => {
                                 label="Node Title"
                                 fullWidth
                                 description="Use underscores instead of spaces"
+                                isDisabled={readOnly}
                             />
                             <hr className="my-2" />
                             {renderConfigFields()}

@@ -1,0 +1,21 @@
+{
+    "extends": "./tsconfig.json",
+    "include": [
+        "next-env.d.ts",
+        "src/**/*.ts",
+        "src/**/*.tsx",
+        "src/**/*.css",
+        "src/**/*.module.css",
+        "src/types/**/*.d.ts"
+    ],
+    "exclude": ["node_modules", "build", "dist", ".next", "coverage"],
+    "compilerOptions": {
+        "noEmit": true,
+        "skipLibCheck": true,
+        "jsx": "react-jsx",
+        "baseUrl": ".",
+        "paths": {
+            "@/*": ["src/*"]
+        }
+    }
+}

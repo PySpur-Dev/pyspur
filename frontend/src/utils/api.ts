@@ -1,24 +1,38 @@
-import axios from 'axios'
-import JSPydanticModel from './JSPydanticModel' // Import the JSPydanticModel class
-import { WorkflowCreateRequest, WorkflowDefinition, WorkflowResponse } from '@/types/api_types/workflowSchemas'
-import { DatasetResponse, DatasetListResponse } from '@/types/api_types/datasetSchemas'
-import { EvalRunRequest, EvalRunResponse } from '@/types/api_types/evalSchemas'
-import { NodeTypeSchema, MinimumNodeConfigSchema } from '@/types/api_types/nodeTypeSchemas'
-import { OutputFileResponse } from '@/types/api_types/outputFileSchemas'
-import { RunResponse } from '@/types/api_types/runSchemas'
-import { PauseHistoryResponse, PausedWorkflowResponse, ResumeActionRequest } from '@/types/api_types/pausedWorkflowSchemas'
 import {
-    DocumentChunkSchema,
-    DocumentWithChunksSchema,
-    ChunkPreviewSchema,
+    MessageGenerationRequest,
+    MessageGenerationResponse,
+    SchemaGenerationResponse,
+} from '@/types/api_types/aiGenerationSchemas'
+import { DatasetListResponse, DatasetResponse } from '@/types/api_types/datasetSchemas'
+import { EvalRunRequest, EvalRunResponse } from '@/types/api_types/evalSchemas'
+import { NodeTypeSchema } from '@/types/api_types/nodeTypeSchemas'
+import { OutputFileResponse } from '@/types/api_types/outputFileSchemas'
+import {
+    PauseHistoryResponse,
+    PausedWorkflowResponse,
+    ResumeActionRequest,
+} from '@/types/api_types/pausedWorkflowSchemas'
+import {
     ChunkPreviewResponseSchema,
     ChunkTemplateSchema,
     DocumentCollectionCreateRequestSchema,
     DocumentCollectionResponseSchema,
+    DocumentWithChunksSchema,
+    ProcessingProgressSchema,
     VectorIndexCreateRequestSchema,
     VectorIndexResponseSchema,
-    ProcessingProgressSchema
 } from '@/types/api_types/ragSchemas'
+import { RunResponse } from '@/types/api_types/runSchemas'
+import { SessionCreate, SessionListResponse, SessionResponse } from '@/types/api_types/sessionSchemas'
+import { UserCreate, UserListResponse, UserResponse, UserUpdate } from '@/types/api_types/userSchemas'
+import {
+    WorkflowCreateRequest,
+    WorkflowDefinition,
+    WorkflowResponse,
+    WorkflowVersionResponse,
+} from '@/types/api_types/workflowSchemas'
+import axios from 'axios'
+import JSPydanticModel from './JSPydanticModel' // Import the JSPydanticModel class
 
 const API_BASE_URL =
     typeof window !== 'undefined'
@@ -479,6 +493,25 @@ export const getWorkflowOutputVariables = async (workflowId: string): Promise<an
         return response.data
     } catch (error) {
         console.error(`Error fetching output variables for workflow ${workflowId}:`, error)
+        throw error
+    }
+}
+
+export const getWorkflowVersions = async (
+    workflowId: string,
+    page: number = 1,
+    pageSize: number = 10
+): Promise<WorkflowVersionResponse[]> => {
+    try {
+        const response = await axios.get(`${API_BASE_URL}/wf/${workflowId}/versions/`, {
+            params: {
+                page,
+                page_size: pageSize,
+            },
+        })
+        return response.data
+    } catch (error) {
+        console.error(`Error fetching versions for workflow ${workflowId}:`, error)
         throw error
     }
 }
@@ -1005,52 +1038,187 @@ export const listPausedWorkflows = async (
     try {
         const response = await axios.get(`${API_BASE_URL}/wf/paused_workflows/`, {
             params: { page, page_size: pageSize },
-        });
-        return response.data;
+        })
+        return response.data
     } catch (error) {
-        console.error('Error listing paused workflows:', error);
-        throw error;
+        console.error('Error listing paused workflows:', error)
+        throw error
     }
 }
 
 export const getPauseHistory = async (runId: string): Promise<PauseHistoryResponse[]> => {
     try {
-        const response = await axios.get(`${API_BASE_URL}/wf/pause_history/${runId}/`);
-        return response.data;
+        const response = await axios.get(`${API_BASE_URL}/wf/pause_history/${runId}/`)
+        return response.data
     } catch (error) {
-        console.error('Error getting pause history:', error);
-        throw error;
+        console.error('Error getting pause history:', error)
+        throw error
     }
 }
 
 /**
  * Take action on a paused workflow
  */
-export const takePauseAction = async (
-    runId: string,
-    actionRequest: ResumeActionRequest
-): Promise<RunResponse> => {
+export const takePauseAction = async (runId: string, actionRequest: ResumeActionRequest): Promise<RunResponse> => {
     try {
-        const response = await axios.post(
-            `${API_BASE_URL}/wf/process_pause_action/${runId}/`,
-            actionRequest
-        );
-        return response.data;
+        const response = await axios.post(`${API_BASE_URL}/wf/process_pause_action/${runId}/`, actionRequest)
+        return response.data
     } catch (error) {
-        console.error('Error taking action on paused workflow:', error);
-        throw error;
+        console.error('Error taking action on paused workflow:', error)
+        throw error
     }
-};
+}
 
 /**
  * Cancel a workflow that is awaiting human approval
  */
 export const cancelWorkflow = async (runId: string): Promise<RunResponse> => {
     try {
-        const response = await axios.post(`${API_BASE_URL}/wf/cancel_workflow/${runId}/`);
-        return response.data;
+        const response = await axios.post(`${API_BASE_URL}/wf/cancel_workflow/${runId}/`)
+        return response.data
     } catch (error) {
-        console.error('Error canceling workflow:', error);
-        throw error;
+        console.error('Error canceling workflow:', error)
+        throw error
     }
-};
+}
+
+export const generateSchema = async (
+    description: string,
+    existingSchema?: string
+): Promise<SchemaGenerationResponse> => {
+    try {
+        const response = await axios.post(`${API_BASE_URL}/ai/generate_schema/`, {
+            description,
+            existing_schema: existingSchema,
+        })
+        return response.data
+    } catch (error) {
+        console.error('Error generating schema:', error)
+        throw error
+    }
+}
+
+export const generateMessage = async (request: MessageGenerationRequest): Promise<MessageGenerationResponse> => {
+    try {
+        const response = await axios.post(`${API_BASE_URL}/ai/generate_message/`, request)
+        return response.data
+    } catch (error) {
+        console.error('Error generating message:', error)
+        throw error
+    }
+}
+
+// User Management Functions
+export const createUser = async (userData: UserCreate): Promise<UserResponse> => {
+    try {
+        // Example usage:
+        // const user = await createUser({
+        //     external_id: "user123",
+        //     user_metadata: { name: "John Doe" }
+        // });
+        const response = await axios.post(`${API_BASE_URL}/user/`, userData)
+        return response.data
+    } catch (error) {
+        console.error('Error creating user:', error)
+        throw error
+    }
+}
+
+export const listUsers = async (skip: number = 0, limit: number = 10): Promise<UserListResponse> => {
+    try {
+        const response = await axios.get(`${API_BASE_URL}/user/`, {
+            params: { skip, limit },
+        })
+        return response.data
+    } catch (error) {
+        console.error('Error listing users:', error)
+        throw error
+    }
+}
+
+export const getUser = async (userId: string): Promise<UserResponse> => {
+    try {
+        const response = await axios.get(`${API_BASE_URL}/user/${userId}/`)
+        return response.data
+    } catch (error) {
+        console.error('Error getting user:', error)
+        throw error
+    }
+}
+
+export const updateUser = async (userId: string, userData: UserUpdate): Promise<UserResponse> => {
+    try {
+        const response = await axios.patch(`${API_BASE_URL}/user/${userId}/`, userData)
+        return response.data
+    } catch (error) {
+        console.error('Error updating user:', error)
+        throw error
+    }
+}
+
+export const deleteUser = async (userId: string): Promise<void> => {
+    try {
+        await axios.delete(`${API_BASE_URL}/user/${userId}/`)
+    } catch (error) {
+        console.error('Error deleting user:', error)
+        throw error
+    }
+}
+
+// Session Management Functions
+export const createSession = async (sessionData: SessionCreate): Promise<SessionResponse> => {
+    try {
+        const response = await axios.post(`${API_BASE_URL}/session/`, sessionData)
+        return response.data
+    } catch (error) {
+        console.error('Error creating session:', error)
+        throw error
+    }
+}
+
+export const listSessions = async (
+    skip: number = 0,
+    limit: number = 10,
+    userId?: string
+): Promise<SessionListResponse> => {
+    try {
+        const params: Record<string, any> = { skip, limit }
+        if (userId) {
+            params.user_id = userId
+        }
+        const response = await axios.get(`${API_BASE_URL}/session/`, { params })
+        return response.data
+    } catch (error) {
+        console.error('Error listing sessions:', error)
+        throw error
+    }
+}
+
+export const getSession = async (sessionId: string): Promise<SessionResponse> => {
+    try {
+        const response = await axios.get(`${API_BASE_URL}/session/${sessionId}/`)
+        return response.data
+    } catch (error) {
+        console.error('Error getting session:', error)
+        throw error
+    }
+}
+
+export const deleteSession = async (sessionId: string): Promise<void> => {
+    try {
+        await axios.delete(`${API_BASE_URL}/session/${sessionId}/`)
+    } catch (error) {
+        console.error('Error deleting session:', error)
+        throw error
+    }
+}
+
+export const createTestSession = async (workflowId: string): Promise<SessionResponse> => {
+    try {
+        const response = await axios.post(`${API_BASE_URL}/session/test/?workflow_id=${workflowId}`)
+        return response.data
+    } catch (error) {
+        console.error('Error creating test session:', error)
+        throw error
+    }
+}

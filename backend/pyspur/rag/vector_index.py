@@ -88,8 +88,7 @@ class VectorIndex:
         config: Dict[str, Any],
         on_progress: Optional[Callable[[float, str, int, int], Coroutine[Any, Any, None]]] = None,
     ) -> str:
-        """
-        Create a vector index from a document collection.
+        """Create a vector index from a document collection.
 
         Args:
             docs_with_chunks: List of documents with their chunks
@@ -98,6 +97,7 @@ class VectorIndex:
 
         Returns:
             str: Vector index ID
+
         """
         try:
             # Update config
@@ -121,7 +121,7 @@ class VectorIndex:
             try:
                 # Use OpenAI's text-embedding-3-small by default
                 embedding_model = config.get(
-                    "embedding_model",
+                    "model",
                     EmbeddingModels.TEXT_EMBEDDING_3_SMALL.value,
                 )
                 model_info = EmbeddingModels.get_model_info(embedding_model)
@@ -252,7 +252,7 @@ class VectorIndex:
             # Initialize datastore
             datastore = await get_datastore(
                 self.config["vector_db"],
-                embedding_model=self.config.get("embedding_model"),
+                embedding_model=self.config.get("model"),
             )
 
             # Delete vectors from vector database
@@ -282,8 +282,7 @@ class VectorIndex:
         semantic_weight: Optional[float] = 1.0,
         keyword_weight: Optional[float] = None,
     ) -> List[Dict[str, Any]]:
-        """
-        Retrieve relevant documents from the vector index.
+        """Retrieve relevant documents from the vector index.
 
         Args:
             query: The search query
@@ -294,6 +293,7 @@ class VectorIndex:
 
         Returns:
             List of documents with their similarity scores
+
         """
         try:
             # Get embedding model from config

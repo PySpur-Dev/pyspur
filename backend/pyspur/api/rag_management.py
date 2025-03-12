@@ -57,7 +57,7 @@ async def update_collection_progress(
     error_message: Optional[str] = None,
     db: Optional[Session] = None,
 ) -> None:
-    """Update document collection processing progress"""
+    """Update document collection processing progress."""
     if collection_id not in collection_progress:
         now = datetime.now(timezone.utc).isoformat()
         collection_progress[collection_id] = ProcessingProgressSchema(
@@ -113,7 +113,7 @@ async def update_index_progress(
     error_message: Optional[str] = None,
     db: Optional[Session] = None,
 ) -> None:
-    """Update vector index processing progress"""
+    """Update vector index processing progress."""
     if not db:
         return
 
@@ -143,35 +143,35 @@ async def update_index_progress(
     else:
         # Update fields using setattr to handle SQLAlchemy types
         if status:
-            setattr(progress_record, "status", status)
+            progress_record.status = status
             # Update index status in database
             index = db.query(VectorIndexModel).filter(VectorIndexModel.id == index_id).first()
             if index:
-                new_status = "ready" if status == "completed" else status
-                setattr(index, "status", new_status)
+                new_status = cast(DocumentStatus, "ready" if status == "completed" else status)
+                index.status = new_status
                 if error_message:
-                    setattr(index, "error_message", error_message)
+                    index.error_message = error_message
                 if processed_chunks:
-                    setattr(index, "chunk_count", int(processed_chunks))
+                    index.chunk_count = int(processed_chunks)
 
         if progress is not None:
-            setattr(progress_record, "progress", float(progress))
+            progress_record.progress = float(progress)
         if current_step:
-            setattr(progress_record, "current_step", current_step)
+            progress_record.current_step = current_step
         if total_chunks is not None:
-            setattr(progress_record, "total_chunks", int(total_chunks))
+            progress_record.total_chunks = int(total_chunks)
         if processed_chunks is not None:
-            setattr(progress_record, "processed_chunks", int(processed_chunks))
+            progress_record.processed_chunks = int(processed_chunks)
         if error_message:
-            setattr(progress_record, "error_message", error_message)
+            progress_record.error_message = error_message
 
-        setattr(progress_record, "updated_at", datetime.now(timezone.utc))
+        progress_record.updated_at = datetime.now(timezone.utc)
 
     db.commit()
 
 
 async def update_index_status(index_id: str, status: str, db: Session) -> None:
-    """Update vector index status in database"""
+    """Update vector index status in database."""
     try:
         index = db.query(VectorIndexModel).filter(VectorIndexModel.id == index_id).first()
         if index:
@@ -193,7 +193,7 @@ async def process_vector_index_creation(
     config: Dict[str, Any],
     db: Session,
 ) -> None:
-    """Process vector index creation in background"""
+    """Process vector index creation in background."""
     try:
         vector_index = VectorIndex(index_id)
         await vector_index.create_from_document_collection(
@@ -217,7 +217,7 @@ async def process_vector_index_creation(
 
 
 async def update_collection_status(collection_id: str, status: str, db: Session) -> None:
-    """Update document collection status in database"""
+    """Update document collection status in database."""
     try:
         collection = (
             db.query(DocumentCollectionModel)
@@ -243,7 +243,7 @@ async def process_document_collection(
     config: Dict[str, Any],
     db: Session,
 ) -> None:
-    """Process document collection in background"""
+    """Process document collection in background."""
     try:
         doc_store = DocumentStore(collection_id)
 
@@ -277,14 +277,18 @@ async def process_document_collection(
 router = APIRouter()
 
 
-@router.post("/collections/", response_model=DocumentCollectionResponseSchema)
+@router.post(
+    "/collections/",
+    response_model=DocumentCollectionResponseSchema,
+    description="Create a new document collection from uploaded files and metadata",
+)
 async def create_document_collection(
     background_tasks: BackgroundTasks,
     files: List[UploadFile] = File(None),
     metadata: str = Form(...),
     db: Session = Depends(get_db),
 ):
-    """Create a new document collection"""
+    """Create a new document collection."""
     try:
         # Parse metadata
         metadata_dict = json.loads(metadata)
@@ -294,7 +298,9 @@ async def create_document_collection(
         if collection_config.text_processing.use_vision_model:
             vision_config = collection_config.text_processing.get_vision_config()
             if not vision_config:
-                raise HTTPException(status_code=400, detail="Invalid vision model configuration")
+                raise HTTPException(
+                    status_code=400, detail="Invalid vision model configuration"
+                ) from None
 
         # Get current timestamp
         now = datetime.now(timezone.utc)
@@ -357,16 +363,20 @@ async def create_document_collection(
         )
 
     except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=400, detail=str(e)) from e
 
 
-@router.post("/indices/", response_model=VectorIndexResponseSchema)
+@router.post(
+    "/indices/",
+    response_model=VectorIndexResponseSchema,
+    description="Create a new vector index from a document collection",
+)
 async def create_vector_index(
     background_tasks: BackgroundTasks,
     index_config: VectorIndexCreateSchema,
     db: Session = Depends(get_db),
 ):
-    """Create a new vector index from a document collection"""
+    """Create a new vector index from a document collection."""
     try:
         # Check if collection exists
         collection = (
@@ -375,7 +385,7 @@ async def create_vector_index(
             .first()
         )
         if not collection:
-            raise HTTPException(status_code=404, detail="Document collection not found")
+            raise HTTPException(status_code=404, detail="Document collection not found") from None
 
         # Create vector index record
         now = datetime.now(timezone.utc)
@@ -446,23 +456,28 @@ async def create_vector_index(
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 
-@router.delete("/indices/{index_id}/")
+@router.delete(
+    "/indices/{index_id}/",
+    description="Delete a vector index and its associated data",
+)
 async def delete_vector_index(index_id: str, db: Session = Depends(get_db)):
-    """Delete a vector index"""
+    """Delete a vector index."""
     try:
         # Get the vector index from the database
         index = db.query(VectorIndexModel).filter(VectorIndexModel.id == index_id).first()
         if not index:
-            raise HTTPException(status_code=404, detail="Vector index not found")
+            raise HTTPException(status_code=404, detail="Vector index not found") from None
 
         # Delete from vector store and filesystem
         vector_index = VectorIndex(index.id)
         success = await vector_index.delete()
         if not success:
-            raise HTTPException(status_code=500, detail="Failed to delete vector index data")
+            raise HTTPException(
+                status_code=500, detail="Failed to delete vector index data"
+            ) from None
 
         # Remove from tracking database
         db.delete(index)
@@ -472,12 +487,16 @@ async def delete_vector_index(index_id: str, db: Session = Depends(get_db)):
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 
-@router.get("/collections/", response_model=List[DocumentCollectionResponseSchema])
+@router.get(
+    "/collections/",
+    response_model=List[DocumentCollectionResponseSchema],
+    description="List all document collections",
+)
 async def list_document_collections(db: Session = Depends(get_db)):
-    """List all document collections"""
+    """List all document collections."""
     try:
         collections = db.query(DocumentCollectionModel).all()
         return [
@@ -495,7 +514,7 @@ async def list_document_collections(db: Session = Depends(get_db)):
             for collection in collections
         ]
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 
 @router.get(
@@ -503,7 +522,7 @@ async def list_document_collections(db: Session = Depends(get_db)):
     response_model=DocumentCollectionResponseSchema,
 )
 async def get_document_collection(collection_id: str, db: Session = Depends(get_db)):
-    """Get document collection details"""
+    """Get document collection details."""
     try:
         collection = (
             db.query(DocumentCollectionModel)
@@ -511,7 +530,7 @@ async def get_document_collection(collection_id: str, db: Session = Depends(get_
             .first()
         )
         if not collection:
-            raise HTTPException(status_code=404, detail="Document collection not found")
+            raise HTTPException(status_code=404, detail="Document collection not found") from None
 
         return DocumentCollectionResponseSchema(
             id=collection.id,
@@ -527,12 +546,15 @@ async def get_document_collection(collection_id: str, db: Session = Depends(get_
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 
-@router.delete("/collections/{collection_id}/")
+@router.delete(
+    "/collections/{collection_id}/",
+    description="Delete a document collection and its associated data",
+)
 async def delete_document_collection(collection_id: str, db: Session = Depends(get_db)):
-    """Delete a document collection"""
+    """Delete a document collection."""
     try:
         # Get the document collection from the database
         collection = (
@@ -541,7 +563,7 @@ async def delete_document_collection(collection_id: str, db: Session = Depends(g
             .first()
         )
         if not collection:
-            raise HTTPException(status_code=404, detail="Document collection not found")
+            raise HTTPException(status_code=404, detail="Document collection not found") from None
 
         # Delete files from filesystem
         collection_dir = Path(f"data/knowledge_bases/{collection_id}")
@@ -558,12 +580,16 @@ async def delete_document_collection(collection_id: str, db: Session = Depends(g
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 
-@router.get("/indices/", response_model=List[VectorIndexResponseSchema])
+@router.get(
+    "/indices/",
+    response_model=List[VectorIndexResponseSchema],
+    description="List all vector indices",
+)
 async def list_vector_indices(db: Session = Depends(get_db)):
-    """List all vector indices"""
+    """List all vector indices."""
     try:
         indices = db.query(VectorIndexModel).all()
         return [
@@ -584,16 +610,20 @@ async def list_vector_indices(db: Session = Depends(get_db)):
             for index in indices
         ]
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 
-@router.get("/indices/{index_id}/", response_model=VectorIndexResponseSchema)
+@router.get(
+    "/indices/{index_id}/",
+    response_model=VectorIndexResponseSchema,
+    description="Get details of a specific vector index",
+)
 async def get_vector_index(index_id: str, db: Session = Depends(get_db)):
-    """Get vector index details"""
+    """Get vector index details."""
     try:
         index = db.query(VectorIndexModel).filter(VectorIndexModel.id == index_id).first()
         if not index:
-            raise HTTPException(status_code=404, detail="Vector index not found")
+            raise HTTPException(status_code=404, detail="Vector index not found") from None
 
         return VectorIndexResponseSchema(
             id=index.id,
@@ -612,7 +642,7 @@ async def get_vector_index(index_id: str, db: Session = Depends(get_db)):
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 
 # Add progress tracking endpoints
@@ -621,15 +651,19 @@ async def get_vector_index(index_id: str, db: Session = Depends(get_db)):
     response_model=ProcessingProgressSchema,
 )
 async def get_collection_progress(collection_id: str):
-    """Get document collection processing progress"""
+    """Get document collection processing progress."""
     if collection_id not in collection_progress:
-        raise HTTPException(status_code=404, detail="No progress information found")
+        raise HTTPException(status_code=404, detail="No progress information found") from None
     return collection_progress[collection_id]
 
 
-@router.get("/indices/{index_id}/progress/", response_model=ProcessingProgressSchema)
+@router.get(
+    "/indices/{index_id}/progress/",
+    response_model=ProcessingProgressSchema,
+    description="Get the processing progress of a vector index",
+)
 async def get_index_progress(index_id: str, db: Session = Depends(get_db)):
-    """Get vector index processing progress"""
+    """Get vector index processing progress."""
     logger.debug(f"Getting progress for index {index_id}")
 
     progress_record = (
@@ -639,7 +673,7 @@ async def get_index_progress(index_id: str, db: Session = Depends(get_db)):
     )
 
     if not progress_record:
-        raise HTTPException(status_code=404, detail="No progress information found")
+        raise HTTPException(status_code=404, detail="No progress information found") from None
 
     logger.debug(f"Progress data for index {index_id}: {progress_record.__dict__}")
 
@@ -670,7 +704,7 @@ async def add_documents_to_collection(
     files: List[UploadFile] = File(...),
     db: Session = Depends(get_db),
 ):
-    """Add documents to an existing collection"""
+    """Add documents to an existing collection."""
     try:
         # Get the document collection
         collection = (
@@ -679,7 +713,7 @@ async def add_documents_to_collection(
             .first()
         )
         if not collection:
-            raise HTTPException(status_code=404, detail="Document collection not found")
+            raise HTTPException(status_code=404, detail="Document collection not found") from None
 
         # Read files and prepare file info
         file_infos: List[Dict[str, Any]] = []
@@ -744,7 +778,7 @@ async def add_documents_to_collection(
         )
 
     except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=400, detail=str(e)) from e
 
 
 @router.delete("/collections/{collection_id}/documents/{document_id}/")
@@ -753,7 +787,7 @@ async def delete_document_from_collection(
     document_id: str,
     db: Session = Depends(get_db),
 ):
-    """Delete a document from a collection"""
+    """Delete a document from a collection."""
     try:
         # Get the document collection
         collection = (
@@ -762,7 +796,7 @@ async def delete_document_from_collection(
             .first()
         )
         if not collection:
-            raise HTTPException(status_code=404, detail="Document collection not found")
+            raise HTTPException(status_code=404, detail="Document collection not found") from None
 
         # Initialize document store
         doc_store = DocumentStore(collection.id)
@@ -770,12 +804,14 @@ async def delete_document_from_collection(
         # Check if document exists
         doc = doc_store.get_document(document_id)
         if not doc:
-            raise HTTPException(status_code=404, detail="Document not found in collection")
+            raise HTTPException(
+                status_code=404, detail="Document not found in collection"
+            ) from None
 
         # Delete document
         success = doc_store.delete_document(document_id)
         if not success:
-            raise HTTPException(status_code=500, detail="Failed to delete document")
+            raise HTTPException(status_code=500, detail="Failed to delete document") from None
 
         # Update collection stats
         collection.document_count -= 1
@@ -788,7 +824,7 @@ async def delete_document_from_collection(
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 
 @router.get(
@@ -798,7 +834,7 @@ async def delete_document_from_collection(
 async def get_collection_documents(
     collection_id: str,
 ) -> List[DocumentWithChunksSchema]:
-    """Get all documents and their chunks for a collection"""
+    """Get all documents and their chunks for a collection."""
     try:
         doc_store = DocumentStore(collection_id)
         documents: List[DocumentWithChunksSchema] = []
@@ -808,10 +844,13 @@ async def get_collection_documents(
                 documents.append(doc)
         return documents
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 
-@router.post("/collections/preview_chunk/")
+@router.post(
+    "/collections/preview_chunk/",
+    description="Preview how a document would be chunked with given configuration",
+)
 async def preview_chunk(
     file: UploadFile = File(...),
     chunking_config: str = Form(...),
@@ -822,7 +861,7 @@ async def preview_chunk(
         config = ChunkingConfigSchema(**json.loads(chunking_config))
 
         if not file.filename:
-            raise HTTPException(status_code=400, detail="Filename is required")
+            raise HTTPException(status_code=400, detail="Filename is required") from None
 
         # Get preview using chunker module
         preview_chunks, total_chunks = await preview_document_chunk(
@@ -832,31 +871,35 @@ async def preview_chunk(
         return {"chunks": preview_chunks, "total_chunks": total_chunks}
 
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=400, detail=str(e)) from e
     except Exception as e:
         logger.error(f"Error previewing chunk: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 
-@router.post("/indices/{index_id}/retrieve/", response_model=RetrievalResponseSchema)
+@router.post(
+    "/indices/{index_id}/retrieve/",
+    response_model=RetrievalResponseSchema,
+    description="Retrieve relevant chunks from a vector index based on a query",
+)
 async def retrieve_from_index(
     index_id: str,
     request: RetrievalRequestSchema,
     db: Session = Depends(get_db),
 ) -> RetrievalResponseSchema:
-    """Retrieve relevant documents from a vector index"""
+    """Retrieve relevant documents from a vector index."""
     try:
         # Get the vector index from the database
         index = db.query(VectorIndexModel).filter(VectorIndexModel.id == index_id).first()
         if not index:
-            raise HTTPException(status_code=404, detail="Vector index not found")
+            raise HTTPException(status_code=404, detail="Vector index not found") from None
 
         # Check if index is ready
         if index.status != "ready":
             raise HTTPException(
                 status_code=400,
                 detail=f"Vector index is not ready (current status: {index.status})",
-            )
+            ) from None
 
         # Initialize vector index
         vector_index = VectorIndex(index.id)
@@ -897,4 +940,4 @@ async def retrieve_from_index(
         raise
     except Exception as e:
         logger.error(f"Error retrieving from vector index: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e

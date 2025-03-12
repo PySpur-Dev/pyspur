@@ -10,7 +10,8 @@ from ..schemas.workflow_schemas import WorkflowDefinitionSchema
 from ..utils import pydantic_utils
 
 # Define TypeVar for Tool reference
-T = TypeVar('T', bound='Tool')
+T = TypeVar("T", bound="Tool")
+
 
 class VisualTag(BaseModel):
     """Pydantic model for visual tag properties."""
@@ -41,11 +42,7 @@ class ToolInput(BaseModel):
 
 
 # Define a type for the input parameter of __call__
-ToolInputType = Union[
-    Dict[str, Any],
-    Dict[str, BaseModel],
-    BaseModel
-]
+ToolInputType = Union[Dict[str, Any], Dict[str, BaseModel], BaseModel]
 
 
 class Tool(BaseModel, ABC):
@@ -86,15 +83,20 @@ class Tool(BaseModel, ABC):
     name: str = Field(description="Unique identifier for the tool")
     input_model: Type[BaseModel] = Field(
         default=BaseModel,
-        description="Defines the structure of tool's input using either a JSON schema string or a Pydantic model class"
+        description=(
+            "Defines the structure of tool's input using"
+            " either a JSON schema string or a Pydantic model class"
+        ),
     )
     output_model: Type[BaseModel] = Field(
         default=BaseModel,
-        description="Defines the structure of tool's output using either a JSON schema string or a Pydantic model class"
+        description=(
+            "Defines the structure of tool's output using"
+            " either a JSON schema string or a Pydantic model class"
+        ),
     )
     has_fixed_output: bool = Field(
-        default=False,
-        description="If True, output schema cannot be modified at runtime"
+        default=False, description="If True, output schema cannot be modified at runtime"
     )
 
     # Internal properties (not exposed to users)
@@ -133,7 +135,7 @@ class Tool(BaseModel, ABC):
         # Get model_extra from Pydantic v2
         model_extra = getattr(self, "model_extra", {}) or {}
 
-        self._context = model_extra.pop('context', None)
+        self._context = model_extra.pop("context", None)
 
         if self._visual_tag is None:
             self._visual_tag = self.get_default_visual_tag()
@@ -247,6 +249,11 @@ class Tool(BaseModel, ABC):
     def context(self) -> Optional[WorkflowExecutionContext]:
         """Return the tool's execution context."""
         return self._context
+
+    @context.setter
+    def context(self, value: Optional[WorkflowExecutionContext]) -> None:
+        """Set the tool's execution context."""
+        self._context = value
 
     @property
     def display_name(self) -> str:

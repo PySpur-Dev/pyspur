@@ -2,13 +2,15 @@ import json
 import logging
 import os
 from typing import Optional
-from pydantic import BaseModel, Field  # type: ignore
-from ...base import BaseNode, BaseNodeConfig, BaseNodeInput, BaseNodeOutput
+
 import praw
+from pydantic import BaseModel, Field  # type: ignore
+
+from ...base import BaseNode, BaseNodeConfig, BaseNodeInput, BaseNodeOutput
 
 
 class RedditCreatePostNodeInput(BaseNodeInput):
-    """Input for the RedditCreatePost node"""
+    """Input for the RedditCreatePost node."""
 
     class Config:
         extra = "allow"
@@ -29,17 +31,25 @@ class RedditCreatePostError(BaseModel):
 
 
 class RedditCreatePostNodeOutput(BaseNodeOutput):
-    post_info: CreatedPostInfo | RedditCreatePostError = Field(..., description="Information about the created post or error details")
+    post_info: CreatedPostInfo | RedditCreatePostError = Field(
+        ..., description="Information about the created post or error details"
+    )
 
 
 class RedditCreatePostNodeConfig(BaseNodeConfig):
     subreddit: str = Field("", description="The subreddit to post in.")
     title: str = Field("", description="The title of the post.")
-    content: str = Field("", description="The content of the post (text for self posts, URL for link posts).")
+    content: str = Field(
+        "", description="The content of the post (text for self posts, URL for link posts)."
+    )
     flair: Optional[str] = Field(None, description="Optional flair to add to the post.")
     is_self: bool = Field(True, description="Whether this is a self (text) post or link post.")
-    username: str = Field("", description="Reddit username.")
-    password: str = Field("", description="Reddit password.")
+    username: str = Field(
+        "", description="Reddit username. Can also be set via REDDIT_USERNAME environment variable."
+    )
+    password: str = Field(
+        "", description="Reddit password. Can also be set via REDDIT_PASSWORD environment variable."
+    )
     has_fixed_output: bool = True
     output_json_schema: str = Field(
         default=json.dumps(RedditCreatePostNodeOutput.model_json_schema()),
@@ -62,16 +72,21 @@ class RedditCreatePostNode(BaseNode):
             client_id = os.getenv("REDDIT_CLIENT_ID")
             client_secret = os.getenv("REDDIT_CLIENT_SECRET")
             user_agent = os.getenv("REDDIT_USER_AGENT", "RedditTools v1.0")
+            username = os.getenv("REDDIT_USERNAME") or self.config.username
+            password = os.getenv("REDDIT_PASSWORD") or self.config.password
 
             if not client_id or not client_secret:
                 raise ValueError("Reddit API credentials not found in environment variables")
+
+            if not username or not password:
+                raise ValueError("Reddit username and password are required for creating posts")
 
             reddit = praw.Reddit(
                 client_id=client_id,
                 client_secret=client_secret,
                 user_agent=user_agent,
-                username=self.config.username,
-                password=self.config.password,
+                username=username,
+                password=password,
             )
 
             # Verify authentication

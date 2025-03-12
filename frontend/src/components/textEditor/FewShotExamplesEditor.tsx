@@ -1,15 +1,22 @@
-import React, { useState } from 'react'
 import { Alert, Card, CardBody, Tab, Tabs, Tooltip } from '@heroui/react'
 import { Icon } from '@iconify/react'
-import FewShotExamples from './FewShotEditor'
-import CodeEditor from '../CodeEditor'
+import React, { useState } from 'react'
 import { FewShotExample, FewShotExamplesEditorProps } from '../../types/fewShot'
+import CodeEditor from '../CodeEditor'
+import FewShotExamples from './FewShotEditor'
 
-const FewShotExamplesEditor: React.FC<FewShotExamplesEditorProps> = ({ nodeID, examples, onChange, readOnly = false }) => {
+const FewShotExamplesEditor: React.FC<FewShotExamplesEditorProps> = ({
+    nodeID,
+    examples,
+    onChange,
+    readOnly = false,
+}) => {
     const [editorMode, setEditorMode] = useState<'visual' | 'json'>('visual')
     const [jsonError, setJsonError] = useState<string>('')
 
     const handleJsonChange = (jsonContent: string) => {
+        if (readOnly) return
+
         try {
             const parsedContent = JSON.parse(jsonContent)
             if (!Array.isArray(parsedContent)) {
@@ -17,10 +24,11 @@ const FewShotExamplesEditor: React.FC<FewShotExamplesEditorProps> = ({ nodeID, e
                 return
             }
 
-            const isValid = parsedContent.every((example: FewShotExample) =>
-                typeof example === 'object' &&
-                (example.input === undefined || typeof example.input === 'string') &&
-                (example.output === undefined || typeof example.output === 'string')
+            const isValid = parsedContent.every(
+                (example: FewShotExample) =>
+                    typeof example === 'object' &&
+                    (example.input === undefined || typeof example.input === 'string') &&
+                    (example.output === undefined || typeof example.output === 'string')
             )
 
             if (!isValid) {
@@ -50,7 +58,10 @@ const FewShotExamplesEditor: React.FC<FewShotExamplesEditorProps> = ({ nodeID, e
                 <Tabs
                     aria-label="Few Shot Editor Options"
                     selectedKey={editorMode}
-                    onSelectionChange={(key) => setEditorMode(key as 'visual' | 'json')}
+                    onSelectionChange={(key) => {
+                        if (readOnly) return
+                        setEditorMode(key as 'visual' | 'json')
+                    }}
                     size="sm"
                     disabledKeys={readOnly ? ['visual', 'json'] : []}
                 >
@@ -60,11 +71,7 @@ const FewShotExamplesEditor: React.FC<FewShotExamplesEditorProps> = ({ nodeID, e
             </div>
 
             {editorMode === 'visual' ? (
-                <FewShotExamples
-                    nodeID={nodeID}
-                    examples={examples}
-                    onChange={onChange}
-                />
+                <FewShotExamples nodeID={nodeID} examples={examples} onChange={onChange} readOnly={readOnly} />
             ) : (
                 <Card>
                     <CardBody>
@@ -77,7 +84,8 @@ const FewShotExamplesEditor: React.FC<FewShotExamplesEditorProps> = ({ nodeID, e
                             </Alert>
                         )}
                         <div className="mb-2 text-sm text-default-500">
-                            Edit all examples in JSON format. Each example should have an &quot;input&quot; and &quot;output&quot; field.
+                            Edit all examples in JSON format. Each example should have an &quot;input&quot; and
+                            &quot;output&quot; field.
                         </div>
                         <CodeEditor
                             code={JSON.stringify(examples, null, 2)}

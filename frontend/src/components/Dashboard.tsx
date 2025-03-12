@@ -1,12 +1,24 @@
-import { RunResponse } from '@/types/api_types/runSchemas'
-import { WorkflowCreateRequest, WorkflowDefinition, WorkflowResponse } from '@/types/api_types/workflowSchemas'
 import { PausedWorkflowResponse, ResumeActionRequest } from '@/types/api_types/pausedWorkflowSchemas'
+import { RunResponse } from '@/types/api_types/runSchemas'
+import {
+    SpurType,
+    WorkflowCreateRequest,
+    WorkflowDefinition,
+    WorkflowResponse,
+} from '@/types/api_types/workflowSchemas'
 import {
     Accordion,
     AccordionItem,
     Alert,
     Button,
     Chip,
+    Modal,
+    ModalBody,
+    ModalContent,
+    ModalFooter,
+    ModalHeader,
+    Radio,
+    RadioGroup,
     Spinner,
     Table,
     TableBody,
@@ -15,11 +27,15 @@ import {
     TableHeader,
     TableRow,
     getKeyValue,
+    useDisclosure,
 } from '@heroui/react'
 import { Icon } from '@iconify/react'
+import { formatDistanceToNow } from 'date-fns'
+import { Upload } from 'lucide-react'
 import Head from 'next/head'
 import { useRouter } from 'next/router'
-import React, { useEffect, useState } from 'react'
+import React, { useCallback, useEffect, useState } from 'react'
+import { useDropzone } from 'react-dropzone'
 import { useSelector } from 'react-redux'
 import { RootState } from '../store/store'
 import { Template } from '../types/workflow'
@@ -39,9 +55,9 @@ import {
     takePauseAction,
 } from '../utils/api'
 import TemplateCard from './cards/TemplateCard'
-import WelcomeModal from './modals/WelcomeModal'
+import SpurTypeChip from './chips/SpurTypeChip'
 import HumanInputModal from './modals/HumanInputModal'
-import { formatDistanceToNow } from 'date-fns'
+import WelcomeModal from './modals/WelcomeModal'
 
 // Calendly Widget Component
 const CalendlyWidget: React.FC = () => {
@@ -127,18 +143,20 @@ const Dashboard: React.FC = () => {
     const [alertMessage, setAlertMessage] = useState<string | null>(null)
     const [alertColor, setAlertColor] = useState<'success' | 'danger' | 'warning' | 'default'>('default')
     const [showAlert, setShowAlert] = useState(false)
+    const { isOpen: isNewSpurModalOpen, onOpen: onOpenNewSpurModal, onClose: onCloseNewSpurModal } = useDisclosure()
+    const [selectedSpurType, setSelectedSpurType] = useState<SpurType>(SpurType.WORKFLOW)
 
     // Function to show alerts
     const onAlert = (message: string, color: 'success' | 'danger' | 'warning' | 'default' = 'default') => {
-        setAlertMessage(message);
-        setAlertColor(color);
-        setShowAlert(true);
+        setAlertMessage(message)
+        setAlertColor(color)
+        setShowAlert(true)
 
         // Auto-hide the alert after 5 seconds
         setTimeout(() => {
-            setShowAlert(false);
-        }, 5000);
-    };
+            setShowAlert(false)
+        }, 5000)
+    }
 
     useEffect(() => {
         const fetchWorkflows = async () => {
@@ -154,7 +172,11 @@ const Dashboard: React.FC = () => {
                         return map
                     }
                 )
-                setWorkflows(workflows as WorkflowResponse[])
+                // Sort workflows by updated_at in descending order (newest first)
+                const sortedWorkflows = [...workflows].sort(
+                    (a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()
+                )
+                setWorkflows(sortedWorkflows as WorkflowResponse[])
                 setShowWelcome(!hasSeenWelcome && workflows.length === 0)
                 setWorkflowRuns(runsMap)
                 setHasMoreWorkflows(workflows.length === 10)
@@ -232,6 +254,7 @@ const Dashboard: React.FC = () => {
     const columns = [
         { key: 'id', label: 'ID' },
         { key: 'name', label: 'Name' },
+        { key: 'spur_type', label: 'Type' },
         { key: 'action', label: 'Action' },
         { key: 'recentRuns', label: 'Recent Runs' },
         { key: 'updated_at', label: 'Last Modified' },
@@ -253,17 +276,29 @@ const Dashboard: React.FC = () => {
     }
 
     const handleNewWorkflowClick = async () => {
+        onOpenNewSpurModal()
+    }
+
+    const handleCreateNewSpur = async () => {
         try {
-            const uniqueName = `New Spur ${new Date().toLocaleString()}`
+            const uniqueName = `New ${selectedSpurType === SpurType.CHATBOT ? 'Chatbot' : 'Workflow'} ${new Date().toLocaleString()}`
             const newWorkflow: WorkflowCreateRequest = {
                 name: uniqueName,
                 description: '',
+                definition: {
+                    nodes: [],
+                    links: [],
+                    test_inputs: [],
+                    spur_type: selectedSpurType,
+                },
             }
 
             const createdWorkflow = await createWorkflow(newWorkflow)
+            onCloseNewSpurModal()
             router.push(`/workflows/${createdWorkflow.id}`)
         } catch (error) {
             console.error('Error creating new workflow:', error)
+            onAlert('Failed to create new spur', 'danger')
         }
     }
 
@@ -366,7 +401,11 @@ const Dashboard: React.FC = () => {
                     }
                 )
 
-                setWorkflows((prev) => [...prev, ...moreWorkflows])
+                setWorkflows((prev) => {
+                    // Merge previous and new workflows, then sort by updated_at
+                    const combined = [...prev, ...moreWorkflows]
+                    return combined.sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime())
+                })
                 setWorkflowRuns((prev) => ({ ...prev, ...runsMap }))
                 setWorkflowPage(nextPage)
                 setHasMoreWorkflows(moreWorkflows.length === 10)
@@ -385,21 +424,21 @@ const Dashboard: React.FC = () => {
         inputData: Record<string, any>,
         comments: string
     ) => {
-        if (!selectedWorkflow) return;
+        if (!selectedWorkflow) return
 
         try {
             // Log the workflow object structure for debugging
-            console.log("Selected workflow:", selectedWorkflow);
-            console.log("Input data:", inputData);
+            console.log('Selected workflow:', selectedWorkflow)
+            console.log('Input data:', inputData)
 
             // Get run ID - this should always be available
-            const runId = selectedWorkflow.run.id;
+            const runId = selectedWorkflow.run.id
 
             // Get workflow ID directly from the run object (not needed for takePauseAction but keeping for logs)
-            const workflowId = selectedWorkflow.run.workflow_id;
+            const workflowId = selectedWorkflow.run.workflow_id
 
-            console.log("Workflow ID:", workflowId);
-            console.log("Run ID:", runId);
+            console.log('Workflow ID:', workflowId)
+            console.log('Run ID:', runId)
 
             if (runId) {
                 try {
@@ -408,41 +447,40 @@ const Dashboard: React.FC = () => {
                         inputs: inputData,
                         user_id: 'current-user',
                         action,
-                        comments
-                    };
+                        comments,
+                    }
 
                     // Call takePauseAction with the request
-                    await takePauseAction(runId, actionRequest);
+                    await takePauseAction(runId, actionRequest)
 
                     // Show success message
-                    onAlert(`Workflow resumed with action: ${action}`, 'success');
+                    onAlert(`Workflow resumed with action: ${action}`, 'success')
 
                     // Close the modal
-                    setIsHumanInputModalOpen(false);
-                    setSelectedWorkflow(null);
-
+                    setIsHumanInputModalOpen(false)
+                    setSelectedWorkflow(null)
                 } catch (resumeError) {
-                    console.error('Error resuming workflow:', resumeError);
-                    onAlert('Failed to resume workflow', 'danger');
+                    console.error('Error resuming workflow:', resumeError)
+                    onAlert('Failed to resume workflow', 'danger')
                 }
             } else {
-                console.error('Cannot resume workflow: Run ID is missing or invalid');
-                onAlert('Cannot resume workflow: missing run ID', 'danger');
+                console.error('Cannot resume workflow: Run ID is missing or invalid')
+                onAlert('Cannot resume workflow: missing run ID', 'danger')
             }
 
             // Refresh paused workflows
-            const paused = await listPausedWorkflows();
-            setPausedWorkflows(paused);
+            const paused = await listPausedWorkflows()
+            setPausedWorkflows(paused)
         } catch (error) {
-            console.error('Error submitting human input:', error);
-            onAlert('Error submitting human input', 'danger');
+            console.error('Error submitting human input:', error)
+            onAlert('Error submitting human input', 'danger')
         }
-    };
+    }
 
     // Handle quick actions (approve/decline) directly from the dashboard
     const handleQuickAction = async (workflow: PausedWorkflowResponse, action: 'APPROVE' | 'DECLINE') => {
         try {
-            const runId = workflow.run.id;
+            const runId = workflow.run.id
 
             if (runId) {
                 // Create a simple action request with empty inputs and comments
@@ -450,69 +488,107 @@ const Dashboard: React.FC = () => {
                     inputs: {},
                     user_id: 'current-user',
                     action,
-                    comments: `Quick ${action.toLowerCase()} from dashboard`
-                };
+                    comments: `Quick ${action.toLowerCase()} from dashboard`,
+                }
 
                 // Call takePauseAction with the request
-                await takePauseAction(runId, actionRequest);
+                await takePauseAction(runId, actionRequest)
 
                 // Show success message
-                onAlert(`Workflow ${action.toLowerCase()}d successfully`, 'success');
+                onAlert(`Workflow ${action.toLowerCase()}d successfully`, 'success')
 
                 // Refresh paused workflows
-                const paused = await listPausedWorkflows();
-                setPausedWorkflows(paused);
+                const paused = await listPausedWorkflows()
+                setPausedWorkflows(paused)
             } else {
-                console.error('Cannot perform action: Run ID is missing or invalid');
-                onAlert('Cannot perform action: missing run ID', 'danger');
+                console.error('Cannot perform action: Run ID is missing or invalid')
+                onAlert('Cannot perform action: missing run ID', 'danger')
             }
         } catch (error) {
-            console.error(`Error performing ${action} action:`, error);
-            onAlert(`Failed to ${action.toLowerCase()} workflow`, 'danger');
+            console.error(`Error performing ${action} action:`, error)
+            onAlert(`Failed to ${action.toLowerCase()} workflow`, 'danger')
         }
-    };
+    }
 
     // Handle cancellation of a workflow
     const handleCancelWorkflow = async (workflow: PausedWorkflowResponse) => {
         try {
-            const runId = workflow.run.id;
+            const runId = workflow.run.id
 
             if (runId) {
                 if (window.confirm(`Are you sure you want to cancel this workflow? This action cannot be undone.`)) {
                     // Call the cancelWorkflow API
-                    await cancelWorkflow(runId);
+                    await cancelWorkflow(runId)
 
                     // Show success message
-                    onAlert('Workflow canceled successfully', 'success');
+                    onAlert('Workflow canceled successfully', 'success')
 
                     // Refresh paused workflows
-                    const paused = await listPausedWorkflows();
-                    setPausedWorkflows(paused);
+                    const paused = await listPausedWorkflows()
+                    setPausedWorkflows(paused)
                 }
             } else {
-                console.error('Cannot cancel workflow: Run ID is missing or invalid');
-                onAlert('Cannot cancel workflow: missing run ID', 'danger');
+                console.error('Cannot cancel workflow: Run ID is missing or invalid')
+                onAlert('Cannot cancel workflow: missing run ID', 'danger')
             }
         } catch (error) {
-            console.error('Error canceling workflow:', error);
-            onAlert('Failed to cancel workflow', 'danger');
+            console.error('Error canceling workflow:', error)
+            onAlert('Failed to cancel workflow', 'danger')
         }
-    };
+    }
+
+    const onJSONDrop = useCallback(
+        (acceptedFiles: File[]) => {
+            const file = acceptedFiles[0]
+            if (!file) return
+            const reader = new FileReader()
+            reader.onload = async (e) => {
+                try {
+                    const result = e.target?.result
+                    if (typeof result !== 'string') return
+                    const jsonContent = JSON.parse(result)
+                    const uniqueName = `Imported Spur ${new Date().toLocaleString()}`
+                    const newWorkflow: WorkflowCreateRequest = {
+                        name: uniqueName,
+                        description: jsonContent.description,
+                        definition: jsonContent.definition as WorkflowDefinition,
+                    }
+                    const createdWorkflow = await createWorkflow(newWorkflow)
+                    router.push(`/workflows/${createdWorkflow.id}`)
+                } catch (error) {
+                    console.error('Error processing dropped JSON file:', error)
+                    alert('Failed to import workflow. Please ensure the file is a valid JSON.')
+                }
+            }
+            reader.readAsText(file)
+        },
+        [router]
+    )
+
+    const { getRootProps, getInputProps, isDragActive } = useDropzone({
+        onDrop: onJSONDrop,
+        accept: { 'application/json': ['.json'] },
+        noClick: true,
+        noKeyboard: true,
+    })
 
     return (
-        <div className="flex flex-col gap-2 max-w-7xl w-full mx-auto pt-2 px-6">
+        <div {...getRootProps()} className="relative flex flex-col gap-2 max-w-7xl w-full mx-auto pt-2 px-6">
+            <input {...getInputProps()} />
+            {isDragActive && (
+                <div className="absolute inset-0 flex flex-col items-center justify-center bg-primary/10 backdrop-blur-sm border-2 border-dashed border-primary rounded-lg z-50 transition-all duration-300 animate-in fade-in">
+                    <Upload className="w-16 h-16 text-primary mb-4" />
+                    <p className="text-primary text-xl font-bold">Drop workflow JSON file here</p>
+                    <p className="text-primary/80 text-sm mt-2">Release to import your workflow</p>
+                </div>
+            )}
             <Head>
                 <link href="https://assets.calendly.com/assets/external/widget.css" rel="stylesheet" />
             </Head>
 
             {/* Alert message */}
             {showAlert && alertMessage && (
-                <Alert
-                    className="mb-4"
-                    variant="solid"
-                    color={alertColor}
-                    onClose={() => setShowAlert(false)}
-                >
+                <Alert className="mb-4" variant="solid" color={alertColor} onClose={() => setShowAlert(false)}>
                     {alertMessage}
                 </Alert>
             )}
@@ -557,14 +633,17 @@ const Dashboard: React.FC = () => {
                                 }
                                 onPress={handleImportWorkflowClick}
                             >
-                                Import Spur
+                                Import Spur (or drop JSON file)
                             </Button>
                         </div>
                     </div>
                 </header>
 
                 {/* Wrap sections in Accordion */}
-                <Accordion defaultExpandedKeys={new Set(['workflows', 'templates', 'human-tasks'])} selectionMode="multiple">
+                <Accordion
+                    defaultExpandedKeys={new Set(['workflows', 'templates', 'human-tasks'])}
+                    selectionMode="multiple"
+                >
                     <AccordionItem
                         key="workflows"
                         aria-label="Recent Spurs"
@@ -642,6 +721,8 @@ const Dashboard: React.FC = () => {
                                                             >
                                                                 {workflow.name}
                                                             </Chip>
+                                                        ) : columnKey === 'spur_type' ? (
+                                                            <SpurTypeChip spurType={workflow.definition.spur_type} />
                                                         ) : columnKey === 'updated_at' ? (
                                                             <span className="text-default-500">
                                                                 {formatDate(getKeyValue(workflow, columnKey))}
@@ -757,8 +838,12 @@ const Dashboard: React.FC = () => {
                                     >
                                         <div className="flex-1">
                                             <div className="flex items-center gap-2 mb-1">
-                                                <h4 className="font-medium">{(workflow.workflow as WorkflowResponse).name}</h4>
-                                                <Chip size="sm" color="warning">Paused</Chip>
+                                                <h4 className="font-medium">
+                                                    {(workflow.workflow as WorkflowResponse).name}
+                                                </h4>
+                                                <Chip size="sm" color="warning">
+                                                    Paused
+                                                </Chip>
                                             </div>
                                             <p className="text-sm text-default-500 mb-2">
                                                 {workflow.current_pause.pause_message}
@@ -767,7 +852,10 @@ const Dashboard: React.FC = () => {
                                                 <span>Run ID: {workflow.run.id}</span>
                                                 <span>•</span>
                                                 <span>
-                                                    Paused {formatDistanceToNow(new Date(workflow.current_pause.pause_time), { addSuffix: true })}
+                                                    Paused{' '}
+                                                    {formatDistanceToNow(new Date(workflow.current_pause.pause_time), {
+                                                        addSuffix: true,
+                                                    })}
                                                 </span>
                                             </div>
                                         </div>
@@ -852,6 +940,46 @@ const Dashboard: React.FC = () => {
                     onSubmit={handleHumanInputSubmit}
                 />
             )}
+            {/* New Spur Type Modal */}
+            <Modal isOpen={isNewSpurModalOpen} onClose={onCloseNewSpurModal}>
+                <ModalContent>
+                    <ModalHeader className="flex flex-col gap-1">Create New Spur</ModalHeader>
+                    <ModalBody>
+                        <RadioGroup
+                            label="Select the type of spur you want to create"
+                            value={selectedSpurType}
+                            onChange={(e) => setSelectedSpurType(e.target.value as SpurType)}
+                        >
+                            <Radio
+                                value={SpurType.WORKFLOW}
+                                description="Create a standard workflow with nodes and edges"
+                            >
+                                <div className="flex items-center gap-2">
+                                    <Icon icon="lucide:workflow" width={20} />
+                                    <span>Workflow</span>
+                                </div>
+                            </Radio>
+                            <Radio
+                                value={SpurType.CHATBOT}
+                                description="Create a chatbot with session management and conversational I/O"
+                            >
+                                <div className="flex items-center gap-2">
+                                    <Icon icon="lucide:message-square" width={20} />
+                                    <span>Chatbot</span>
+                                </div>
+                            </Radio>
+                        </RadioGroup>
+                    </ModalBody>
+                    <ModalFooter>
+                        <Button color="danger" variant="light" onPress={onCloseNewSpurModal}>
+                            Cancel
+                        </Button>
+                        <Button color="primary" onPress={handleCreateNewSpur}>
+                            Create
+                        </Button>
+                    </ModalFooter>
+                </ModalContent>
+            </Modal>
         </div>
     )
 }

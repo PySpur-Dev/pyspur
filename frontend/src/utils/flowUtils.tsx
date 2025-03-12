@@ -474,8 +474,8 @@ export const useFlowEventHandlers = ({ dispatch, nodes, setHelperLines }: FlowEv
             }
 
             // Handle position changes with throttling
-            const positionChanges = changes.filter(c => c.type === 'position')
-            const otherChanges = changes.filter(c => c.type !== 'position')
+            const positionChanges = changes.filter((c) => c.type === 'position')
+            const otherChanges = changes.filter((c) => c.type !== 'position')
 
             // Immediately dispatch non-position changes
             if (otherChanges.length > 0) {
@@ -491,9 +491,12 @@ export const useFlowEventHandlers = ({ dispatch, nodes, setHelperLines }: FlowEv
     )
 
     // Handle drag end to flush any pending position changes
-    const onNodeDragStop = useCallback((event: React.MouseEvent, node: Node) => {
-        throttledPosition.flushChanges(dispatch)
-    }, [dispatch, throttledPosition])
+    const onNodeDragStop = useCallback(
+        (event: React.MouseEvent, node: Node) => {
+            throttledPosition.flushChanges(dispatch)
+        },
+        [dispatch, throttledPosition]
+    )
 
     const onEdgesChange: OnEdgesChange = useCallback(
         (changes: EdgeChange[]) => dispatch(edgesChange({ changes })),
@@ -543,7 +546,7 @@ export const useFlowEventHandlers = ({ dispatch, nodes, setHelperLines }: FlowEv
         onNodesChange,
         onEdgesChange,
         onConnect,
-        onNodeDragStop
+        onNodeDragStop,
     }
 }
 
@@ -603,7 +606,7 @@ export const createThrottledPositionChange = () => {
                 animationFrame = requestAnimationFrame(() => {
                     // Only take the latest position for each node
                     const latestPositions = new Map<string, NodeChange>()
-                    pendingChanges.forEach(change => {
+                    pendingChanges.forEach((change) => {
                         if (change.type === 'position' && change.id) {
                             latestPositions.set(change.id, change)
                         }
@@ -628,7 +631,7 @@ export const createThrottledPositionChange = () => {
             if (pendingChanges.length > 0) {
                 // Optimize final update
                 const latestPositions = new Map<string, NodeChange>()
-                pendingChanges.forEach(change => {
+                pendingChanges.forEach((change) => {
                     if (change.type === 'position' && change.id) {
                         latestPositions.set(change.id, change)
                     }
@@ -639,7 +642,7 @@ export const createThrottledPositionChange = () => {
                 pendingChanges = []
                 lastUpdate = Date.now()
             }
-        }
+        },
     }
 }
 
@@ -651,15 +654,15 @@ interface NodesWithStatusOptions {
 export const useNodesWithStatus = ({ nodes, nodeOutputs }: NodesWithStatusOptions) => {
     return useMemo(() => {
         return nodes.filter(Boolean).map((node) => {
-            const nodeTitle = node.data?.title || node.id;
+            const nodeTitle = node.data?.title || node.id
 
             // If this node already has a defined status, keep it
             if (node.data?.taskStatus) {
-                return node;
+                return node
             }
 
             // If node has outputs in nodeOutputs, check if it's completed or paused
-            if (nodeOutputs && nodeOutputs[nodeTitle]) {
+            if (nodeOutputs && typeof nodeTitle === 'string' && nodeTitle in nodeOutputs) {
                 // If this is a paused node (like human intervention)
                 if (nodeOutputs[nodeTitle].__paused) {
                     return {
@@ -667,9 +670,9 @@ export const useNodesWithStatus = ({ nodes, nodeOutputs }: NodesWithStatusOption
                         data: {
                             ...node.data,
                             taskStatus: 'PAUSED',
-                            run: nodeOutputs[nodeTitle]
-                        }
-                    };
+                            run: nodeOutputs[nodeTitle],
+                        },
+                    }
                 }
 
                 // Regular completed node
@@ -678,9 +681,9 @@ export const useNodesWithStatus = ({ nodes, nodeOutputs }: NodesWithStatusOption
                     data: {
                         ...node.data,
                         taskStatus: 'COMPLETED',
-                        run: nodeOutputs[nodeTitle]
-                    }
-                };
+                        run: nodeOutputs[nodeTitle],
+                    },
+                }
             }
 
             // Otherwise, mark as pending
@@ -688,9 +691,9 @@ export const useNodesWithStatus = ({ nodes, nodeOutputs }: NodesWithStatusOption
                 ...node,
                 data: {
                     ...node.data,
-                    taskStatus: 'PENDING'
-                }
-            };
-        });
-    }, [nodes, nodeOutputs]);
-};
+                    taskStatus: 'PENDING',
+                },
+            }
+        })
+    }, [nodes, nodeOutputs])
+}

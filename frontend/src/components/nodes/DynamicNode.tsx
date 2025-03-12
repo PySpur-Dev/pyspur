@@ -1,8 +1,8 @@
-import React, { useEffect, useRef, useState, useMemo, memo } from 'react'
+import { FlowWorkflowNode } from '@/types/api_types/nodeTypeSchemas'
 import { NodeProps } from '@xyflow/react'
+import React, { useState } from 'react'
 import BaseNode from './BaseNode'
 import styles from './DynamicNode.module.css'
-import { FlowWorkflowNode } from '@/types/api_types/nodeTypeSchemas'
 import NodeOutputModal from './NodeOutputModal'
 import { OutputHandleRow } from './shared/OutputHandleRow'
 
@@ -46,7 +46,9 @@ const DynamicNode: React.FC<DynamicNodeProps> = ({
     const renderOutputHandles = () => {
         return (
             <div className={`${styles.handlesColumn} ${styles.outputHandlesColumn}`} id="output-handle">
-                {nodeData?.title && <OutputHandleRow id={id} keyName={String(nodeData?.title)} isCollapsed={isCollapsed} />}
+                {nodeData?.title && (
+                    <OutputHandleRow id={id} keyName={String(nodeData?.title)} isCollapsed={isCollapsed} />
+                )}
             </div>
         )
     }
@@ -66,8 +68,7 @@ const DynamicNode: React.FC<DynamicNodeProps> = ({
                     positionAbsoluteY={positionAbsoluteY}
                     renderOutputHandles={renderOutputHandles}
                     {...props}
-                >
-                </BaseNode>
+                ></BaseNode>
             </div>
             <NodeOutputModal
                 isOpen={isModalOpen}
