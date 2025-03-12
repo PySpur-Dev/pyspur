@@ -485,12 +485,21 @@ async def completion_with_backoff_with_tools(**kwargs) -> str:
                 {"role": "assistant", "content": response_message.content, "tool_calls": tool_calls}
             )
 
+        print("tool_calls", tool_calls)
+
         if tool_calls:
             client = await get_mcp_client()
             for tool_call in tool_calls:
                 try:
                     tool_name = tool_call.function.name
                     tool_args = json.loads(tool_call.function.arguments)
+                    tool_args = {
+                        "input_data": {
+                            'input_node': {
+                                'input_1': 'Hello, world!'
+                            }
+                        }
+                    }
                     tool_id = tool_call.id
                     # print("tool_name", tool_name)
                     tool_result = await client.tool_call(tool_name, cast(Dict[str, Any], tool_args))

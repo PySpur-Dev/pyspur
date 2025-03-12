@@ -222,6 +222,20 @@ const flowSlice = createSlice({
             if (targetNode.type === 'CoalesceNode') {
                 rebuildCoalesceNodeSchema(state, targetNode)
             }
+            // If it's a ToolCallNode, update tool_names based on incoming connections
+            if (targetNode.type === 'ToolCallNode') {
+                const incomingEdges = state.edges.filter((edge) => edge.target === targetNode.id)
+                const toolNames = incomingEdges.map((edge) => {
+                    const sourceNode = state.nodes.find((n) => n.id === edge.source)
+                    return sourceNode?.id || ''
+                }).filter(id => id !== '')
+
+                // Update the node's config with the new tool_names
+                state.nodeConfigs[targetNode.id] = {
+                    ...state.nodeConfigs[targetNode.id],
+                    tool_names: toolNames
+                }
+            }
         },
 
         addNode: (state, action: PayloadAction<{ node: FlowWorkflowNode }>) => {
@@ -375,6 +389,22 @@ const flowSlice = createSlice({
                     state.nodeConfigs[targetNode.id] = {
                         ...targetNodeConfig,
                         output_json_schema: intersectionSchema,
+                    }
+                }
+
+                // If target is a ToolCallNode, update tool_names
+                if (targetNode?.type === 'ToolCallNode') {
+                    // Get remaining incoming edges after deletion
+                    const remainingEdges = state.edges.filter((e) => e.target === targetNode.id && e.id !== edgeId)
+                    const toolNames = remainingEdges.map((e) => {
+                        const sourceNode = state.nodes.find((n) => n.id === e.source)
+                        return sourceNode?.id || ''
+                    }).filter(id => id !== '')
+
+                    // Update the node's config with the remaining tool_names
+                    state.nodeConfigs[targetNode.id] = {
+                        ...targetNodeConfig,
+                        tool_names: toolNames
                     }
                 }
 
