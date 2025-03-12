@@ -389,7 +389,7 @@ if __name__ == "__main__":
 
         chat_input = ChatInput.model_validate(
             {
-                "user_message": "What's the capital of France?",
+                "user_message": "What's most famous about it? keep it short",
                 "message_history": [
                     {"role": "user", "content": "Hello, can you help me with geography questions?"},
                     {
@@ -397,6 +397,8 @@ if __name__ == "__main__":
                         "content": "Of course! I'd be happy to help with geography questions. \
                             What would you like to know?",
                     },
+                    {"role": "user", "content": "What's the capital of France?"},
+                    {"role": "assistant", "content": "The capital of France is Paris."},
                 ],
             }
         )
