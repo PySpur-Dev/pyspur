@@ -1,5 +1,7 @@
 import logging
 import os
+import sys
+import textwrap
 from typing import Dict, List, Optional, Any
 
 from dotenv import load_dotenv
@@ -57,6 +59,12 @@ class ToolFileResponse(BaseModel):
     success: bool
     message: str
     data: Optional[Dict[str, Any]] = None
+
+
+class RegisterNodesRequest(BaseModel):
+    """Request to register nodes as tools"""
+
+    workflow_id: str
 
 
 # Create router
@@ -318,3 +326,110 @@ async def delete_tool_file(filename: str) -> ToolFileResponse:
                 os.remove(file_path)
             os.rename(backup_path, file_path)
         raise HTTPException(status_code=500, detail=f"Failed to delete tool file: {str(e)}")
+
+
+@router.post("/tools/register", response_model=ToolFileResponse)
+async def register_nodes_as_tools(request: RegisterNodesRequest) -> ToolFileResponse:
+    """
+    Register nodes as tools by creating tool files for nodes connected to ToolCallNodes.
+    This endpoint should be called before running a workflow to ensure all necessary tools are registered.
+    """
+    from ..models.workflow_model import WorkflowModel
+    from ..database import get_db
+
+    created_files = []
+
+    try:
+        # Get the workflow from the database
+        db = next(get_db())
+        workflow_model = (
+            db.query(WorkflowModel).filter(WorkflowModel.id == request.workflow_id).first()
+        )
+
+        if not workflow_model:
+            raise HTTPException(
+                status_code=404, detail=f"Workflow with ID {request.workflow_id} not found"
+            )
+
+        # Convert to WorkflowDefinitionSchema
+        from ..schemas.workflow_schemas import WorkflowDefinitionSchema
+
+        workflow = WorkflowDefinitionSchema.model_validate(workflow_model.definition)
+
+        # Find all tool call nodes
+        tool_call_nodes = [node for node in workflow.nodes if node.node_type == "ToolCallNode"]
+
+        if not tool_call_nodes:
+            return ToolFileResponse(
+                success=True,
+                message="No ToolCallNodes found in the workflow, no tools registered",
+                data={"created_files": []},
+            )
+
+        # Build a node dictionary for easy lookup
+        node_dict = {node.id: node for node in workflow.nodes}
+
+        # For each tool call node, find the source nodes
+        for tool_call_node in tool_call_nodes:
+            source_nodes = []
+            for link in workflow.links:
+                if link.target_id == tool_call_node.id:
+                    source_node = node_dict.get(link.source_id)
+                    if source_node:
+                        source_nodes.append(source_node)
+
+            # Convert source nodes to tools and register them
+            for source_node in source_nodes:
+                filename = source_node.id + ".py"
+                tool_content = textwrap.dedent(
+                    f"""
+                    from typing import Any, Dict
+                    from registry import ToolRegistry
+                    from pyspur.nodes.factory import NodeFactory
+                    from dotenv import load_dotenv
+                    load_dotenv()
+
+                    @ToolRegistry.register(description="Auto-generated tool for node_id={source_node.id}, node_type={source_node.node_type}")
+                    async def {source_node.id}(input_data: Dict[str, Any]) -> str:
+
+                        node_instance = NodeFactory.create_node(
+                            node_name="{source_node.node_type}",
+                            node_type_name="{source_node.node_type}",
+                            config={source_node.config}
+                        )
+                        return await node_instance(input_data)
+                    """
+                )
+
+                tool_info = ToolFileInfo(
+                    filename=filename,
+                    content=tool_content,
+                    description=f"Auto-generated tool for node {source_node.id}",
+                )
+
+                # Create the tool file
+                file_path = get_full_tool_path(tool_info.filename)
+
+                # Check if file already exists - if so, skip it
+                if os.path.exists(file_path):
+                    continue
+
+                # Write the file
+                with open(file_path, "w") as f:
+                    f.write(tool_info.content)
+
+                created_files.append(tool_info.filename)
+
+        return ToolFileResponse(
+            success=True,
+            message=f"Successfully registered {len(created_files)} tools for workflow {request.workflow_id}",
+            data={"created_files": created_files, "workflow_id": request.workflow_id},
+        )
+    except Exception as e:
+        # Clean up any created files if there was an error
+        for filename in created_files:
+            file_path = get_full_tool_path(filename)
+            if os.path.exists(file_path):
+                os.remove(file_path)
+
+        raise HTTPException(status_code=500, detail=f"Failed to register nodes as tools: {str(e)}")

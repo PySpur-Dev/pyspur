@@ -999,6 +999,28 @@ export const updateToolFile = async (filename: string, content: string): Promise
     }
 }
 
+export const deleteToolFile = async (filename: string): Promise<ToolFileResponse> => {
+    try {
+        const response = await axios.delete(`${API_BASE_URL}/mcp/tools/files/${filename}`)
+        return response.data
+    } catch (error) {
+        console.error('Error deleting tool file:', error)
+        throw error
+    }
+}
+
+export const registerNodesAsTools = async (workflowId: string): Promise<ToolFileResponse> => {
+    try {
+        const response = await axios.post(`${API_BASE_URL}/mcp/tools/register`, {
+            workflow_id: workflowId
+        })
+        return response.data
+    } catch (error) {
+        console.error('Error registering nodes as tools:', error)
+        throw error
+    }
+}
+
 export const getVectorIndex = async (id: string): Promise<VectorIndexResponseSchema> => {
     try {
         const response = await axios.get(`${API_BASE_URL}/rag/indices/${id}/`)

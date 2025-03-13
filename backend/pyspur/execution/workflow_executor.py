@@ -18,8 +18,6 @@ from ..schemas.workflow_schemas import (
 )
 from .task_recorder import TaskRecorder, TaskStatus
 from .workflow_execution_context import WorkflowExecutionContext
-from ..api.mcp_management import create_tool_file, ToolFileInfo
-import textwrap
 
 if TYPE_CHECKING:
     from .task_recorder import TaskRecorder
@@ -677,78 +675,12 @@ class WorkflowExecutor:
 
         return {str(key): _serialize_value(value) for key, value in data.items()}
 
-    async def _register_nodes_as_tools(self) -> None:
-        """
-        Dynamically create a separate Python "tool" .py file for each node in the workflow connected to a ToolCallNode.
-        The generated tool has a function named `<node_id>(input_data)`,
-        and it creates a node instance with the node's config, then runs it with `input_data`.
-        """
-        for node_def in self.workflow.nodes:
-            # Find all tool call nodes
-            tool_call_nodes = [
-                node for node in self.workflow.nodes if node.node_type == "ToolCallNode"
-            ]
-
-            if not tool_call_nodes:
-                return
-
-            # For each tool call node, find the source node
-            for tool_call_node in tool_call_nodes:
-                source_nodes = []
-                for link in self.workflow.links:
-                    if link.target_id == tool_call_node.id:
-                        source_node = self._node_dict.get(link.source_id)
-                        if source_node:
-                            source_nodes.append(source_node)
-
-            # Convert source nodes to tools and register them
-            for source_node in source_nodes:
-                # Create a node instance with the node's config
-                # node_instance = NodeFactory.create_node(
-                #     node_name=source_node.node_type,
-                #     node_type_name=source_node.node_type,
-                #     config=source_node.config,
-                # )
-                # output = await node_instance({})
-                # print("outputt", output)
-                filename = source_node.id + ".py"
-                tool_content = textwrap.dedent(
-                    f"""
-                    from typing import Any, Dict
-                    from registry import ToolRegistry
-                    from pyspur.nodes.factory import NodeFactory
-                    from pydantic import BaseModel
-                    from dotenv import load_dotenv
-                    load_dotenv()
-
-                    @ToolRegistry.register(description="Auto-generated tool for node_id={source_node.id}, node_type={source_node.node_type}")
-                    async def {source_node.id}(input_data: Dict[str, Any]) -> Dict[str, Any]:
-                        
-                        node_instance = NodeFactory.create_node(
-                            node_name="{source_node.node_type}",
-                            node_type_name="{source_node.node_type}",
-                            config={source_node.config},
-                        )
-                        return await node_instance({{}})
-                """
-                )
-
-                tool_info = ToolFileInfo(
-                    filename=filename,
-                    content=tool_content,
-                    description=f"Auto-generated tool for node {node_def.id}",
-                )
-
-                await create_tool_file(tool_info)
-
     async def run(
         self,
         input: Dict[str, Any] = {},
         node_ids: List[str] = [],
         precomputed_outputs: Dict[str, Dict[str, Any] | List[Dict[str, Any]]] = {},
     ) -> Dict[str, BaseNodeOutput]:
-        # Register nodes as tools before starting execution
-        await self._register_nodes_as_tools()
 
         # Handle precomputed outputs first
         if precomputed_outputs:
