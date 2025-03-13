@@ -20,7 +20,7 @@ import '@xyflow/react/dist/style.css'
 import { toPng } from 'html-to-image'
 import { throttle } from 'lodash'
 import isEqual from 'lodash/isEqual'
-import React, { MouseEvent as ReactMouseEvent, useCallback, useEffect, useRef, useState } from 'react'
+import React, { MouseEvent as ReactMouseEvent, useCallback, useEffect, useRef, useState, memo, useMemo, useDeferredValue } from 'react'
 import { useDispatch, useSelector } from 'react-redux'
 import { useKeyboardShortcuts } from '../../hooks/useKeyboardShortcuts'
 import { useSaveWorkflow } from '../../hooks/useSaveWorkflow'
@@ -61,6 +61,20 @@ const edgeTypes: EdgeTypes = {
     custom: CustomEdge,
 }
 
+// Add this memoized component at the top of the file
+const MemoizedReactFlow = memo(ReactFlow, (prevProps, nextProps) => {
+    // Custom comparison focusing on the most important props
+    if (prevProps.nodes.length !== nextProps.nodes.length) return false;
+    if (prevProps.edges.length !== nextProps.edges.length) return false;
+
+    // We don't need deep comparison for all properties of nodes and edges
+    // Just check if the references changed, which is what we control with our memoization
+    return (
+        prevProps.nodes === nextProps.nodes &&
+        prevProps.edges === nextProps.edges
+    );
+});
+
 // Create a wrapper component that includes ReactFlow logic
 const ChatCanvasContent: React.FC<ChatCanvasProps> = ({ workflowData, workflowID, onDownloadImageInit }) => {
     const dispatch = useDispatch()
@@ -93,9 +107,16 @@ const ChatCanvasContent: React.FC<ChatCanvasProps> = ({ workflowData, workflowID
         }
     }, [dispatch, workflowData, workflowID, nodeTypesConfig])
 
-    const nodes = useSelector((state: RootState) => state.flow.nodes, isEqual)
-    const edges = useSelector((state: RootState) => state.flow.edges, isEqual)
-    const nodeConfigs = useSelector((state: RootState) => state.flow.nodeConfigs, isEqual)
+    // Use more efficient selector comparison for nodes and edges
+    const nodes = useSelector((state: RootState) => state.flow.nodes,
+        (prev, next) => prev.length === next.length && prev === next
+    )
+    const edges = useSelector((state: RootState) => state.flow.edges,
+        (prev, next) => prev.length === next.length && prev === next
+    )
+    const nodeConfigs = useSelector((state: RootState) => state.flow.nodeConfigs,
+        (prev, next) => prev === next
+    )
     const selectedNodeID = useSelector((state: RootState) => state.flow.selectedNode)
     const selectedEdgeId = useSelector((state: RootState) => state.flow.selectedEdgeId)
 
@@ -185,7 +206,21 @@ const ChatCanvasContent: React.FC<ChatCanvasProps> = ({ workflowData, workflowID
         mode: mode as 'pointer' | 'hand',
     })
 
-    const nodesWithAdjustedZIndex = useAdjustGroupNodesZIndex({ nodes: nodesWithMode })
+    const nodesWithAdjustedZIndex = useMemo(() => {
+        let groupNodeZIndex = -1
+        return nodesWithMode.map((node) => {
+            if (node.type === 'ForLoopNode') {
+                return {
+                    ...node,
+                    style: {
+                        ...node.style,
+                        zIndex: groupNodeZIndex,
+                    },
+                }
+            }
+            return node
+        });
+    }, [nodesWithMode])
 
     const onEdgeMouseEnter = useCallback(
         (_: React.MouseEvent, edge: Edge) => {
@@ -344,20 +379,36 @@ const ChatCanvasContent: React.FC<ChatCanvasProps> = ({ workflowData, workflowID
         [nodes, nodeTypesConfig, dispatch, setPopoverContentVisible]
     )
 
+    // Add a dragging mode state
+    const [isDragging, setIsDragging] = useState(false);
+
     const onNodeDrag = useCallback(
         throttle((event: ReactMouseEvent, node: Node) => {
-            onNodeDragOverGroupNode(event, node, nodes, dispatch, getIntersectingNodes, getNodes, updateNode)
-        }, 16),
-        [nodes, dispatch, getIntersectingNodes]
-    )
+            // During drag, only do minimal position updates without expensive calculations
+            // Skip group node intersection checks during dragging for better performance
+            setIsDragging(true);
+
+            // Skip complex group node calculations during drag
+            // Just update position visually without triggering Redux updates
+            if (node.parentId) {
+                // Only handle parent nodes differently during drag
+                return;
+            }
+        }, 48), // Increase throttle time for better performance
+        [setIsDragging]
+    );
 
     const onNodeDragStop = useCallback(
         (event: ReactMouseEvent, node: Node) => {
-            onNodeDragStopOverGroupNode(event, node, nodes, edges, dispatch, getIntersectingNodes, getNodes, updateNode)
-            onNodeDragStopThrottled(event, node)
+            // Process expensive calculations only when node drag stops
+            setIsDragging(false);
+
+            // Now perform full group node intersection check
+            onNodeDragStopOverGroupNode(event, node, nodes, edges, dispatch, getIntersectingNodes, getNodes, updateNode);
+            onNodeDragStopThrottled(event, node);
         },
         [nodes, edges, dispatch, getIntersectingNodes, getNodes, updateNode, onNodeDragStopThrottled]
-    )
+    );
 
     const handleDownloadImage = useCallback(() => {
         const flowContainer = document.querySelector('.react-flow__viewport') as HTMLElement
@@ -424,6 +475,9 @@ const ChatCanvasContent: React.FC<ChatCanvasProps> = ({ workflowData, workflowID
         setShowChat((prev) => !prev)
     }
 
+    // Use deferred values for nodes with adjusted z-index to optimize rendering during drags
+    const deferredNodes = useDeferredValue(nodesWithAdjustedZIndex);
+
     if (isLoading) {
         return <LoadingSpinner />
     }
@@ -436,8 +490,8 @@ const ChatCanvasContent: React.FC<ChatCanvasProps> = ({ workflowData, workflowID
         >
             {/* React Flow Canvas */}
             <div className="flex-grow relative h-full overflow-hidden">
-                <ReactFlow
-                    nodes={nodesWithAdjustedZIndex}
+                <MemoizedReactFlow
+                    nodes={isDragging ? deferredNodes : nodesWithAdjustedZIndex}
                     edges={styledEdges}
                     onNodesChange={onNodesChange}
                     onEdgesChange={onEdgesChange}
@@ -495,7 +549,7 @@ const ChatCanvasContent: React.FC<ChatCanvasProps> = ({ workflowData, workflowID
                             </Button>
                         </Tooltip>
                     </Panel>
-                </ReactFlow>
+                </MemoizedReactFlow>
 
                 {/* Node Sidebar */}
                 {selectedNodeID && (

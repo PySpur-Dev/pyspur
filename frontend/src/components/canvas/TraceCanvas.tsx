@@ -13,7 +13,8 @@ import {
     useReactFlow,
 } from '@xyflow/react'
 import { toPng } from 'html-to-image'
-import React, { useCallback, useEffect, useMemo, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useState, memo, MouseEvent as ReactMouseEvent, useDeferredValue } from 'react'
+import { throttle } from 'lodash'
 
 import { FlowWorkflowEdge, FlowWorkflowNode } from '@/types/api_types/nodeTypeSchemas'
 import { WorkflowDefinition } from '@/types/api_types/workflowSchemas'
@@ -58,6 +59,20 @@ interface HelperLines {
     horizontal: number | null
     vertical: number | null
 }
+
+// Add memoized ReactFlow component
+const MemoizedReactFlow = memo(ReactFlow, (prevProps, nextProps) => {
+    // Custom comparison focusing on the most important props
+    if (prevProps.nodes.length !== nextProps.nodes.length) return false;
+    if (prevProps.edges.length !== nextProps.edges.length) return false;
+
+    // We don't need deep comparison for all properties of nodes and edges
+    // Just check if the references changed, which is what we control with our memoization
+    return (
+        prevProps.nodes === nextProps.nodes &&
+        prevProps.edges === nextProps.edges
+    );
+});
 
 const TraceCanvasContent: React.FC<TraceCanvasProps> = ({
     workflowData,
@@ -110,7 +125,7 @@ const TraceCanvasContent: React.FC<TraceCanvasProps> = ({
                 })
             )
         }
-    }, [dispatch, workflowData, workflowID])
+    }, [dispatch, workflowData, workflowID, nodeTypesConfig])
 
     // New effect to update node data after initialization
     useEffect(() => {
@@ -146,8 +161,15 @@ const TraceCanvasContent: React.FC<TraceCanvasProps> = ({
         }
     }, [dispatch, tasksData])
 
-    const nodes = useSelector((state: RootState) => state.flow.nodes)
-    const edges = useSelector((state: RootState) => state.flow.edges)
+    // Use more efficient selector comparison for nodes and edges
+    const nodes = useSelector((state: RootState) => state.flow.nodes,
+        (prev, next) => prev.length === next.length && prev === next
+    )
+
+    const edges = useSelector((state: RootState) => state.flow.edges,
+        (prev, next) => prev.length === next.length && prev === next
+    )
+
     const selectedNodeID = useSelector((state: RootState) => state.flow.selectedNode)
 
     const [reactFlowInstance, setReactFlowInstance] = useState<ReactFlowInstance | null>(null)
@@ -183,7 +205,21 @@ const TraceCanvasContent: React.FC<TraceCanvasProps> = ({
         mode: mode as 'pointer' | 'hand',
     })
 
-    const nodesWithAdjustedZIndex = useAdjustGroupNodesZIndex({ nodes: nodesWithMode })
+    const nodesWithAdjustedZIndex = useMemo(() => {
+        let groupNodeZIndex = -1
+        return nodesWithMode.map((node) => {
+            if (node.type === 'ForLoopNode') {
+                return {
+                    ...node,
+                    style: {
+                        ...node.style,
+                        zIndex: groupNodeZIndex,
+                    },
+                }
+            }
+            return node
+        });
+    }, [nodesWithMode])
 
     // Add nodeOutputs map for node status tracking
     const nodeOutputs = useMemo(() => {
@@ -215,6 +251,9 @@ const TraceCanvasContent: React.FC<TraceCanvasProps> = ({
         nodes: nodesWithAdjustedZIndex,
         nodeOutputs
     });
+
+    // Use deferred values for nodes with status to optimize rendering during drags
+    const deferredNodes = useDeferredValue(nodesWithStatus);
 
     const onEdgeMouseEnter = useCallback((_: React.MouseEvent, edge: Edge) => {
         setHoveredEdge(edge.id)
@@ -371,6 +410,27 @@ const TraceCanvasContent: React.FC<TraceCanvasProps> = ({
         }
     }, [handleDownloadImage, onDownloadImageInit])
 
+    // Add a drag mode flag
+    const [isDragging, setIsDragging] = useState(false);
+
+    // In TraceCanvas (read-only mode), we don't need complex intersection detection
+    // We can use more aggressive optimizations
+    const onNodeDrag = useCallback(
+        throttle((event: ReactMouseEvent, node: Node) => {
+            // Set dragging flag for other optimizations if needed
+            setIsDragging(true);
+
+            // Skip all complex operations during drag in trace view
+            // This is a read-only view, so we don't need group node checking
+        }, 64), // Use even higher throttling for trace view
+        [setIsDragging]
+    );
+
+    const onNodeDragStop = useCallback((event: ReactMouseEvent, node: Node) => {
+        // End dragging state
+        setIsDragging(false);
+    }, []);
+
     if (isLoading) {
         return <LoadingSpinner />
     }
@@ -390,9 +450,9 @@ const TraceCanvasContent: React.FC<TraceCanvasProps> = ({
                         zIndex: 1,
                     }}
                 >
-                    <ReactFlow
+                    <MemoizedReactFlow
                         key={`flow-${workflowID}`}
-                        nodes={nodesWithStatus}
+                        nodes={isDragging ? deferredNodes : nodesWithStatus}
                         edges={styledEdges}
                         onNodesChange={onNodesChange}
                         onEdgesChange={onEdgesChange}
@@ -437,7 +497,7 @@ const TraceCanvasContent: React.FC<TraceCanvasProps> = ({
                             handleLayout={handleLayout}
                             handleDownloadImage={handleDownloadImage}
                         />
-                    </ReactFlow>
+                    </MemoizedReactFlow>
                 </div>
                 {selectedNodeID && (
                     <div

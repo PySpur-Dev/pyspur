@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo, useEffect } from 'react'
+import React, { useState, useCallback, useMemo, useEffect, memo, useDeferredValue } from 'react'
 import {
     ReactFlow,
     Background,
@@ -92,6 +92,20 @@ const groupNodesBySubcategory = (nodes: FlowWorkflowNodeType[]): GroupedNodes =>
     }, {})
 }
 
+// Add this memoized component at the top of the file, outside the main component
+const MemoizedReactFlow = memo(ReactFlow, (prevProps, nextProps) => {
+    // Custom comparison focusing on the most important props
+    if (prevProps.nodes.length !== nextProps.nodes.length) return false;
+    if (prevProps.edges.length !== nextProps.edges.length) return false;
+
+    // We don't need deep comparison for all properties of nodes and edges
+    // Just check if the references changed, which is what we control with our memoization
+    return (
+        prevProps.nodes === nextProps.nodes &&
+        prevProps.edges === nextProps.edges
+    );
+});
+
 // Create a wrapper component that includes ReactFlow logic
 const EditorCanvasContent: React.FC<EditorCanvasProps> = ({ workflowData, workflowID, onDownloadImageInit }) => {
     const dispatch = useDispatch()
@@ -118,9 +132,19 @@ const EditorCanvasContent: React.FC<EditorCanvasProps> = ({ workflowData, workfl
         }
     }, [dispatch, workflowData, workflowID, nodeTypesConfig])
 
-    const nodes = useSelector((state: RootState) => state.flow.nodes, isEqual)
-    const edges = useSelector((state: RootState) => state.flow.edges, isEqual)
-    const nodeConfigs = useSelector((state: RootState) => state.flow.nodeConfigs, isEqual)
+    // Use more efficient selector comparison for nodes and edges
+    const nodes = useSelector((state: RootState) => state.flow.nodes,
+        (prev, next) => prev.length === next.length && prev === next
+    )
+
+    const edges = useSelector((state: RootState) => state.flow.edges,
+        (prev, next) => prev.length === next.length && prev === next
+    )
+
+    const nodeConfigs = useSelector((state: RootState) => state.flow.nodeConfigs,
+        (prev, next) => prev === next
+    )
+
     const selectedNodeID = useSelector((state: RootState) => state.flow.selectedNode)
     const selectedEdgeId = useSelector((state: RootState) => state.flow.selectedEdgeId)
 
@@ -207,7 +231,24 @@ const EditorCanvasContent: React.FC<EditorCanvasProps> = ({ workflowData, workfl
         mode: mode as 'pointer' | 'hand',
     })
 
-    const nodesWithAdjustedZIndex = useAdjustGroupNodesZIndex({ nodes: nodesWithMode })
+    const nodesWithAdjustedZIndex = useMemo(() => {
+        let groupNodeZIndex = -1
+        return nodesWithMode.map((node) => {
+            if (node.type === 'ForLoopNode') {
+                return {
+                    ...node,
+                    style: {
+                        ...node.style,
+                        zIndex: groupNodeZIndex,
+                    },
+                }
+            }
+            return node
+        });
+    }, [nodesWithMode])
+
+    // Use deferred values for nodes with adjusted z-index to optimize rendering during drags
+    const deferredNodes = useDeferredValue(nodesWithAdjustedZIndex);
 
     const onEdgeMouseEnter = useCallback(
         (_: React.MouseEvent, edge: Edge) => {
@@ -353,17 +394,33 @@ const EditorCanvasContent: React.FC<EditorCanvasProps> = ({ workflowData, workfl
         [nodes, nodeTypesConfig, reactFlowInstance, dispatch, setPopoverContentVisible]
     )
 
+    // Add a dragging mode state
+    const [isDragging, setIsDragging] = useState(false);
+
     const onNodeDrag = useCallback(
         throttle((event: ReactMouseEvent, node: Node) => {
-            onNodeDragOverGroupNode(event, node, nodes, dispatch, getIntersectingNodes, getNodes, updateNode)
-        }, 16),
-        [nodes, dispatch, getIntersectingNodes]
-    )
+            // During drag, only do minimal position updates without expensive calculations
+            // Skip group node intersection checks during dragging for better performance
+            setIsDragging(true);
+
+            // Skip complex group node calculations during drag
+            // Just update position visually without triggering Redux updates
+            if (node.parentId) {
+                // Only handle parent nodes differently during drag
+                return;
+            }
+        }, 48), // Increase throttle time for better performance
+        [setIsDragging]
+    );
 
     const onNodeDragStop = useCallback(
         (event: ReactMouseEvent, node: Node) => {
-            onNodeDragStopOverGroupNode(event, node, nodes, edges, dispatch, getIntersectingNodes, getNodes, updateNode)
-            onNodeDragStopThrottled(event, node)
+            // Process expensive calculations only when node drag stops
+            setIsDragging(false);
+
+            // Now perform full group node intersection check
+            onNodeDragOverGroupNode(event, node, nodes, dispatch, getIntersectingNodes, getNodes, updateNode);
+            onNodeDragStopThrottled(event, node);
         },
         [nodes, edges, dispatch, getIntersectingNodes, getNodes, updateNode, onNodeDragStopThrottled]
     )
@@ -643,8 +700,8 @@ const EditorCanvasContent: React.FC<EditorCanvasProps> = ({ workflowData, workfl
                         zIndex: 1,
                     }}
                 >
-                    <ReactFlow
-                        nodes={nodesWithAdjustedZIndex}
+                    <MemoizedReactFlow
+                        nodes={isDragging ? deferredNodes : nodesWithAdjustedZIndex}
                         edges={styledEdges}
                         onNodesChange={onNodesChange}
                         onEdgesChange={onEdgesChange}
@@ -684,7 +741,7 @@ const EditorCanvasContent: React.FC<EditorCanvasProps> = ({ workflowData, workfl
                             <HelperLinesRenderer horizontal={helperLines.horizontal} vertical={helperLines.vertical} />
                         )}
                         <Operator handleLayout={handleLayout} handleDownloadImage={handleDownloadImage} />
-                    </ReactFlow>
+                    </MemoizedReactFlow>
                 </div>
                 {selectedNodeID && (
                     <div

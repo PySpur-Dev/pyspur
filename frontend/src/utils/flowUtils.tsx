@@ -16,7 +16,7 @@ import {
 } from '@xyflow/react'
 import isEqual from 'lodash/isEqual'
 import { useTheme } from 'next-themes'
-import { useCallback, useMemo } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import { v4 as uuidv4 } from 'uuid'
 import DynamicNode from '../components/nodes/DynamicNode'
 import InputNode from '../components/nodes/InputNode'
@@ -464,8 +464,23 @@ export const useFlowEventHandlers = ({ dispatch, nodes, setHelperLines }: FlowEv
     // Create throttled position handler
     const throttledPosition = useMemo(() => createThrottledPositionChange(), [])
 
+    // Track if we're in drag mode to optimize performance
+    const [isDragging, setIsDragging] = useState(false);
+
     const onNodesChange: OnNodesChange = useCallback(
         (changes: NodeChange[]) => {
+            // Check if we're in drag mode
+            const isDragOperation = changes.some(change =>
+                change.type === 'position' && change.dragging === true
+            );
+
+            if (isDragOperation) {
+                setIsDragging(true);
+            } else if (isDragging && changes.some(change => change.type === 'position' && change.dragging === false)) {
+                // This is a drag end operation
+                setIsDragging(false);
+            }
+
             // Clear helper lines if not a position change
             if (!changes.some((c) => c.type === 'position')) {
                 setHelperLines?.({ horizontal: null, vertical: null })
@@ -482,16 +497,23 @@ export const useFlowEventHandlers = ({ dispatch, nodes, setHelperLines }: FlowEv
                 dispatch(nodesChange({ changes: otherChanges }))
             }
 
-            // Throttle position changes
+            // More aggressive throttling during drag operations
             if (positionChanges.length > 0) {
-                throttledPosition.handlePositionChange(positionChanges, dispatch)
+                if (isDragging || isDragOperation) {
+                    // During drag, use the most aggressive throttling
+                    throttledPosition.handlePositionChange(positionChanges, dispatch, true)
+                } else {
+                    // Regular position changes
+                    throttledPosition.handlePositionChange(positionChanges, dispatch, false)
+                }
             }
         },
-        [dispatch, nodes, setHelperLines, throttledPosition]
+        [dispatch, nodes, setHelperLines, throttledPosition, isDragging, setIsDragging]
     )
 
     // Handle drag end to flush any pending position changes
     const onNodeDragStop = useCallback((event: React.MouseEvent, node: Node) => {
+        setIsDragging(false);
         throttledPosition.flushChanges(dispatch)
     }, [dispatch, throttledPosition])
 
@@ -582,16 +604,23 @@ export const getPredecessorFields = (nodeId: string, nodes: FlowWorkflowNode[], 
 // Add throttled position update utilities
 export const createThrottledPositionChange = () => {
     let lastUpdate = 0
-    const throttleInterval = 16 // Reduced to 16ms (roughly 60fps) for more responsive updates
+    const normalThrottleInterval = 32 // Normal throttle (roughly 30fps)
+    const dragThrottleInterval = 64 // More aggressive throttle during drag (roughly 15fps)
     let pendingChanges: NodeChange[] = []
     let animationFrame: number | null = null
+    const nodePositions = new Map<string, NodeChange>()
 
     return {
-        handlePositionChange: (changes: NodeChange[], dispatch: AppDispatch) => {
+        handlePositionChange: (changes: NodeChange[], dispatch: AppDispatch, isDragging: boolean = false) => {
             const now = Date.now()
+            const throttleInterval = isDragging ? dragThrottleInterval : normalThrottleInterval
 
-            // Always collect changes
-            pendingChanges = [...pendingChanges, ...changes]
+            // Store only the latest position for each node
+            changes.forEach(change => {
+                if (change.type === 'position' && change.id) {
+                    nodePositions.set(change.id, change)
+                }
+            })
 
             // If animation frame is already scheduled, don't schedule another one
             if (animationFrame !== null) {
@@ -601,17 +630,14 @@ export const createThrottledPositionChange = () => {
             // If enough time has passed, schedule update on next animation frame
             if (now - lastUpdate >= throttleInterval) {
                 animationFrame = requestAnimationFrame(() => {
-                    // Only take the latest position for each node
-                    const latestPositions = new Map<string, NodeChange>()
-                    pendingChanges.forEach(change => {
-                        if (change.type === 'position' && change.id) {
-                            latestPositions.set(change.id, change)
-                        }
-                    })
+                    // Convert map to array of changes
+                    const optimizedChanges = Array.from(nodePositions.values())
 
-                    const optimizedChanges = [...latestPositions.values()]
-                    dispatch(nodesChange({ changes: optimizedChanges }))
-                    pendingChanges = []
+                    if (optimizedChanges.length > 0) {
+                        dispatch(nodesChange({ changes: optimizedChanges }))
+                        nodePositions.clear()
+                    }
+
                     lastUpdate = now
                     animationFrame = null
                 })
@@ -625,18 +651,11 @@ export const createThrottledPositionChange = () => {
                 animationFrame = null
             }
 
-            if (pendingChanges.length > 0) {
-                // Optimize final update
-                const latestPositions = new Map<string, NodeChange>()
-                pendingChanges.forEach(change => {
-                    if (change.type === 'position' && change.id) {
-                        latestPositions.set(change.id, change)
-                    }
-                })
-
-                const optimizedChanges = [...latestPositions.values()]
+            // Apply any pending changes
+            if (nodePositions.size > 0) {
+                const optimizedChanges = Array.from(nodePositions.values())
                 dispatch(nodesChange({ changes: optimizedChanges }))
-                pendingChanges = []
+                nodePositions.clear()
                 lastUpdate = Date.now()
             }
         }

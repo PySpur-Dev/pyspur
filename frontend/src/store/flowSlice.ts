@@ -11,7 +11,7 @@ import { isTargetAncestorOfSource } from '@/utils/cyclicEdgeUtils'
 import { computeJsonSchemaIntersection } from '@/utils/schemaUtils'
 import { createSlice, PayloadAction } from '@reduxjs/toolkit'
 import { addEdge, applyEdgeChanges, applyNodeChanges, Connection, EdgeChange, NodeChange } from '@xyflow/react'
-import { isEqual } from 'lodash'
+import { isEqual, cloneDeep } from 'lodash'
 import { v4 as uuidv4 } from 'uuid'
 import { createNode } from '../utils/nodeFactory'
 
@@ -38,11 +38,20 @@ const initialState: FlowState = {
 }
 
 const saveToHistory = (state: FlowState) => {
+    // Use a more efficient deep cloning approach
+    const nodesCopy = state.nodes.map(node => ({
+        ...node,
+        data: node.data ? { ...node.data } : undefined,
+        position: { ...node.position }
+    }));
+
+    const edgesCopy = state.edges.map(edge => ({ ...edge }));
+
     state.history.past.push({
-        nodes: JSON.parse(JSON.stringify(state.nodes)),
-        edges: JSON.parse(JSON.stringify(state.edges)),
-    })
-    state.history.future = []
+        nodes: nodesCopy,
+        edges: edgesCopy,
+    });
+    state.history.future = [];
 }
 
 const generateJsonSchema = (schema: Record<string, any>): string => {
@@ -57,25 +66,50 @@ const generateJsonSchema = (schema: Record<string, any>): string => {
 function rebuildRouterNodeSchema(state: FlowState, routerNode: FlowWorkflowNode) {
     const incomingEdges = state.edges.filter((edge) => edge.target === routerNode.id)
 
-    // Build new output schema by combining all source nodes
-    const newSchemaProperties = incomingEdges.reduce(
-        (properties, edge) => {
-            const sourceNode = state.nodes.find((n) => n.id === edge.source)
-            const sourceNodeConfig = sourceNode ? state.nodeConfigs[sourceNode.id] : undefined
-            if (sourceNodeConfig?.output_json_schema) {
-                const nodeTitle = sourceNodeConfig.title || sourceNode?.id
-                const sourceSchema = sourceNodeConfig.output_json_schema
+    // Early return if no incoming edges
+    if (incomingEdges.length === 0) {
+        // Set empty schema if no incoming edges
+        const routerNodeConfig = state.nodeConfigs[routerNode.id] || {}
+        const emptySchema = JSON.stringify({
+            type: 'object',
+            properties: {},
+            required: [],
+            additionalProperties: false,
+        })
 
-                properties[nodeTitle] = JSON.parse(sourceSchema)
+        if (routerNodeConfig.output_json_schema !== emptySchema) {
+            state.nodeConfigs[routerNode.id] = {
+                ...routerNodeConfig,
+                output_json_schema: emptySchema,
             }
-            return properties
-        },
-        {} as Record<string, any>
-    )
+        }
+        return;
+    }
+
+    // Build new output schema by combining all source nodes
+    const newSchemaProperties = {}
+
+    for (const edge of incomingEdges) {
+        const sourceNode = state.nodes.find((n) => n.id === edge.source)
+        if (!sourceNode) continue;
+
+        const sourceNodeConfig = state.nodeConfigs[sourceNode.id]
+        if (!sourceNodeConfig?.output_json_schema) continue;
+
+        const nodeTitle = sourceNodeConfig.title || sourceNode.id
+        try {
+            newSchemaProperties[nodeTitle] = JSON.parse(sourceNodeConfig.output_json_schema)
+        } catch (e) {
+            // Skip invalid JSON
+            console.error('Invalid JSON schema for node', nodeTitle)
+        }
+    }
+
+    const requiredFields = Object.keys(newSchemaProperties)
     const newOutputSchema = JSON.stringify({
         type: 'object',
         properties: newSchemaProperties,
-        required: Object.keys(newSchemaProperties),
+        required: requiredFields,
         additionalProperties: false,
     })
 
@@ -95,23 +129,46 @@ function rebuildRouterNodeSchema(state: FlowState, routerNode: FlowWorkflowNode)
 function rebuildCoalesceNodeSchema(state: FlowState, coalesceNode: FlowWorkflowNode) {
     const incomingEdges = state.edges.filter((edge) => edge.target === coalesceNode.id)
 
+    // Early return if no incoming edges
+    if (incomingEdges.length === 0) {
+        const coalesceNodeConfig = state.nodeConfigs[coalesceNode.id] || {}
+        const emptySchema = JSON.stringify({
+            type: 'object',
+            properties: {},
+            required: [],
+        })
+
+        if (coalesceNodeConfig.output_json_schema !== emptySchema) {
+            state.nodeConfigs[coalesceNode.id] = {
+                ...coalesceNodeConfig,
+                output_json_schema: emptySchema,
+            }
+        }
+        return;
+    }
+
     // Collect all source schemas
     const schemas: string[] = []
-    incomingEdges.forEach((ed) => {
-        const sourceNode = state.nodes.find((n) => n.id === ed.source)
-        const sourceNodeConfig = sourceNode ? state.nodeConfigs[sourceNode.id] : undefined
+    for (const edge of incomingEdges) {
+        const sourceNode = state.nodes.find((n) => n.id === edge.source)
+        if (!sourceNode) continue;
+
+        const sourceNodeConfig = state.nodeConfigs[sourceNode.id]
         if (sourceNodeConfig?.output_json_schema) {
             schemas.push(sourceNodeConfig.output_json_schema)
         }
-    })
+    }
 
     // Compute intersection using the utility function
     const intersectionSchema = computeJsonSchemaIntersection(schemas)
 
     const coalesceNodeConfig = state.nodeConfigs[coalesceNode.id] || {}
-    state.nodeConfigs[coalesceNode.id] = {
-        ...coalesceNodeConfig,
-        output_json_schema: intersectionSchema,
+    // Only update if there are actual changes
+    if (coalesceNodeConfig.output_json_schema !== intersectionSchema) {
+        state.nodeConfigs[coalesceNode.id] = {
+            ...coalesceNodeConfig,
+            output_json_schema: intersectionSchema,
+        }
     }
 }
 
@@ -658,9 +715,17 @@ const flowSlice = createSlice({
         undo: (state) => {
             const previous = state.history.past.pop()
             if (previous) {
+                const nodesCopy = state.nodes.map(node => ({
+                    ...node,
+                    data: node.data ? { ...node.data } : undefined,
+                    position: { ...node.position }
+                }));
+
+                const edgesCopy = state.edges.map(edge => ({ ...edge }));
+
                 state.history.future.push({
-                    nodes: JSON.parse(JSON.stringify(state.nodes)),
-                    edges: JSON.parse(JSON.stringify(state.edges)),
+                    nodes: nodesCopy,
+                    edges: edgesCopy,
                 })
                 state.nodes = previous.nodes
                 state.edges = previous.edges
@@ -670,9 +735,17 @@ const flowSlice = createSlice({
         redo: (state) => {
             const next = state.history.future.pop()
             if (next) {
+                const nodesCopy = state.nodes.map(node => ({
+                    ...node,
+                    data: node.data ? { ...node.data } : undefined,
+                    position: { ...node.position }
+                }));
+
+                const edgesCopy = state.edges.map(edge => ({ ...edge }));
+
                 state.history.past.push({
-                    nodes: JSON.parse(JSON.stringify(state.nodes)),
-                    edges: JSON.parse(JSON.stringify(state.edges)),
+                    nodes: nodesCopy,
+                    edges: edgesCopy,
                 })
                 state.nodes = next.nodes
                 state.edges = next.edges
