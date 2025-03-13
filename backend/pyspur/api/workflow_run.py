@@ -9,8 +9,8 @@ from pathlib import Path  # Import Path for directory handling
 from typing import Any, Awaitable, Callable, Coroutine, Dict, List, Optional, Set, Tuple, Union
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
-from sqlalchemy.orm import Session
 from loguru import logger
+from sqlalchemy.orm import Session
 
 from ..database import get_db
 from ..dataset.ds_util import get_ds_column_names, get_ds_iterator
@@ -94,7 +94,7 @@ def process_embedded_files(
     response_model=Dict[str, Any],
     description="Run a workflow and return the outputs",
 )
-async def run_workflow_blocking(
+async def run_workflow_blocking(  # noqa: C901
     workflow_id: str,
     request: StartRunRequestSchema,
     db: Session = Depends(get_db),
@@ -160,9 +160,7 @@ async def run_workflow_blocking(
             # Get all blocked nodes from paused nodes
             all_blocked_nodes: Set[str] = set()
             for paused_node_id in paused_node_ids:
-                blocked_nodes = executor.get_blocked_nodes(
-                    workflow_version.definition, paused_node_id
-                )
+                blocked_nodes = executor.get_blocked_nodes(paused_node_id)
                 all_blocked_nodes.update(blocked_nodes)
 
             # Make sure all downstream nodes are in PENDING status
@@ -196,7 +194,7 @@ async def run_workflow_blocking(
         ]
         all_blocked_nodes: Set[str] = set()
         for paused_node_id in paused_node_ids:
-            blocked_nodes = executor.get_blocked_nodes(workflow_version.definition, paused_node_id)
+            blocked_nodes = executor.get_blocked_nodes(paused_node_id)
             all_blocked_nodes.update(blocked_nodes)
 
         # Make sure all downstream nodes are in PENDING status
@@ -221,7 +219,7 @@ async def run_workflow_blocking(
     response_model=RunResponseSchema,
     description="Start a non-blocking workflow run and return the run details",
 )
-async def run_workflow_non_blocking(
+async def run_workflow_non_blocking(  # noqa: C901
     workflow_id: str,
     start_run_request: StartRunRequestSchema,
     background_tasks: BackgroundTasks,
@@ -377,7 +375,7 @@ async def run_workflow_non_blocking(
         """Update status of tasks that depend on paused nodes."""
         all_blocked_nodes: Set[str] = set()
         for paused_node_id in paused_node_ids:
-            blocked_nodes = executor.get_blocked_nodes(workflow_version.definition, paused_node_id)
+            blocked_nodes = executor.get_blocked_nodes(paused_node_id)
             all_blocked_nodes.update(blocked_nodes)
 
         # Make sure all downstream nodes are in PENDING status
@@ -429,7 +427,7 @@ async def run_partial_workflow(
     response_model=RunResponseSchema,
     description="Start a batch run of a workflow over a dataset and return the run details",
 )
-async def batch_run_workflow_non_blocking(
+async def batch_run_workflow_non_blocking(  # noqa: C901
     workflow_id: str,
     request: BatchRunRequestSchema,
     background_tasks: BackgroundTasks,
@@ -937,15 +935,16 @@ def _update_executor_outputs(
 
             # If we have task inputs, include them in the structure
             if paused_task.inputs and isinstance(paused_task.inputs, dict):
-                inputs_data.update(paused_task.inputs)
+                inputs_data.update(paused_task.inputs)  # type: ignore
 
             # Add the new inputs from the action request
             # This ensures downstream nodes can access values via HumanInterventionNode_1.input_1
             if action_request.inputs:
-                inputs_data.update(action_request.inputs)
+                inputs_data.update(action_request.inputs)  # type: ignore
 
             # Create the output with the proper structure - don't nest under input_node
-            # This makes fields directly accessible in templates like {{HumanInterventionNode_1.input_1}}
+            # This makes fields directly accessible
+            # in templates like {{HumanInterventionNode_1.input_1}}
             updated_output = HumanInterventionNodeOutput(**inputs_data)
 
             # For debugging
@@ -965,7 +964,8 @@ def process_pause_action(
     This is the common function used by the take_pause_action endpoint.
     It handles the core logic for processing human intervention in paused workflows.
 
-    The workflow_id is retrieved from the run object, so it doesn't need to be passed as a parameter.
+    The workflow_id is retrieved from the run object,
+    so it doesn't need to be passed as a parameter.
 
     Args:
         db: Database session
@@ -1004,12 +1004,15 @@ def process_pause_action(
     else:
         # If no background_tasks, just return as before
         response = RunResponseSchema.model_validate(run)
-        response.message = "Task marked as completed. Please call the resume endpoint to continue workflow execution."
+        response.message = (
+            "Task marked as completed. Please call the resume"
+            "endpoint to continue workflow execution."
+        )
 
     return response
 
 
-def _create_resume_workflow_task(
+def _create_resume_workflow_task(  # noqa: C901
     executor: WorkflowExecutor,
     run: RunModel,
     paused_task: TaskModel,
@@ -1032,22 +1035,12 @@ def _create_resume_workflow_task(
 
     """
 
-    async def resume_workflow_task():
+    async def resume_workflow_task():  # noqa: C901
         try:
             # Find any PENDING tasks that were blocked by the paused node
             blocked_node_ids: set[str] = set()
-            if workflow_definition := getattr(context, "workflow_definition", None):
-                # Convert to dict because get_blocked_nodes expects Dict[str, Any]
-                if isinstance(workflow_definition, WorkflowDefinitionSchema):
-                    workflow_definition_dict = workflow_definition.model_dump()
-                elif isinstance(workflow_definition, dict):
-                    workflow_definition_dict = workflow_definition
-                else:
-                    workflow_definition_dict = {}
-
-                blocked_node_ids = executor.get_blocked_nodes(
-                    workflow_definition_dict, paused_task.node_id
-                )
+            if _workflow_definition := getattr(context, "workflow_definition", None):
+                blocked_node_ids = executor.get_blocked_nodes(paused_task.node_id)
 
             # Update their status to RUNNING
             for task in run.tasks:
@@ -1066,7 +1059,8 @@ def _create_resume_workflow_task(
                         continue
 
             # Get all nodes including blocked nodes and the resumed node
-            # We specifically don't include the paused node in nodes_to_run since it's already been completed
+            # We specifically don't include the paused node
+            # in nodes_to_run since it's already been completed
             nodes_to_run: set[str] = blocked_node_ids
 
             # IMPORTANT: Add the paused node ID to the executor's resumed_node_ids set
@@ -1075,7 +1069,7 @@ def _create_resume_workflow_task(
 
             # Also add any node IDs that already have COMPLETED tasks
             # This prevents the executor from creating new tasks for these nodes
-            completed_node_ids = set()
+            completed_node_ids: set[str] = set()
             for task in run.tasks:
                 if task.status == TaskStatus.COMPLETED:
                     completed_node_ids.add(task.node_id)
@@ -1156,7 +1150,10 @@ def cancel_workflow(
     if run.status not in [RunStatus.PAUSED, RunStatus.RUNNING]:
         raise HTTPException(
             status_code=400,
-            detail=f"Run is in state {run.status} and cannot be canceled. Only PAUSED or RUNNING runs can be canceled.",
+            detail=(
+                f"Run is in state {run.status} and cannot be canceled."
+                "Only PAUSED or RUNNING runs can be canceled."
+            ),
         )
 
     # Update the run status

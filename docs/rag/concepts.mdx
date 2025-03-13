@@ -1,0 +1,114 @@
+---
+title: 'Concepts'
+description: 'Learn the basics of Retrieval Augmented Generation in PySpur'
+---
+
+# Understanding RAG in PySpur
+
+Retrieval Augmented Generation (RAG) is a powerful technique that enhances AI models by providing them with relevant information from your own data. Instead of relying solely on what an AI was trained on, RAG lets you ground responses in your specific documents, knowledge bases, and data.
+
+## Why Use RAG?
+
+RAG solves several common problems with traditional AI systems:
+
+- **Up-to-date information**: Include data that wasn't available when the AI was trained
+- **Private knowledge**: Incorporate your organization's proprietary information
+- **Reduced hallucinations**: Ground AI responses in factual information
+- **Source attribution**: Trace where information came from
+
+## How RAG Works in PySpur
+
+<img className="block dark:hidden" src="/images/rag/rag_flow_light.png" />
+<img className="hidden dark:block" src="/images/rag/rag_flow_dark.png" />
+
+The RAG process in PySpur has three main components:
+
+### 1. Document Collections
+
+Document collections are groups of related files that you want the AI to reference. These could be:
+
+- PDFs of research papers or technical documentation
+- Word documents with company policies
+- Text files with product information
+- And more!
+
+When you upload documents to a collection, PySpur:
+- Processes the files to extract text (including from PDFs with images)
+- Breaks the text into smaller "chunks" of a manageable size
+- Stores these chunks with metadata (like which document they came from)
+
+### 2. Vector Indices
+
+Vector indices transform your document chunks into a format that can be efficiently searched. This process:
+
+1. Converts text chunks into "embeddings" (mathematical representations of meaning)
+2. Stores these embeddings in a vector database
+3. Creates an index that allows for semantic search (finding content by meaning, not just keywords)
+
+When setting up a vector index, you select:
+- Which document collection to index
+- Which embedding model to use (different models have different strengths)
+- Which vector database to store the embeddings in
+
+### 3. Retriever Node
+
+The Retriever node is how you integrate RAG into your workflows. This node:
+- Takes a query as input
+- Searches your vector index for relevant chunks
+- Returns the most relevant text snippets
+
+You can then use these retrieved snippets as context for an LLM node, creating AI responses that are grounded in your data.
+
+## The RAG Workflow in PySpur
+
+Here's a typical workflow for using RAG in PySpur:
+
+1. **Create a Document Collection**
+   - Give it a name and description
+   - Configure chunking settings (chunk size, overlap)
+   - Upload documents
+
+2. **Add Documents to Your Collection**
+   - Upload PDFs, text files, Word documents, etc.
+   - PySpur processes and chunks these automatically
+
+3. **Create a Vector Index**
+   - Select which document collection to index
+   - Choose an embedding model (e.g., OpenAI, Cohere, etc.)
+   - Select a vector database (e.g., Pinecone, Chroma, etc.)
+
+4. **Use the Retriever Node in Spurs**
+   - Add a Retriever node to your workflow
+   - Configure it to use your vector index
+   - Connect its output to an LLM node
+   - Use the retrieved context to generate accurate responses
+
+## Example RAG Spur
+
+Here's a simple example of how to use RAG in a workflow:
+
+<img className="block dark:hidden" src="/images/rag/example_spur_light.png" />
+<img className="hidden dark:block" src="/images/rag/example_spur_dark.png" />
+
+This spur:
+1. Takes a user question as input
+2. Uses the Retriever node to find relevant information in your vector index
+3. Sends that information to an LLM to generate a comprehensive answer
+4. Returns the answer to the user
+
+## Best Practices
+
+For best results with RAG in PySpur:
+
+- **Create focused collections**: Group related documents together
+- **Experiment with chunk sizes**: Smaller chunks work better for specific questions, larger chunks provide more context
+- **Choose the right embedding model**: Different models have different strengths and context lengths
+- **Provide clear instructions to your LLM**: Tell it to use the retrieved context and cite sources
+
+## Next Steps
+
+Now that you understand the basics of RAG in PySpur:
+
+- Follow our [quickstart guide](/quickstart) to set up your first document collection
+- Explore the [example workflow](/example) to see RAG in action
+- Join our [Discord community](https://discord.gg/7Spn7C8A5F) to share your RAG applications

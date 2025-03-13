@@ -3,23 +3,22 @@ import store, { RootState } from '@/store/store'
 import { AlertState } from '@/types/alert'
 import { FlowWorkflowNode } from '@/types/api_types/nodeTypeSchemas'
 import { TaskStatus } from '@/types/api_types/taskSchemas'
+import { isTargetAncestorOfSource } from '@/utils/cyclicEdgeUtils'
 import { deleteNode, duplicateNode, getNodeTitle } from '@/utils/flowUtils'
 import { convertToPythonVariableName } from '@/utils/variableNameUtils'
 import { Alert, Button, Card, CardBody, CardHeader, Divider, Input } from '@heroui/react'
 import { Icon } from '@iconify/react'
 import { createSelector } from '@reduxjs/toolkit'
 import { Handle, Position, useConnection, useNodeConnections, useUpdateNodeInternals } from '@xyflow/react'
+import { debounce } from 'lodash'
 import isEqual from 'lodash/isEqual'
-import React, { useMemo, useRef, useState, useEffect } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { useDispatch, useSelector } from 'react-redux'
 import { updateNodeDataOnly, updateNodeParentAndCoordinates, updateNodeTitle } from '../../store/flowSlice'
-import NodeControls from './NodeControls'
 import styles from './BaseNode.module.css'
-import { isTargetAncestorOfSource } from '@/utils/cyclicEdgeUtils'
+import NodeControls from './NodeControls'
 import NodeErrorDisplay from './NodeErrorDisplay'
 import NodeOutputDisplay from './NodeOutputDisplay'
-import { debounce } from 'lodash'
-
 
 export interface BaseNodeProps {
     isCollapsed: boolean
@@ -202,6 +201,8 @@ const BaseNode: React.FC<BaseNodeProps> = ({
     const nodeData = data
     const edges = useSelector((state: RootState) => state.flow.edges, isEqual)
     const nodes = useSelector((state: RootState) => state.flow.nodes, isEqual)
+    const node = nodes.find((n) => n.id === id)
+    const nodeType = node?.type
 
     const updateNodeInternals = useUpdateNodeInternals()
 
@@ -214,7 +215,7 @@ const BaseNode: React.FC<BaseNodeProps> = ({
                 if (sourceNode.type === 'RouterNode' && edge.sourceHandle) {
                     return {
                         ...sourceNode,
-                        handle_id: edge.targetHandle
+                        handle_id: edge.targetHandle,
                     }
                 }
                 return sourceNode
@@ -443,7 +444,8 @@ const BaseNode: React.FC<BaseNodeProps> = ({
                             type: connection.fromNode.type,
                             handle_id: connection.fromHandle.id,
                             data: {
-                                title: (connection.fromNode.data as { title?: string })?.title || connection.fromNode.id,
+                                title:
+                                    (connection.fromNode.data as { title?: string })?.title || connection.fromNode.id,
                             },
                         },
                     ]
@@ -468,17 +470,13 @@ const BaseNode: React.FC<BaseNodeProps> = ({
     }, [edges, nodes, connection, id])
 
     useEffect(() => {
-        // Check if finalPredecessors differ from predecessorNodes
-        // (We do a deeper comparison to detect config/title changes, not just ID changes)
-        const hasChanged =
-            finalPredecessors.length !== predecessorNodes.length ||
-            finalPredecessors.some((newNode, i) => !isEqual(newNode, predecessorNodes[i]))
-
-        if (hasChanged) {
+        // Use lodash's isEqual for efficient deep comparison
+        if (!isEqual(finalPredecessors, predecessorNodes)) {
             setPredecessorNodes(finalPredecessors)
+            // Only update node internals when predecessors actually change
             updateNodeInternals(id)
         }
-    }, [finalPredecessors, predecessorNodes, updateNodeInternals, id])
+    }, [finalPredecessors, predecessorNodes, id, updateNodeInternals])
 
     const renderHandles = () => {
         if (!nodeData) {
@@ -494,9 +492,9 @@ const BaseNode: React.FC<BaseNodeProps> = ({
                 <div className={`${styles.handlesColumn} ${styles.inputHandlesColumn}`} id="input-handles">
                     {dedupedPredecessors.map((node) => {
                         const handleId =
-                        node.type === 'RouterNode' && node.handle_id
-                            ? (node.data?.title + '.' + node.handle_id)
-                            : String(node.data?.title || node.id || '')
+                            node.type === 'RouterNode' && node.handle_id
+                                ? node.data?.title + '.' + node.handle_id
+                                : String(node.data?.title || node.id || '')
                         // set node id for router node as node.id + node.data.title
                         const nodeId = node.type === 'RouterNode' ? node?.id + '.' + node?.handle_id : node?.id
                         return (
@@ -518,9 +516,10 @@ const BaseNode: React.FC<BaseNodeProps> = ({
     const nodeRef = useRef<HTMLDivElement | null>(null)
 
     const debouncedTitleChange = useMemo(
-        () => debounce((newTitle: string) => {
-            handleTitleChange(newTitle)
-        }, 300),
+        () =>
+            debounce((newTitle: string) => {
+                handleTitleChange(newTitle)
+            }, 300),
         []
     )
 
@@ -656,7 +655,7 @@ const BaseNode: React.FC<BaseNodeProps> = ({
                             <CardBody key={`body-${id}`} className="px-3 py-2">
                                 <div className={styles.nodeWrapper} ref={nodeRef} id={`node-${id}-wrapper`}>
                                     {renderHandles()}
-                                    </div>
+                                </div>
                                 {children}
                                 {nodeData?.error && <NodeErrorDisplay error={nodeData?.error} />}
                                 <NodeOutputDisplay key={`output-display-${id}`} output={nodeData?.run} />
@@ -672,8 +671,8 @@ const BaseNode: React.FC<BaseNodeProps> = ({
                     isInputNode={isInputNode}
                     hasRun={data?.run !== undefined}
                     handlePartialRun={handlePartialRun}
-                    handleDelete={handleDelete}
-                    handleDuplicate={handleDuplicate}
+                    handleDelete={!isInputNode && nodeType !== 'OutputNode' ? handleDelete : undefined}
+                    handleDuplicate={!isInputNode && nodeType !== 'OutputNode' ? handleDuplicate : undefined}
                     handleOpenModal={handleOpenModal}
                     handleDetach={parentId ? handleDetach : undefined}
                 />
@@ -682,4 +681,4 @@ const BaseNode: React.FC<BaseNodeProps> = ({
     )
 }
 
-export default BaseNode
+export default React.memo(BaseNode, baseNodeComparator)

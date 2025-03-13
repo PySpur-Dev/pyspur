@@ -166,3 +166,8 @@ cython_debug/
 
 # Ruff cache
 **/.ruff_cache/
+
+
+# node_modules
+**/node_modules/
+**/node_modules

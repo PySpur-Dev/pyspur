@@ -1,0 +1,107 @@
+# Evaluations API
+
+This document outlines the API endpoints for managing evaluations in PySpur.
+
+## List Available Evaluations
+
+**Description**: Lists all available evaluations by scanning the tasks directory for YAML files. Returns metadata about each evaluation including name, description, type, and number of samples.
+
+**URL**: `/evals/`
+
+**Method**: GET
+
+**Response Schema**:
+```python
+List[Dict[str, Any]]
+```
+
+Each dictionary in the list contains:
+```python
+{
+    "name": str,  # Name of the evaluation
+    "description": str,  # Description of the evaluation
+    "type": str,  # Type of evaluation
+    "num_samples": str,  # Number of samples in the evaluation
+    "paper_link": str,  # Link to the paper describing the evaluation
+    "file_name": str  # Name of the YAML file
+}
+```
+
+## Launch Evaluation
+
+**Description**: Launches an evaluation job by triggering the evaluator with the specified evaluation configuration. The evaluation is run asynchronously in the background.
+
+**URL**: `/evals/launch/`
+
+**Method**: POST
+
+**Request Payload**:
+```python
+class EvalRunRequest:
+    eval_name: str  # Name of the evaluation to run
+    workflow_id: str  # ID of the workflow to evaluate
+    output_variable: str  # Output variable to evaluate
+    num_samples: int = 100  # Number of random samples to evaluate
+```
+
+**Response Schema**:
+```python
+class EvalRunResponse:
+    run_id: str  # ID of the evaluation run
+    eval_name: str  # Name of the evaluation
+    workflow_id: str  # ID of the workflow being evaluated
+    status: EvalRunStatusEnum  # Status of the evaluation run
+    start_time: datetime  # When the evaluation started
+    end_time: Optional[datetime]  # When the evaluation ended (if completed)
+    results: Optional[Dict[str, Any]]  # Results of the evaluation (if completed)
+```
+
+## Get Evaluation Run Status
+
+**Description**: Gets the status of a specific evaluation run, including results if the evaluation has completed.
+
+**URL**: `/evals/runs/{eval_run_id}`
+
+**Method**: GET
+
+**Parameters**:
+```python
+eval_run_id: str  # ID of the evaluation run
+```
+
+**Response Schema**:
+```python
+class EvalRunResponse:
+    run_id: str  # ID of the evaluation run
+    eval_name: str  # Name of the evaluation
+    workflow_id: str  # ID of the workflow being evaluated
+    status: EvalRunStatusEnum  # Status of the evaluation run
+    start_time: datetime  # When the evaluation started
+    end_time: Optional[datetime]  # When the evaluation ended (if completed)
+    results: Optional[Dict[str, Any]]  # Results of the evaluation (if completed)
+```
+
+## List Evaluation Runs
+
+**Description**: Lists all evaluation runs, ordered by start time descending.
+
+**URL**: `/evals/runs/`
+
+**Method**: GET
+
+**Response Schema**:
+```python
+List[EvalRunResponse]
+```
+
+Where `EvalRunResponse` contains:
+```python
+class EvalRunResponse:
+    run_id: str  # ID of the evaluation run
+    eval_name: str  # Name of the evaluation
+    workflow_id: str  # ID of the workflow being evaluated
+    status: EvalRunStatusEnum  # Status of the evaluation run
+    start_time: datetime  # When the evaluation started
+    end_time: Optional[datetime]  # When the evaluation ended (if completed)
+    results: Optional[Dict[str, Any]]  # Results of the evaluation (if completed)
+```

@@ -8,8 +8,7 @@ from .base_model import BaseModel
 
 
 class WorkflowModel(BaseModel):
-    """
-    Represents a workflow in the system.
+    """Represents a workflow in the system.
 
     A version of the workflow is created only when the workflow is run.
     The latest or current version of the workflow is always stored in the

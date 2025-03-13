@@ -1,10 +1,26 @@
-import React, { useEffect, useRef, useState, useMemo, memo } from 'react'
+import { FlowWorkflowNode } from '@/types/api_types/nodeTypeSchemas'
 import { NodeProps } from '@xyflow/react'
+import React, { useState, useMemo } from 'react'
 import BaseNode from './BaseNode'
 import styles from './DynamicNode.module.css'
-import { FlowWorkflowNode } from '@/types/api_types/nodeTypeSchemas'
 import NodeOutputModal from './NodeOutputModal'
 import { OutputHandleRow } from './shared/OutputHandleRow'
+import isEqual from 'lodash/isEqual'
+
+// Define a comparator for the memo
+const dynamicNodeComparator = (
+    prevProps: DynamicNodeProps,
+    nextProps: DynamicNodeProps
+): boolean => {
+    return (
+        prevProps.id === nextProps.id &&
+        prevProps.selected === nextProps.selected &&
+        prevProps.zIndex === nextProps.zIndex &&
+        prevProps.positionAbsoluteX === nextProps.positionAbsoluteX &&
+        prevProps.positionAbsoluteY === nextProps.positionAbsoluteY &&
+        isEqual(prevProps.data, nextProps.data)
+    )
+}
 
 const baseNodeStyle = {
     width: 'auto',
@@ -43,13 +59,18 @@ const DynamicNode: React.FC<DynamicNodeProps> = ({
 
     const nodeData = data
 
-    const renderOutputHandles = () => {
-        return (
+    // Memoize the output handles rendering
+    const renderOutputHandles = useMemo(() => {
+        const OutputHandlesComponent = () => (
             <div className={`${styles.handlesColumn} ${styles.outputHandlesColumn}`} id="output-handle">
-                {nodeData?.title && <OutputHandleRow id={id} keyName={String(nodeData?.title)} isCollapsed={isCollapsed} />}
+                {nodeData?.title && (
+                    <OutputHandleRow id={id} keyName={String(nodeData?.title)} isCollapsed={isCollapsed} />
+                )}
             </div>
-        )
-    }
+        );
+        OutputHandlesComponent.displayName = 'OutputHandlesComponent';
+        return OutputHandlesComponent;
+    }, [id, nodeData?.title, isCollapsed])
 
     return (
         <>
@@ -66,8 +87,7 @@ const DynamicNode: React.FC<DynamicNodeProps> = ({
                     positionAbsoluteY={positionAbsoluteY}
                     renderOutputHandles={renderOutputHandles}
                     {...props}
-                >
-                </BaseNode>
+                ></BaseNode>
             </div>
             <NodeOutputModal
                 isOpen={isModalOpen}
@@ -79,4 +99,13 @@ const DynamicNode: React.FC<DynamicNodeProps> = ({
     )
 }
 
-export default DynamicNode
+// Add display name to the original component
+DynamicNode.displayName = 'DynamicNode'
+
+// Create memoized component
+const MemoizedDynamicNode = React.memo(DynamicNode, dynamicNodeComparator)
+
+// Add display name to memoized component
+MemoizedDynamicNode.displayName = 'MemoizedDynamicNode'
+
+export default MemoizedDynamicNode

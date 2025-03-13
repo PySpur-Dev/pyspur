@@ -28,7 +28,6 @@ import { cloneDeep, debounce, set } from 'lodash'
 import isEqual from 'lodash/isEqual'
 import React, { useCallback, useEffect, useState } from 'react'
 import { useDispatch, useSelector } from 'react-redux'
-import { jsonOptions } from '../../../constants/jsonOptions'
 import {
     selectNodeById,
     setSelectedNode,
@@ -49,9 +48,8 @@ import NumberInput from '../../NumberInput'
 import FewShotExamplesEditor from '../../textEditor/FewShotExamplesEditor'
 import TextEditor from '../../textEditor/TextEditor'
 import NodeOutput from '../NodeOutputDisplay'
+import IOMapEditor from './IOMapEditor'
 import OutputSchemaEditor from './OutputSchemaEditor'
-import SchemaEditor from './SchemaEditor'
-import ToolEditor, { defaultToolTemplate } from './ToolEditor'
 
 import { extractSchemaFromJsonSchema, generateJsonSchemaFromSchema } from '@/utils/schemaUtils'
 import { convertToPythonVariableName } from '@/utils/variableNameUtils'
@@ -221,78 +219,11 @@ const isTemplateField = (key: string, fieldMetadata?: FieldMetadata): boolean =>
     return templatePatterns.some((pattern) => key === pattern || key.endsWith(pattern))
 }
 
-// Add new interfaces for tool management
-interface ToolEditorModalProps {
-    isOpen: boolean
-    onClose: () => void
-    onSave: (filename: string, content: string) => Promise<void>
-    initialFilename?: string
-    initialContent?: string
-}
-
-const ToolEditorModal: React.FC<ToolEditorModalProps> = ({
-    isOpen,
-    onClose,
-    onSave,
-    initialFilename = '',
-    initialContent = '',
-}) => {
-    const [filename, setFilename] = useState(initialFilename)
-    const [content, setContent] = useState(initialContent)
-    const [isLoading, setIsLoading] = useState(false)
-
-    useEffect(() => {
-        setFilename(initialFilename)
-        setContent(initialContent)
-    }, [initialFilename, initialContent])
-
-    const handleSave = async () => {
-        try {
-            setIsLoading(true)
-            await onSave(filename, content)
-            onClose()
-        } catch (error) {
-            console.error('Error saving tool:', error)
-        } finally {
-            setIsLoading(false)
-        }
-    }
-
-    return (
-        <Modal isOpen={isOpen} onClose={onClose} size="4xl">
-            <ModalContent>
-                <ModalHeader>
-                    <div className="flex flex-col gap-1">
-                        <h2 className="text-lg font-semibold">Tool Editor</h2>
-                        <Input
-                            label="Tool Name"
-                            value={filename}
-                            onChange={(e) => setFilename(e.target.value)}
-                            placeholder="Enter tool name (without .py extension)"
-                        />
-                    </div>
-                </ModalHeader>
-                <ModalBody>
-                    <div className="h-[60vh]">
-                        <CodeEditor
-                            code={content}
-                            onChange={setContent}
-                            mode="python"
-                            readOnly={false}
-                        />
-                    </div>
-                </ModalBody>
-                <ModalFooter>
-                    <Button variant="light" onPress={onClose}>
-                        Cancel
-                    </Button>
-                    <Button color="primary" onPress={handleSave} isLoading={isLoading}>
-                        Save Tool
-                    </Button>
-                </ModalFooter>
-            </ModalContent>
-        </Modal>
-    )
+interface JsonSchema {
+    type?: string
+    properties?: Record<string, any>
+    required?: string[]
+    items?: JsonSchema
 }
 
 const NodeSidebar: React.FC<NodeSidebarProps> = ({ nodeID, readOnly }) => {
@@ -375,19 +306,25 @@ const NodeSidebar: React.FC<NodeSidebarProps> = ({ nodeID, readOnly }) => {
 
                         // Find nodes that feed into the HumanInterventionNode
                         const humanNodeInputEdges = edges.filter((edge) => edge.target === node.id)
-                        const humanNodeInputs = humanNodeInputEdges.map((edge) => nodes.find((n) => n.id === edge.source))
+                        const humanNodeInputs = humanNodeInputEdges.map((edge) =>
+                            nodes.find((n) => n.id === edge.source)
+                        )
 
                         // Collect the schema from those nodes as they will be passed through
-                        humanNodeInputs.forEach(inputNode => {
+                        humanNodeInputs.forEach((inputNode) => {
                             if (!inputNode) return
                             const inputConfig = allNodeConfigs[inputNode.id]
                             if (inputConfig?.output_json_schema) {
                                 const inputSchema = extractSchemaFromJsonSchema(inputConfig.output_json_schema)
-                                if (!inputSchema.error && inputSchema.schema && typeof inputSchema.schema === 'object') {
+                                if (
+                                    !inputSchema.error &&
+                                    inputSchema.schema &&
+                                    typeof inputSchema.schema === 'object'
+                                ) {
                                     Object.keys(inputSchema.schema).forEach((key) => {
                                         // Use the title of the predecessor node to suggest nested access, e.g., HumanInterventionNode_1.input_node.input_1
-                                        const predecessorTitle = inputNode.title || inputNode.id;
-                                        acc.push(`${nodeTitle}.${predecessorTitle}.${key}`);
+                                        const predecessorTitle = inputNode.title || inputNode.id
+                                        acc.push(`${nodeTitle}.${predecessorTitle}.${key}`)
                                     })
                                 }
                             }
@@ -460,9 +397,9 @@ const NodeSidebar: React.FC<NodeSidebarProps> = ({ nodeID, readOnly }) => {
     // Function to handle message generation specifically
     const handleMessageGenerated = (key: string, newMessage: string) => {
         // Update the message version for this field
-        setMessageVersions(prev => ({
+        setMessageVersions((prev) => ({
             ...prev,
-            [key]: (prev[key] || 0) + 1
+            [key]: (prev[key] || 0) + 1,
         }))
 
         // Call the regular input change handler
@@ -1314,7 +1251,62 @@ const NodeSidebar: React.FC<NodeSidebarProps> = ({ nodeID, readOnly }) => {
         }
     }
 
-    // Update renderConfigFields to include URL variable configuration
+    // Add this function after renderUrlVariableConfig but before renderConfigFields
+    const renderMessageHistoryConfig = () => {
+        // Only show for SingleLLMCallNode
+        if (nodeType !== 'SingleLLMCallNode') {
+            return null
+        }
+
+        const incomingSchemaVars = collectIncomingSchema(nodeID)
+
+        // Default to false if not defined
+        const enableMessageHistory = currentNodeConfig.enable_message_history ?? false
+        const messageHistoryVariable = currentNodeConfig.message_history_variable || ''
+
+        return (
+            <div className="my-4">
+                <div className="flex items-center gap-2 mb-2">
+                    <h3 className="font-semibold">Message History</h3>
+                    <Tooltip
+                        content="Select an input variable containing message history. This should be an array of objects with 'role' and 'content' properties."
+                        placement="left-start"
+                        showArrow={true}
+                        className="max-w-xs"
+                    >
+                        <Icon icon="solar:question-circle-linear" className="text-default-400 cursor-help" width={20} />
+                    </Tooltip>
+                </div>
+                <div className="mb-2">
+                    <Switch
+                        isSelected={enableMessageHistory}
+                        onValueChange={(checked) => handleInputChange('enable_message_history', checked)}
+                        size="sm"
+                    >
+                        Enable Message History
+                    </Switch>
+                </div>
+                {enableMessageHistory && (
+                    <div className="mb-2">
+                        <Select
+                            label="Message History Variable"
+                            selectedKeys={[messageHistoryVariable]}
+                            onChange={(e) => handleInputChange('message_history_variable', e.target.value)}
+                            isDisabled={!enableMessageHistory}
+                        >
+                            {['', ...incomingSchemaVars].map((variable) => (
+                                <SelectItem key={variable} value={variable}>
+                                    {variable || 'None'}
+                                </SelectItem>
+                            ))}
+                        </Select>
+                    </div>
+                )}
+            </div>
+        )
+    }
+
+    // Update renderConfigFields to include URL variable config and message history config
     const renderConfigFields = (): React.ReactNode => {
         if (!nodeSchema || !nodeSchema.config || !currentNodeConfig) return null
         const properties = nodeSchema.config
@@ -1335,6 +1327,10 @@ const NodeSidebar: React.FC<NodeSidebarProps> = ({ nodeID, readOnly }) => {
                 if (!isClaudeSonnet37 && (key === 'enable_thinking' || key === 'thinking_budget_tokens')) {
                     return false
                 }
+                // Hide these fields as we'll render them separately
+                if (key === 'enable_message_history' || key === 'message_history_variable') {
+                    return false
+                }
                 return true
             })
 
@@ -1348,12 +1344,13 @@ const NodeSidebar: React.FC<NodeSidebarProps> = ({ nodeID, readOnly }) => {
                     const isLast = index === orderedKeys.length - 1
                     const result = renderField(key, field, value, `${nodeType}.config`, isLast)
 
-                    // Insert URL variable config after template/message fields
+                    // Insert URL variable config and message history config after template/message fields
                     if (index === priorityFields.length + templateFields.length - 1) {
                         return (
                             <React.Fragment key={key}>
                                 {result}
                                 {renderUrlVariableConfig()}
+                                {renderMessageHistoryConfig()}
                             </React.Fragment>
                         )
                     }
@@ -1467,6 +1464,20 @@ const NodeSidebar: React.FC<NodeSidebarProps> = ({ nodeID, readOnly }) => {
         incomingSchema: string[],
         handleInputChange: (key: string, value: any) => void
     ) => {
+        // Parse the output schema if it's a string
+        let outputSchemaProperties: string[] = []
+        try {
+            if (currentNodeConfig?.output_json_schema) {
+                const parsedSchema =
+                    typeof currentNodeConfig.output_json_schema === 'string'
+                        ? (JSON.parse(currentNodeConfig.output_json_schema) as JsonSchema)
+                        : (currentNodeConfig.output_json_schema as JsonSchema)
+                outputSchemaProperties = Object.keys(parsedSchema?.properties || {})
+            }
+        } catch (e) {
+            console.error('Failed to parse output schema:', e)
+        }
+
         return (
             <div key={key} className="my-2">
                 <div className="flex items-center gap-2 mb-2">
@@ -1480,14 +1491,14 @@ const NodeSidebar: React.FC<NodeSidebarProps> = ({ nodeID, readOnly }) => {
                         <Icon icon="solar:question-circle-linear" className="text-default-400 cursor-help" width={20} />
                     </Tooltip>
                 </div>
-                <SchemaEditor
-                    key={`input-map-editor-${nodeID}`}
-                    jsonValue={value || {}}
+                <IOMapEditor
+                    leftOptions={incomingSchema}
+                    rightOptions={outputSchemaProperties}
+                    value={value || {}}
                     onChange={(newValue) => handleInputChange(key, newValue)}
-                    options={jsonOptions}
-                    nodeId={nodeID}
-                    availableFields={incomingSchema}
                     readOnly={readOnly}
+                    leftLabel="Incoming Field"
+                    rightLabel="Input Field"
                 />
             </div>
         )
@@ -1499,6 +1510,20 @@ const NodeSidebar: React.FC<NodeSidebarProps> = ({ nodeID, readOnly }) => {
         incomingSchema: string[],
         handleInputChange: (key: string, value: any) => void
     ) => {
+        // Parse the output schema if it's a string
+        let outputSchemaProperties: string[] = []
+        try {
+            if (currentNodeConfig?.output_json_schema) {
+                const parsedSchema =
+                    typeof currentNodeConfig.output_json_schema === 'string'
+                        ? (JSON.parse(currentNodeConfig.output_json_schema) as JsonSchema)
+                        : (currentNodeConfig.output_json_schema as JsonSchema)
+                outputSchemaProperties = Object.keys(parsedSchema?.properties || {})
+            }
+        } catch (e) {
+            console.error('Failed to parse output schema:', e)
+        }
+
         return (
             <div key={key} className="my-2">
                 <div className="flex items-center gap-2 mb-2">
@@ -1512,14 +1537,14 @@ const NodeSidebar: React.FC<NodeSidebarProps> = ({ nodeID, readOnly }) => {
                         <Icon icon="solar:question-circle-linear" className="text-default-400 cursor-help" width={20} />
                     </Tooltip>
                 </div>
-                <SchemaEditor
-                    key={`output-map-editor-${nodeID}`}
-                    jsonValue={value || {}}
+                <IOMapEditor
+                    leftOptions={outputSchemaProperties}
+                    rightOptions={incomingSchema}
+                    value={value || {}}
                     onChange={(newValue) => handleInputChange(key, newValue)}
-                    options={jsonOptions}
-                    nodeId={nodeID}
-                    availableFields={incomingSchema}
                     readOnly={readOnly}
+                    leftLabel="Output Field"
+                    rightLabel="Target Field"
                 />
             </div>
         )
@@ -1597,6 +1622,7 @@ const NodeSidebar: React.FC<NodeSidebarProps> = ({ nodeID, readOnly }) => {
                 boxShadow: '0 4px 15px rgba(0, 0, 0, 0.2)',
                 borderRadius: '10px',
                 backdropFilter: 'blur(8px)',
+                zIndex: 20, // Higher z-index to ensure it overlays the chat
             }}
         >
             {showTitleError && (

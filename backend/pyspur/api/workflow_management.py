@@ -1,3 +1,4 @@
+import json
 import shutil
 from datetime import datetime, timezone
 from pathlib import Path
@@ -29,6 +30,7 @@ from ..schemas.run_schemas import (
     RunResponseSchema,
 )
 from ..schemas.workflow_schemas import (
+    SpurType,
     WorkflowCreateRequestSchema,
     WorkflowDefinitionSchema,
     WorkflowNodeSchema,
@@ -98,20 +100,86 @@ def take_pause_action(
     return process_pause_action(db, run_id, action_request, background_tasks)
 
 
-def create_a_new_workflow_definition() -> WorkflowDefinitionSchema:
-    return WorkflowDefinitionSchema(
-        nodes=[
-            WorkflowNodeSchema.model_validate(
+def create_a_new_workflow_definition(
+    spur_type: SpurType = SpurType.WORKFLOW,
+) -> WorkflowDefinitionSchema:
+    if spur_type == SpurType.CHATBOT:
+        # Create input node with required chatbot fields
+        input_node_config = InputNodeConfig().model_dump()
+        input_node_config["output_json_schema"] = json.dumps(
+            {
+                "type": "object",
+                "properties": {
+                    "user_message": {"type": "string"},
+                    "session_id": {"type": "string"},
+                    "message_history": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "role": {"type": "string"},
+                                "content": {"type": "string"},
+                            },
+                        },
+                    },
+                },
+                "required": ["user_message", "session_id"],
+            }
+        )
+        input_node_config["output_schema"] = {
+            "user_message": "string",
+            "session_id": "string",
+            "message_history": "List[Dict[str, str]]",
+        }
+        # Create output node with required chatbot fields
+        output_node_config = {
+            "output_schema": {"assistant_message": "string"},
+            "output_json_schema": json.dumps(
                 {
-                    "id": "input_node",
-                    "node_type": "InputNode",
-                    "coordinates": {"x": 100, "y": 100},
-                    "config": InputNodeConfig().model_dump(),
+                    "type": "object",
+                    "properties": {"assistant_message": {"type": "string"}},
+                    "required": ["assistant_message"],
                 }
-            )
-        ],
-        links=[],
-    )
+            ),
+        }
+
+        return WorkflowDefinitionSchema(
+            nodes=[
+                WorkflowNodeSchema.model_validate(
+                    {
+                        "id": "input_node",
+                        "node_type": "InputNode",
+                        "coordinates": {"x": 100, "y": 100},
+                        "config": input_node_config,
+                    }
+                ),
+                WorkflowNodeSchema.model_validate(
+                    {
+                        "id": "output_node",
+                        "node_type": "OutputNode",
+                        "coordinates": {"x": 300, "y": 100},
+                        "config": output_node_config,
+                    }
+                ),
+            ],
+            links=[],
+            spur_type=spur_type,
+        )
+    else:
+        return WorkflowDefinitionSchema(
+            nodes=[
+                WorkflowNodeSchema.model_validate(
+                    {
+                        "id": "input_node",
+                        "node_type": "InputNode",
+                        "coordinates": {"x": 100, "y": 100},
+                        "config": InputNodeConfig().model_dump(),
+                    }
+                )
+            ],
+            links=[],
+            spur_type=spur_type,
+        )
 
 
 def generate_unique_workflow_name(db: Session, base_name: str) -> str:
@@ -130,8 +198,20 @@ def generate_unique_workflow_name(db: Session, base_name: str) -> str:
 def create_workflow(
     workflow_request: WorkflowCreateRequestSchema, db: Session = Depends(get_db)
 ) -> WorkflowResponseSchema:
+    print(workflow_request)
     if not workflow_request.definition:
-        workflow_request.definition = create_a_new_workflow_definition()
+        # If no definition is provided, create a new one with default WORKFLOW type
+        workflow_request.definition = create_a_new_workflow_definition(spur_type=SpurType.WORKFLOW)
+    elif (
+        workflow_request.definition.spur_type == SpurType.CHATBOT
+        and len(workflow_request.definition.nodes) == 0
+    ):
+        # If the workflow type is CHATBOT, create a new definition with required fields
+        workflow_request.definition = create_a_new_workflow_definition(spur_type=SpurType.CHATBOT)
+    elif len(workflow_request.definition.nodes) == 0:
+        # If the workflow type is not CHATBOT, create a new definition with default WORKFLOW type
+        workflow_request.definition = create_a_new_workflow_definition(spur_type=SpurType.WORKFLOW)
+    # Generate a unique name for the workflow
     workflow_name = generate_unique_workflow_name(db, workflow_request.name or "Untitled Workflow")
     new_workflow = WorkflowModel(
         name=workflow_name,
@@ -349,7 +429,10 @@ def get_workflow_output_variables(
     return output_variables
 
 
-@router.post("/upload_test_files/")
+@router.post(
+    "/upload_test_files/",
+    description="Upload test files for a specific node in a workflow",
+)
 async def upload_test_files(
     workflow_id: str = Form(...),
     files: List[UploadFile] = File(...),

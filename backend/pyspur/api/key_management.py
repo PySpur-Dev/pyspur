@@ -243,7 +243,21 @@ PROVIDER_CONFIGS = [
         parameters=[
             ProviderParameter(name="REDDIT_CLIENT_ID", description="Reddit API Client ID"),
             ProviderParameter(name="REDDIT_CLIENT_SECRET", description="Reddit API Client Secret"),
-            ProviderParameter(name="REDDIT_USER_AGENT", description="Reddit API User Agent", type="text", required=False),
+            ProviderParameter(
+                name="REDDIT_USERNAME", description="Reddit Username", type="text", required=False
+            ),
+            ProviderParameter(
+                name="REDDIT_PASSWORD",
+                description="Reddit Password",
+                type="password",
+                required=False,
+            ),
+            ProviderParameter(
+                name="REDDIT_USER_AGENT",
+                description="Reddit API User Agent",
+                type="text",
+                required=False,
+            ),
         ],
     ),
     # Add Firecrawl Provider
@@ -273,6 +287,17 @@ PROVIDER_CONFIGS = [
             ),
         ],
     ),
+    # Add Exa Provider
+    ProviderConfig(
+        id="exa",
+        name="Exa",
+        description="Exa web search API",
+        category="search",
+        icon="solar:search-bold",
+        parameters=[
+            ProviderParameter(name="EXA_API_KEY", description="Exa API Key"),
+        ],
+    ),
 ]
 
 # For backward compatibility, create a flat list of all parameter names
@@ -295,12 +320,11 @@ def get_env_variable(name: str) -> Optional[str]:
 
 
 def set_env_variable(name: str, value: str):
-    """
-    Sets an environment variable both in the .env file and in the current process.
+    """Sets an environment variable both in the .env file and in the current process.
     Also ensures the value is properly quoted if it contains special characters.
     """
     # Ensure the value is properly quoted if it contains spaces or special characters
-    if any(c in value for c in ' \'"$&()|<>'):
+    if any(c in value for c in " '\"$&()|<>"):
         value = f'"{value}"'
 
     # Update the .env file using set_key
@@ -321,8 +345,7 @@ def delete_env_variable(name: str):
 
 
 def mask_key_value(value: str, param_type: str = "password") -> str:
-    """
-    Masks the key value based on the parameter type.
+    """Masks the key value based on the parameter type.
     For password types, shows only the first and last few characters.
     For other types, shows the full value.
     """
@@ -347,9 +370,7 @@ async def get_providers():
 
 @router.get("/", description="Get a list of all environment variable names")
 async def list_api_keys():
-    """
-    Returns a list of all model provider keys
-    """
+    """Returns a list of all model provider keys"""
     return [k["name"] for k in MODEL_PROVIDER_KEYS]
 
 
@@ -358,8 +379,7 @@ async def list_api_keys():
     description="Get the masked value of a specific environment variable",
 )
 async def get_api_key(name: str):
-    """
-    Returns the masked value of the specified environment variable.
+    """Returns the masked value of the specified environment variable.
     Requires authentication.
     """
     # Find the parameter configuration
@@ -381,8 +401,7 @@ async def get_api_key(name: str):
 
 @router.post("/", description="Add or update an environment variable")
 async def set_api_key(api_key: APIKey):
-    """
-    Adds a new environment variable or updates an existing one.
+    """Adds a new environment variable or updates an existing one.
     Requires authentication.
     """
     if api_key.name not in [k["name"] for k in MODEL_PROVIDER_KEYS]:
@@ -395,8 +414,7 @@ async def set_api_key(api_key: APIKey):
 
 @router.delete("/{name}", description="Delete an environment variable")
 async def delete_api_key(name: str):
-    """
-    Deletes the specified environment variable.
+    """Deletes the specified environment variable.
     Requires authentication.
     """
     if name not in [k["name"] for k in MODEL_PROVIDER_KEYS]:

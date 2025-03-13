@@ -1,7 +1,7 @@
 import React, { useState } from 'react'
 import Markdown from 'react-markdown'
-import SyntaxHighlighter from 'react-syntax-highlighter/dist/cjs/prism'
-import { oneDark } from 'react-syntax-highlighter/dist/cjs/styles/prism'
+import SyntaxHighlighter from 'react-syntax-highlighter'
+import { oneDark } from 'react-syntax-highlighter'
 import { Icon } from '@iconify/react'
 
 import JsonView from 'react18-json-view'

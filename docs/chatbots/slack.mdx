@@ -1,0 +1,307 @@
+---
+title: 'Using Chatbots with Slack'
+description: 'How to integrate your PySpur chatbots with Slack'
+---
+
+# Integrating PySpur Chatbots with Slack
+
+This guide explains how to connect your PySpur chatbots to Slack, allowing users to interact with your chatbot directly through Slack channels and threads.
+
+## Understanding Slack Integration Options
+
+PySpur offers two distinct ways to work with Slack:
+
+1. **Workflow Output to Slack** - Using the `SlackNotifyNode` to send one-time results from a workflow to a Slack channel
+2. **Interactive Chatbot in Slack** - Creating a fully interactive chatbot that users can converse with through Slack
+
+It's important to understand the difference between these approaches:
+
+| Feature | SlackNotifyNode | Interactive Chatbot |
+|---------|-----------------|---------------------|
+| Interaction | One-way (workflow → Slack) | Two-way conversation |
+| Session Management | None | Full conversation history |
+| Use Case | Sending alerts, summaries, notifications | Q&A, support, interactive assistance |
+| Implementation | Simple workflow node | Custom Slack app with API integration |
+
+## Setting Up an Interactive Chatbot in Slack
+
+Follow these steps to integrate your PySpur chatbot with Slack for interactive conversations:
+
+### 1. Create a Slack App
+
+1. Go to [api.slack.com/apps](https://api.slack.com/apps) and click "Create New App"
+2. Choose "From scratch" and provide a name and workspace
+3. In the app settings, enable the following:
+   - Socket Mode (under "Socket Mode")
+   - Event Subscriptions (under "Event Subscriptions")
+   - Bot Token Scopes (under "OAuth & Permissions"):
+     - `app_mentions:read`
+     - `channels:history`
+     - `chat:write`
+     - `groups:history`
+     - `im:history`
+     - `mpim:history`
+
+### 2. Collect Required Tokens
+
+You'll need three tokens from your Slack app:
+- **Bot Token** (`SLACK_BOT_TOKEN`): Found under "OAuth & Permissions" → "Bot User OAuth Token"
+- **Signing Secret** (`SLACK_SIGNING_SECRET`): Found under "Basic Information" → "App Credentials"
+- **App Token** (`SLACK_APP_TOKEN`): Generate under "Basic Information" → "App-Level Tokens" (with `connections:write` scope)
+
+### 3. Create Your Integration Script
+
+Create a Python script similar to the example below. This script:
+- Initializes a Slack Bolt app
+- Listens for mentions and thread replies
+- Creates PySpur sessions for users
+- Forwards messages to your PySpur chatbot workflow
+- Returns responses back to Slack
+
+```python
+# slack_integration.py
+import logging
+import os
+import sys
+from logging import getLogger
+
+import requests
+from dotenv import load_dotenv
+from slack_bolt import App
+from slack_bolt.adapter.socket_mode import SocketModeHandler
+
+# Load environment variables from .env file
+load_dotenv()
+
+# Replace with your bot's user ID and workflow ID
+BOT_USER_ID = "U08HMJ15AHF"  # Your bot's user ID in Slack
+WORKFLOW_ID = "S58"          # Your chatbot workflow ID in PySpur
+PYSPUR_API_URL = "http://localhost:6080/api"  # Change to your PySpur API URL
+
+# Configure logger
+logger = getLogger(__name__)
+logger.setLevel(logging.INFO)
+handler = logging.StreamHandler(sys.stderr)
+handler.setFormatter(
+    logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+)
+logger.addHandler(handler)
+
+# Initialize Slack app
+app = App(
+    token=os.environ.get("SLACK_BOT_TOKEN"),
+    signing_secret=os.environ.get("SLACK_SIGNING_SECRET"),
+    logger=logger,
+)
+
+# Handler for @mentions
+@app.event("app_mention")
+def handle_app_mention(event, say, logger):
+    logger.info(f"Received mention: {event}")
+    thread_ts = event.get("thread_ts") or event.get("ts")
+    user_external_id = event.get("user")
+
+    try:
+        # Create or get user
+        user_data = {
+            "external_id": user_external_id,
+            "user_metadata": {"platform": "slack"}
+        }
+        user_response = requests.post(f"{PYSPUR_API_URL}/user/", json=user_data)
+        if user_response.status_code not in [200, 409]:  # 409 means user already exists
+            logger.error(f"Failed to create user: {user_response.text}")
+            say(text="Sorry, I encountered an error processing your request.", thread_ts=thread_ts)
+            return
+
+        user_id = user_response.json().get("id")
+
+        # Create a new session or get existing one
+        session_data = {
+            "workflow_id": WORKFLOW_ID,
+            "user_id": user_id,
+            "external_id": thread_ts
+        }
+        session_response = requests.post(f"{PYSPUR_API_URL}/session/", json=session_data)
+        if session_response.status_code != 200:
+            logger.error(f"Failed to create session: {session_response.text}")
+            say(text="Sorry, I encountered an error processing your request.", thread_ts=thread_ts)
+            return
+
+        # Get the message text
+        message = app.client.conversations_history(
+            channel=event["channel"], ts=thread_ts
+        )
+
+        # Call the workflow API
+        url = f"{PYSPUR_API_URL}/wf/{WORKFLOW_ID}/run/?run_type=blocking"
+        data = {
+            "initial_inputs": {
+                "input_node": {
+                    "user_message": message["messages"][0]["text"],
+                    "session_id": session_response.json()["id"],
+                    "message_history": []
+                }
+            }
+        }
+
+        response = requests.post(url, json=data)
+        response_data = response.json()
+
+        # Get the assistant's message from the output node
+        assistant_message = response_data.get("output_node", {}).get("assistant_message", "")
+
+        # Send the response back to Slack
+        if assistant_message:
+            say(text=assistant_message, thread_ts=thread_ts)
+        else:
+            say(text="I encountered an issue processing your request.", thread_ts=thread_ts)
+
+    except Exception as e:
+        logger.error(f"Error processing request: {e}")
+        say(text="Sorry, I encountered an error processing your request.", thread_ts=thread_ts)
+
+# Handler for thread replies
+@app.event("message")
+def handle_thread_replies(event, say, logger):
+    # Only process thread replies (not the first message) and ignore bot messages
+    if (
+        "thread_ts" in event
+        and event.get("ts") != event.get("thread_ts")
+        and not event.get("bot_id")
+    ):
+        thread_ts = event["thread_ts"]
+        channel_id = event["channel"]
+        user_external_id = event.get("user")
+
+        try:
+            # Create or get user
+            user_data = {
+                "external_id": user_external_id,
+                "user_metadata": {"platform": "slack"}
+            }
+            user_response = requests.post(f"{PYSPUR_API_URL}/user/", json=user_data)
+            if user_response.status_code not in [200, 409]:
+                logger.error(f"Failed to create user: {user_response.text}")
+                say(text="Sorry, I encountered an error processing your request.", thread_ts=thread_ts)
+                return
+
+            user_id = user_response.json().get("id")
+
+            # Create a new session or get existing one
+            session_data = {
+                "workflow_id": WORKFLOW_ID,
+                "user_id": user_id,
+                "external_id": thread_ts
+            }
+            session_response = requests.post(f"{PYSPUR_API_URL}/session/", json=session_data)
+            if session_response.status_code != 200:
+                logger.error(f"Failed to create session: {session_response.text}")
+                say(text="Sorry, I encountered an error processing your request.", thread_ts=thread_ts)
+                return
+
+            # Get all replies in the thread
+            result = app.client.conversations_replies(channel=channel_id, ts=thread_ts)
+
+            # Format messages as a conversation history
+            chat_messages = []
+            for message in result["messages"]:
+                role = "assistant" if message.get("user") == BOT_USER_ID else "user"
+                chat_messages.append({"role": role, "content": message.get("text", "")})
+
+            # Get message history and current message
+            message_history = chat_messages[:-1] if len(chat_messages) > 1 else []
+            user_message = chat_messages[-1]["content"] if chat_messages else ""
+
+            # Call the workflow API
+            url = f"{PYSPUR_API_URL}/wf/{WORKFLOW_ID}/run/?run_type=blocking"
+            data = {
+                "initial_inputs": {
+                    "input_node": {
+                        "user_message": user_message,
+                        "session_id": session_response.json()["id"],
+                        "message_history": message_history,
+                    }
+                }
+            }
+
+            response = requests.post(url, json=data)
+            response_data = response.json()
+
+            # Get the assistant's message
+            assistant_message = response_data.get("output_node", {}).get("assistant_message", "")
+
+            # Send the response back to Slack
+            if assistant_message:
+                say(text=assistant_message, thread_ts=thread_ts)
+            else:
+                say(text="I encountered an issue processing your request.", thread_ts=thread_ts)
+
+        except Exception as e:
+            logger.error(f"Error processing thread reply: {e}")
+            say(text="Sorry, I had trouble processing your message.", thread_ts=thread_ts)
+
+if __name__ == "__main__":
+    # Start the app using Socket Mode
+    handler = SocketModeHandler(app, os.environ.get("SLACK_APP_TOKEN"))
+    handler.start()
+```
+
+### 4. Set Up Environment Variables
+
+Create a `.env` file with your tokens:
+
+```
+SLACK_BOT_TOKEN=xoxb-your-token
+SLACK_SIGNING_SECRET=your-signing-secret
+SLACK_APP_TOKEN=xapp-your-app-token
+```
+
+### 5. Run Your Integration
+
+1. Install required packages:
+   ```
+   pip install slack-bolt python-dotenv requests
+   ```
+
+2. Make sure your PySpur server is running
+
+3. Start your Slack integration:
+   ```
+   python slack_integration.py
+   ```
+
+## How It Works
+
+This integration creates a bidirectional connection between Slack and your PySpur chatbot:
+
+1. **User Input**: When a user mentions your bot or replies in a thread, the Slack app captures this input.
+
+2. **Session Management**: The script creates or retrieves a PySpur session for the user, using the thread timestamp as the external ID to track conversations.
+
+3. **Message History**: For thread replies, the script retrieves the entire conversation history and formats it in the proper structure for your chatbot.
+
+4. **PySpur API Call**: The user message and conversation history are sent to your PySpur workflow through the API.
+
+5. **Response**: The assistant's response from your workflow is posted back to the Slack thread.
+
+## Key Differences from SlackNotifyNode
+
+This approach differs significantly from the `SlackNotifyNode`:
+
+- **SlackNotifyNode** is a one-way communication channel where your workflow sends a message to Slack when it completes. It's ideal for notifications, alerts, or sharing results of automated processes.
+
+- **Interactive Slack Integration** creates a two-way communication channel where users can have ongoing conversations with your chatbot. The integration manages sessions, tracks conversation history, and maintains context across multiple interactions.
+
+## Example Use Cases
+
+- **Support Bot**: Create a support chatbot that answers user questions about your product
+- **Data Query Assistant**: Allow users to query company data through natural language in Slack
+- **Task Manager**: Build a bot that helps users create and track tasks through conversation
+- **Knowledge Base**: Develop a bot that retrieves and explains information from your documentation
+
+## Troubleshooting
+
+- **Bot not responding**: Ensure your bot has been invited to the channel and has the necessary permissions
+- **Missing messages**: Check your log output for any API errors
+- **Session errors**: Verify that your PySpur server is running and accessible
+- **Token issues**: Double-check that all environment variables are set correctly

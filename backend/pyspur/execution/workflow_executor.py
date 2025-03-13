@@ -8,26 +8,28 @@ from pydantic import ValidationError
 
 from ..models.run_model import RunModel, RunStatus
 from ..models.task_model import TaskStatus
+from ..models.user_session_model import MessageModel, SessionModel
 from ..models.workflow_model import WorkflowModel
 from ..nodes.base import BaseNode, BaseNodeOutput
 from ..nodes.factory import NodeFactory
 from ..nodes.logic.human_intervention import PauseException
 from ..schemas.workflow_schemas import (
+    SpurType,
     WorkflowDefinitionSchema,
     WorkflowNodeSchema,
 )
-from .task_recorder import TaskRecorder, TaskStatus
+from .task_recorder import TaskRecorder
 from .workflow_execution_context import WorkflowExecutionContext
 
 if TYPE_CHECKING:
     from .task_recorder import TaskRecorder
 
 
-class UpstreamFailure(Exception):
+class UpstreamFailureError(Exception):
     pass
 
 
-class UnconnectedNode(Exception):
+class UnconnectedNodeError(Exception):
     pass
 
 
@@ -128,6 +130,8 @@ class WorkflowExecutor:
                     if node.id in (link.source_id, link.target_id)
                 )
             ],
+            test_inputs=workflow.test_inputs,
+            spur_type=workflow.spur_type,
         )
 
     def _build_node_dict(self):
@@ -140,14 +144,15 @@ class WorkflowExecutor:
         self._dependencies = dependencies
 
     def _get_source_handles(self) -> Dict[Tuple[str, str], str]:
-        """Build a mapping of (source_id, target_id) -> source_handle for router nodes only"""
+        """Build a mapping of (source_id, target_id) -> source_handle for router nodes only."""
         source_handles: Dict[Tuple[str, str], str] = {}
         for link in self.workflow.links:
             source_node = self._node_dict[link.source_id]
             if source_node.node_type == "RouterNode":
                 if not link.source_handle:
                     raise ValueError(
-                        f"Missing source_handle in link from router node {link.source_id} to {link.target_id}"
+                        f"Missing source_handle in link from router node "
+                        f"{link.source_id} to {link.target_id}"
                     )
                 source_handles[(link.source_id, link.target_id)] = link.source_handle
         return source_handles
@@ -166,14 +171,12 @@ class WorkflowExecutor:
             self.task_recorder.create_task(node_id, {})
         return task
 
-    def get_blocked_nodes(
-        self, workflow_definition: Dict[str, Any], paused_node_id: str
-    ) -> Set[str]:
+    def get_blocked_nodes(self, paused_node_id: str) -> Set[str]:
         """Find all nodes that are blocked by the paused node.
+
         These are nodes that directly or indirectly depend on the paused node.
 
         Args:
-            workflow_definition: The workflow definition containing node information
             paused_node_id: The ID of the node that is paused
 
         Returns:
@@ -205,7 +208,7 @@ class WorkflowExecutor:
         return blocked_nodes
 
     def is_downstream_of_pause(self, node_id: str) -> bool:
-        """Check if a node is downstream of any paused node
+        """Check if a node is downstream of any paused node.
 
         Args:
             node_id: The ID of the node to check
@@ -232,21 +235,70 @@ class WorkflowExecutor:
 
         # Check if this node is downstream of any paused node
         for paused_node_id in paused_nodes:
-            if workflow_definition := getattr(self.context, "workflow_definition", None):
-                blocked_nodes = self.get_blocked_nodes(workflow_definition, paused_node_id)
+            if _workflow_definition := getattr(self.context, "workflow_definition", None):
+                blocked_nodes = self.get_blocked_nodes(paused_node_id)
                 if node_id in blocked_nodes:
                     return True
 
         return False
 
     def _get_workflow_definition(self) -> Dict[str, Any]:
-        """Get workflow definition from context"""
+        """Get workflow definition from context."""
         return getattr(self.context, "workflow_definition", {}) or {}
+
+    def _get_message_history(self, session_id: str) -> List[Dict[str, str]]:
+        """Extract message history from a session.
+
+        For chatbot workflows, this extracts the history of user and assistant messages
+        from the session's message history.
+        """
+        if not self.context or not self.context.db_session:
+            return []
+
+        # Query the session and its messages
+        session = (
+            self.context.db_session.query(SessionModel)
+            .filter(SessionModel.id == session_id)
+            .first()
+        )
+
+        if not session:
+            return []
+
+        history: List[Dict[str, Any]] = []
+        for message in session.messages:
+            history.append(message.content)
+
+        return history
+
+    def _store_message_history(
+        self, session_id: str, user_message: str, assistant_message: str
+    ) -> None:
+        """Store the current turn's messages in the session history."""
+        if not self.context or not self.context.db_session:
+            return
+
+        # Create user message
+        user_msg = MessageModel(
+            session_id=session_id,
+            run_id=self.context.run_id if self.context else None,
+            content={"role": "user", "content": user_message},
+        )
+        self.context.db_session.add(user_msg)
+
+        # Create assistant message
+        assistant_msg = MessageModel(
+            session_id=session_id,
+            run_id=self.context.run_id if self.context else None,
+            content={"role": "assistant", "content": assistant_message},
+        )
+        self.context.db_session.add(assistant_msg)
+        self.context.db_session.commit()
 
     def _mark_node_as_paused(
         self, node_id: str, pause_output: Optional[BaseNodeOutput] = None
     ) -> None:
-        """Mark a node as paused and store its output"""
+        """Mark a node as paused and store its output."""
         # Store the output
         self._outputs[node_id] = pause_output
 
@@ -260,10 +312,9 @@ class WorkflowExecutor:
             )
 
     def _mark_downstream_nodes_as_pending(self, paused_node_id: str) -> Set[str]:
-        """Mark all downstream nodes of a paused node as pending"""
-        workflow_definition = self._get_workflow_definition()
+        """Mark all downstream nodes of a paused node as pending."""
         # Use explicit typing to satisfy the linter
-        blocked_nodes: Set[str] = self.get_blocked_nodes(workflow_definition, paused_node_id)
+        blocked_nodes: Set[str] = self.get_blocked_nodes(paused_node_id)
 
         # Record for the return value
         all_updated_nodes = set(blocked_nodes)
@@ -286,14 +337,14 @@ class WorkflowExecutor:
         return all_updated_nodes
 
     def _update_run_status_to_paused(self) -> None:
-        """Update the run status to paused in the database"""
+        """Update the run status to paused in the database."""
         if self.context is None:
             return
 
-        if not hasattr(self.context, "db_session") or self.context.db_session is None:
+        if self.context.db_session is None:
             return
 
-        if not hasattr(self.context, "run_id") or self.context.run_id is None:
+        if not hasattr(self.context, "run_id"):
             return
 
         run = (
@@ -307,7 +358,7 @@ class WorkflowExecutor:
             # Note: We don't commit immediately - caller should commit when all updates are done
 
     def _handle_pause_exception(self, node_id: str, pause_exception: PauseException) -> None:
-        """Handle a pause exception for a node"""
+        """Handle a pause exception for a node."""
         # Mark the node as paused
         self._mark_node_as_paused(node_id, pause_exception.output)
 
@@ -325,16 +376,28 @@ class WorkflowExecutor:
         ):
             self.context.db_session.commit()
 
+    def _get_tasks_to_update(self, run: RunModel) -> List[str]:
+        """Get list of task IDs that need to be updated from CANCELED to PENDING."""
+        # Find all downstream nodes of any paused node
+        all_blocked_nodes: Set[str] = set()
+        for task in run.tasks:
+            if task.status == TaskStatus.PAUSED:
+                blocked_nodes = self.get_blocked_nodes(task.node_id)
+                all_blocked_nodes.update(blocked_nodes)
+
+        # Return tasks that are CANCELED but should be PENDING
+        return [
+            task.node_id
+            for task in run.tasks
+            if task.status == TaskStatus.CANCELED and task.node_id in all_blocked_nodes
+        ]
+
     def _fix_canceled_tasks_after_pause(self, paused_node_id: str) -> None:
-        """Fix any tasks that were incorrectly marked as CANCELED but should be PENDING because they're downstream of a paused node"""
-        if self.task_recorder is None:
+        """Fix any tasks that were incorrectly marked as CANCELED."""
+        if not all([self.task_recorder, self.context, hasattr(self.context, "run_id")]):
             return
 
-        if self.context is None:
-            return
-
-        if not hasattr(self.context, "run_id") or self.context.run_id is None:
-            return
+        assert self.context is not None
 
         if not hasattr(self.context, "db_session") or self.context.db_session is None:
             return
@@ -344,40 +407,23 @@ class WorkflowExecutor:
             .filter(RunModel.id == self.context.run_id)
             .first()
         )
-
         if not run:
             return
 
-        # Find all downstream nodes of any paused node
-        all_blocked_nodes: Set[str] = set()
-        for task in run.tasks:
-            if task.status == TaskStatus.PAUSED:
-                workflow_definition = self._get_workflow_definition()
-                # Use explicit typing to satisfy the linter
-                blocked_nodes: Set[str] = self.get_blocked_nodes(workflow_definition, task.node_id)
-                all_blocked_nodes.update(blocked_nodes)
-
-        # Batch update for database efficiency
-        tasks_to_update: List[str] = []
-        for task in run.tasks:
-            if task.status == TaskStatus.CANCELED and task.node_id in all_blocked_nodes:
-                tasks_to_update.append(task.node_id)
-
-        # Update all tasks at once
+        tasks_to_update = self._get_tasks_to_update(run)
         if tasks_to_update:
             current_time = datetime.now()
             for node_id in tasks_to_update:
-                self.task_recorder.update_task(
-                    node_id=node_id,
-                    status=TaskStatus.PENDING,
-                    end_time=current_time,
-                    is_downstream_of_pause=True,
-                )
-
-            # Commit all changes at once
+                if self.task_recorder:
+                    self.task_recorder.update_task(
+                        node_id=node_id,
+                        status=TaskStatus.PENDING,
+                        end_time=current_time,
+                        is_downstream_of_pause=True,
+                    )
             self.context.db_session.commit()
 
-    async def _execute_node(self, node_id: str) -> Optional[BaseNodeOutput]:
+    async def _execute_node(self, node_id: str) -> Optional[BaseNodeOutput]:  # noqa: C901
         node = self._node_dict[node_id]
         node_input = {}
         try:
@@ -424,13 +470,15 @@ class WorkflowExecutor:
                             for dep_id in dependency_ids
                         ),
                     )
-                except Exception:
-                    raise UpstreamFailure(f"Node {node_id} skipped due to upstream failure")
+                except Exception as e:
+                    raise UpstreamFailureError(
+                        f"Node {node_id} skipped due to upstream failure"
+                    ) from e
 
             if any(dep_id in self._failed_nodes for dep_id in dependency_ids):
                 print(f"Node {node_id} skipped due to upstream failure")
                 self._failed_nodes.add(node_id)
-                raise UpstreamFailure(f"Node {node_id} skipped due to upstream failure")
+                raise UpstreamFailureError(f"Node {node_id} skipped due to upstream failure")
 
             # Before checking for None outputs, check if any dependencies are paused
             has_paused_dependencies = False
@@ -454,7 +502,7 @@ class WorkflowExecutor:
                 return None
 
             if node.node_type != "CoalesceNode" and any(
-                [output is None for output in predecessor_outputs]
+                output is None for output in predecessor_outputs
             ):
                 self._outputs[node_id] = None
                 if self.task_recorder:
@@ -514,9 +562,14 @@ class WorkflowExecutor:
                     if hasattr(output, "model_dump"):
                         # Get a dictionary representation of the output to examine its structure
                         output_dict = output.model_dump()
-                        # Special transformation for HumanInterventionNode - modify node_input directly
-                        # This ensures downstream nodes can access by node ID like {{HumanInterventionNode_1.input_node.input_1}}
-                        # Store the raw output data directly in the node_input using dep_id as the key
+                        # Special transformation for
+                        # HumanInterventionNode - modify node_input directly
+                        #
+                        # This ensures downstream nodes can access by node ID
+                        # like {{HumanInterventionNode_1.input_node.input_1}}
+                        #
+                        # Store the raw output data directly in the node_input
+                        # using dep_id as the key
                         node_input[dep_id] = output_dict
                 else:
                     node_input[dep_id] = output
@@ -526,10 +579,10 @@ class WorkflowExecutor:
                 node_input = self._initial_inputs.get(node_id, {})
 
             # Only fail early for None inputs if it is NOT a CoalesceNode
-            if node.node_type != "CoalesceNode" and any([v is None for v in node_input.values()]):
+            if node.node_type != "CoalesceNode" and any(v is None for v in node_input.values()):
                 self._outputs[node_id] = None
                 return None
-            elif node.node_type == "CoalesceNode" and all([v is None for v in node_input.values()]):
+            elif node.node_type == "CoalesceNode" and all(v is None for v in node_input.values()):
                 self._outputs[node_id] = None
                 return None
 
@@ -551,7 +604,7 @@ class WorkflowExecutor:
             # If node_input is empty, return None
             if not node_input:
                 self._outputs[node_id] = None
-                raise UnconnectedNode(f"Node {node_id} has no input")
+                raise UnconnectedNodeError(f"Node {node_id} has no input")
 
             node_instance = NodeFactory.create_node(
                 node_name=node.title,
@@ -593,7 +646,7 @@ class WorkflowExecutor:
                 # Return None to prevent downstream execution
                 return None
 
-        except UpstreamFailure as e:
+        except UpstreamFailureError as e:
             self._failed_nodes.add(node_id)
             self._outputs[node_id] = None
             if self.task_recorder:
@@ -602,8 +655,6 @@ class WorkflowExecutor:
                 # Check if this node is downstream of a paused node
                 has_paused_upstream = False
                 if hasattr(self, "context") and self.context:
-                    workflow_definition = getattr(self.context, "workflow_definition", {})
-
                     # Find any paused nodes
                     paused_node_ids: List[str] = []
                     for _, task in self.task_recorder.tasks.items():
@@ -612,7 +663,7 @@ class WorkflowExecutor:
 
                     # Check if this node is blocked by any paused node
                     for paused_node_id in paused_node_ids:
-                        blocked_nodes = self.get_blocked_nodes(workflow_definition, paused_node_id)
+                        blocked_nodes = self.get_blocked_nodes(paused_node_id)
                         if node_id in blocked_nodes:
                             has_paused_upstream = True
                             break
@@ -655,7 +706,7 @@ class WorkflowExecutor:
             raise e
 
     def _serialize_output(self, output: Optional[BaseNodeOutput]) -> Optional[Dict[str, Any]]:
-        """Helper method to serialize node outputs, handling datetime objects."""
+        """Serialize node outputs, handling datetime objects."""
         if output is None:
             return None
 
@@ -675,7 +726,7 @@ class WorkflowExecutor:
 
         return {str(key): _serialize_value(value) for key, value in data.items()}
 
-    async def run(
+    async def _execute_workflow(  # noqa: C901
         self,
         input: Dict[str, Any] = {},
         node_ids: List[str] = [],
@@ -694,20 +745,24 @@ class WorkflowExecutor:
                         ).output_model.model_validate(output)
                     else:
                         # If output is a list of dicts, do not validate the output
-                        # these are outputs of loop nodes, their precomputed outputs are not supported yet
+                        # these are outputs of loop nodes,
+                        # their precomputed outputs are not supported yet
                         continue
 
                 except ValidationError as e:
                     print(
-                        f"[WARNING]: Precomputed output validation failed for node {node_id}: {e}\n skipping precomputed output"
+                        f"[WARNING]: Precomputed output validation failed for node {node_id}: "
+                        f"{e}\n skipping precomputed output"
                     )
                 except AttributeError as e:
                     print(
-                        f"[WARNING]: Node {node_id} does not have an output_model defined: {e}\n skipping precomputed output"
+                        f"[WARNING]: Node {node_id} does not have an output_model defined: "
+                        f"{e}\n skipping precomputed output"
                     )
                 except KeyError as e:
                     print(
-                        f"[WARNING]: Node {node_id} not found in the predecessor workflow: {e}\n skipping precomputed output"
+                        f"[WARNING]: Node {node_id} not found in the predecessor workflow: "
+                        f"{e}\n skipping precomputed output"
                     )
 
         # Store input in initial inputs to be used by InputNode
@@ -814,6 +869,54 @@ class WorkflowExecutor:
         # return the non-None outputs
         return {node_id: output for node_id, output in self._outputs.items() if output is not None}
 
+    async def run(
+        self,
+        input: Dict[str, Any] = {},
+        node_ids: List[str] = [],
+        precomputed_outputs: Dict[str, Dict[str, Any] | List[Dict[str, Any]]] = {},
+    ) -> Dict[str, BaseNodeOutput]:
+        # For chatbot workflows, extract and inject message history
+        if self.workflow.spur_type == SpurType.CHATBOT:
+            session_id = input.get("session_id")
+            user_message = input.get("user_message")
+            message_history = input.get("message_history", [])
+
+            if session_id and user_message:
+                if len(message_history) == 0:
+                    # Get message history from the database
+                    message_history = self._get_message_history(session_id)
+
+                # Add message_history to input
+                input["message_history"] = message_history
+
+        # Run the workflow
+        outputs = await self._execute_workflow(input, node_ids, precomputed_outputs)
+
+        # For chatbot workflows, store the new messages
+        if self.workflow.spur_type == SpurType.CHATBOT:
+            session_id = input.get("session_id")
+            user_message = input.get("user_message")
+
+            # Find the output node to get assistant's message
+            output_node = next(
+                (node for node in self.workflow.nodes if node.node_type == "OutputNode"), None
+            )
+
+            if output_node and session_id and user_message:
+                # Get assistant's message from outputs
+                assistant_message = None
+                if output_node.id in outputs:
+                    output = outputs[output_node.id]
+                    # Get the output as a dict to safely access fields
+                    output_dict = output.model_dump()
+                    assistant_message = str(output_dict.get("assistant_message", ""))
+
+                if assistant_message:
+                    # Store the messages
+                    self._store_message_history(session_id, user_message, assistant_message)
+
+        return outputs
+
     async def __call__(
         self,
         input: Dict[str, Any] = {},
@@ -821,9 +924,11 @@ class WorkflowExecutor:
         precomputed_outputs: Dict[str, Dict[str, Any] | List[Dict[str, Any]]] = {},
     ) -> Dict[str, BaseNodeOutput]:
         """Execute the workflow with the given input data.
+
         input: input for the input node of the workflow. Dict[<field_name>: <value>]
         node_ids: list of node_ids to run. If empty, run all nodes.
-        precomputed_outputs: precomputed outputs for the nodes. These nodes will not be executed again.
+        precomputed_outputs: precomputed outputs for the nodes.
+        These nodes will not be executed again.
         """
         return await self.run(input, node_ids, precomputed_outputs)
 

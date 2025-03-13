@@ -1,0 +1,55 @@
+---
+title: 'Concepts'
+description: 'Understanding Chatbots in PySpur'
+---
+
+# Chatbot Concepts
+
+PySpur allows you to create two types of Spurs: standard workflows and chatbots. This guide explains what chatbots are in PySpur, how they differ from standard workflows, and why you might want to use them.
+
+## What Are Chatbots in PySpur?
+
+In PySpur, a chatbot is a special type of workflow designed to handle conversational interactions. Unlike standard workflows that process data in a one-time execution flow, chatbots:
+
+- Maintain conversation history across multiple interactions
+- Process user messages and generate assistant responses
+- Handle user sessions to keep conversations separate
+- Support conversational context and state management
+
+## How Chatbots Differ from Standard Workflows
+
+| Feature | Standard Workflow | Chatbot |
+| ------- | ---------------- | ------- |
+| Input/Output Structure | Flexible, user-defined | Fixed structure with specific fields |
+| Session Management | Not built-in | Automatic session tracking |
+| Message History | Not available | Automatically maintained |
+| Execution Model | One-time processing | Conversational, multi-turn |
+| Primary Use Case | Data processing, automation | User interactions, conversations |
+
+### Required Input/Output Fields
+
+Chatbots in PySpur have a predefined structure to support conversations:
+
+**Required Input Fields:**
+- `user_message` (string): The message from the user
+- `session_id` (string): A unique identifier for the conversation session
+- `message_history` (array): Previous messages in the conversation (automatically managed)
+
+**Required Output Fields:**
+- `assistant_message` (string): The response message from the chatbot
+
+## When to Use Chatbots
+
+Choose a chatbot Spur when you need to:
+
+- Create conversational interfaces for your users
+- Build customer support or information retrieval systems
+- Develop virtual assistants that remember context
+- Design interactive Q&A systems
+
+Choose a standard workflow when you need to:
+- Process data in a one-time operation
+- Build automation pipelines without conversation
+- Create custom data transformations with flexible inputs/outputs
+
+In the next section, we'll walk through how to create and configure a chatbot in PySpur.

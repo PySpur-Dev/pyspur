@@ -1,0 +1,171 @@
+---
+title: 'Creating Chatbots'
+description: 'Step-by-step guide to building chatbots in PySpur'
+---
+
+# Creating Chatbots in PySpur
+
+This guide will walk you through the process of creating, configuring, and deploying a chatbot in PySpur. We'll build a simple customer support chatbot that can answer questions about a product.
+
+## Creating a New Chatbot
+
+<Steps>
+  <Step title="Open the Dashboard">
+    Start by navigating to the PySpur dashboard. This is your central hub for managing all your Spurs.
+  </Step>
+
+  <Step title="Create a New Spur">
+    Click the **New Spur** button in the top right corner of the dashboard.
+
+    ![New Spur Button](/images/chatbots/new-spur-button.png)
+  </Step>
+
+  <Step title="Select Chatbot Type">
+    In the modal that appears, select **Chatbot** as the spur type.
+
+    <Note>
+      PySpur automatically sets up the required input and output nodes with the correct fields for a chatbot.
+    </Note>
+  </Step>
+
+  <Step title="Name Your Chatbot">
+    Give your chatbot a descriptive name, such as "Product Support Bot" or "Customer Help Assistant".
+  </Step>
+</Steps>
+
+## Understanding the Default Chatbot Structure
+
+When you create a new chatbot, PySpur automatically creates two nodes:
+
+1. **Input Node**: Contains the required fields:
+   - `user_message`: The message from the user
+   - `session_id`: A unique identifier for the conversation
+   - `message_history`: An array of previous messages (automatically populated)
+
+2. **Output Node**: Contains the required field:
+   - `assistant_message`: The response from your chatbot
+
+## Adding Intelligence to Your Chatbot
+
+<Steps>
+  <Step title="Add an LLM Node">
+    Drag an LLM (Large Language Model) node from the sidebar onto the canvas. This will be the "brain" of your chatbot.
+
+    Connect the Input node to your LLM node, and the LLM node to the Output node.
+  </Step>
+
+  <Step title="Configure the LLM Node">
+    Click on the LLM node to open its configuration panel. Here you can:
+
+    - Select the model provider (OpenAI, Anthropic, etc.)
+    - Choose the specific model (GPT-4, Claude, etc.)
+    - Customize the prompt template to guide the model's responses
+
+    <Tip>
+      Structure your prompt to mention that this is a customer support bot for your specific product or service. Include instructions about tone, personality, and knowledge limits.
+    </Tip>
+  </Step>
+
+  <Step title="Format Messages">
+    In the LLM node configuration, make sure your prompt references the incoming data correctly:
+
+    ```
+    You are a helpful customer support agent for [Your Product].
+
+    Previous conversation:
+    {{message_history}}
+
+    User: {{user_message}}
+
+    Assistant:
+    ```
+
+    This template ensures the LLM sees the conversation history and the latest user message.
+  </Step>
+</Steps>
+
+## Enhancing Your Chatbot with Additional Nodes
+
+You can make your chatbot more powerful by adding other nodes:
+
+- **Vector Database Node**: Connect to a vector database to retrieve product information
+- **Tool Node**: Enable the chatbot to perform actions like looking up orders or tracking shipments
+- **Branching Node**: Direct the conversation flow based on user intent
+- **API Node**: Connect to external services to fetch real-time data
+
+## Testing Your Chatbot
+
+<Steps>
+  <Step title="Open the Test Panel">
+    Click the "Test" tab in the right sidebar to open the testing interface.
+  </Step>
+
+  <Step title="Set Test Values">
+    Enter test values for the required input fields:
+    - `user_message`: "What features does your product have?"
+    - `session_id`: "test-session-123"
+
+    You don't need to provide `message_history` as it's automatically managed.
+  </Step>
+
+  <Step title="Run the Test">
+    Click the "Run" button to execute the workflow and see the chatbot's response.
+  </Step>
+
+  <Step title="Continue the Conversation">
+    To test multi-turn conversation, enter a follow-up message like "How much does it cost?" using the same session ID.
+
+    Notice that the chatbot now has access to the previous messages and can maintain context.
+  </Step>
+</Steps>
+
+## Deploying Your Chatbot
+
+Once you're satisfied with your chatbot:
+
+<Steps>
+  <Step title="Save Your Work">
+    Click the Save button to save your chatbot configuration.
+  </Step>
+
+  <Step title="Deploy as API">
+    Click the "Deploy" button in the top bar. This creates an API endpoint for your chatbot.
+  </Step>
+
+  <Step title="Get Integration Details">
+    You'll receive API details that you can use to integrate the chatbot:
+
+    - API URL: The endpoint to call
+    - Request format: How to structure calls to your chatbot
+    - Authentication details: How to securely access your chatbot
+  </Step>
+
+  <Step title="Integrate with Your Application">
+    Using the API details, you can now integrate the chatbot with:
+
+    - Your website using JavaScript
+    - Mobile apps
+    - Custom UIs
+    - Other backend systems
+  </Step>
+</Steps>
+
+## Example: Simple Customer Support Chatbot
+
+Here's a simple example of a customer support chatbot for a fictional product:
+
+1. **Input Node**: Receives user questions
+2. **Vector Database Node**: Searches product documentation for relevant information
+3. **LLM Node**: Formulates a helpful response using the retrieved information
+4. **Output Node**: Returns the response to the user
+
+This chatbot can answer questions about product features, troubleshooting steps, and basic account information.
+
+## Next Steps
+
+- **Customize Node Configurations**: Fine-tune your chatbot's behavior
+- **Add Authentication**: Secure your chatbot API
+- **Implement Analytics**: Track and analyze chatbot usage
+- **Add Specialized Nodes**: Enhance capabilities with custom functionality
+
+By following this guide, you've created a basic but functional chatbot in PySpur. As you become more familiar with the platform, you can create increasingly sophisticated chatbots for various use cases.

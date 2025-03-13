@@ -1,17 +1,16 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react'
-import { Handle, NodeProps, Position, useConnection } from '@xyflow/react'
+import {NodeProps, useConnection } from '@xyflow/react'
 import BaseNode from '../BaseNode'
-import { Input, Card, Divider, Button, Select, SelectItem } from '@heroui/react'
+import { Card, Divider, Select, SelectItem } from '@heroui/react'
 import { useDispatch, useSelector } from 'react-redux'
 import { updateNodeConfigOnly } from '../../../store/flowSlice'
 import styles from '../DynamicNode.module.css'
-import { Icon } from '@iconify/react'
 import { RootState } from '../../../store/store'
 import isEqual from 'lodash/isEqual'
 import { FlowWorkflowNode } from '@/types/api_types/nodeTypeSchemas'
 import NodeOutputModal from '../NodeOutputModal'
 import { OutputHandleRow } from '../shared/OutputHandleRow'
-import DynamicNode from '../DynamicNode'
+
 
 export interface CoalesceNodeProps extends NodeProps<FlowWorkflowNode> {
     displayOutput?: boolean
@@ -39,9 +38,6 @@ export const CoalesceNode: React.FC<CoalesceNodeProps> = ({ id, data }) => {
     const edges = useSelector((state: RootState) => state.flow.edges)
 
     const [isModalOpen, setIsModalOpen] = useState(false)
-
-    // Node's output for display
-    const nodeOutput = useSelector((state: RootState) => state.flow.nodes.find((node) => node.id === id)?.data?.run)
 
     // Node's config
     const nodeConfig = useSelector((state: RootState) => state.flow.nodeConfigs[id])

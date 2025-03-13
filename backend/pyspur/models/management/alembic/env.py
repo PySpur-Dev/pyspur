@@ -16,6 +16,7 @@ from pyspur.models.eval_run_model import EvalRunModel  # type: ignore
 from pyspur.models.output_file_model import OutputFileModel  # type: ignore
 from pyspur.models.run_model import RunModel  # type: ignore
 from pyspur.models.task_model import TaskModel  # type: ignore
+from pyspur.models.user_session_model import MessageModel, SessionModel, UserModel  # type: ignore
 from pyspur.models.workflow_model import WorkflowModel  # type: ignore
 from pyspur.models.workflow_version_model import WorkflowVersionModel  # type: ignore
 

@@ -1,0 +1,223 @@
+---
+title: 'Deploying Spurs as APIs'
+description: 'Turn your Spur workflows into production-ready APIs with one click'
+---
+
+## One-Click Deployment
+
+PySpur makes it incredibly easy to deploy your workflows as production-ready APIs with a single click.
+
+<Steps>
+  <Step title="Open your workflow">
+    Navigate to any workflow you've created and want to deploy.
+  </Step>
+  <Step title="Click Deploy">
+    Click the "Deploy" button in the top navigation bar to open the deployment modal.
+    <img
+      className="block dark:hidden"
+      src="/images/deploy/deploy_header_light.png"
+      alt="Deploy Modal Light Mode"
+    />
+    <img
+      className="hidden dark:block"
+      src="/images/deploy/deploy_header_dark.png"
+      alt="Deploy Modal Dark Mode"
+    />
+  </Step>
+  <Step title="Choose deployment options">
+    In the modal that appears, you can configure:
+    - **API call type**: Choose between blocking (synchronous) or non-blocking (asynchronous) calls
+    - **Programming language**: Select your preferred language for the code example
+
+    For example, in Python:
+    <img
+      className="block dark:hidden"
+      src="/images/deploy/light_deploy_python.png"
+      alt="Deploy Modal Light Mode"
+    />
+    <img
+      className="hidden dark:block"
+      src="/images/deploy/dark_deploy_python.png"
+      alt="Deploy Modal Dark Mode"
+    />
+    Or in TypeScript:
+    <img
+      className="block dark:hidden"
+      src="/images/deploy/light_deploy_ts.png"
+      alt="Deploy Modal Light Mode"
+    />
+    <img
+      className="hidden dark:block"
+      src="/images/deploy/dark_deploy_ts.png"
+      alt="Deploy Modal Dark Mode"
+    />
+  </Step>
+  <Step title="Copy the code">
+    Copy the generated code example to integrate with your application.
+  </Step>
+</Steps>
+
+## API Call Types
+
+PySpur supports two types of API calls when deploying your workflows:
+
+<AccordionGroup>
+  <Accordion icon="bolt" title="Blocking (Synchronous)">
+    Use blocking calls when:
+    - You need immediate results
+    - The workflow completes quickly
+    - You want to process the response in the same request
+
+    The API will wait for the workflow to complete before returning a response.
+
+    ```bash
+    # Endpoint structure
+    POST /api/wf/{workflow_id}/run/?run_type=blocking
+    ```
+  </Accordion>
+  <Accordion icon="clock" title="Non-Blocking (Asynchronous)">
+    Use non-blocking calls when:
+    - Workflows may take longer to complete
+    - You want to decouple request and response
+    - You need better scalability for long-running tasks
+
+    The API will immediately return a run ID, and you can check the status later.
+
+    ```bash
+    # Start endpoint
+    POST /api/wf/{workflow_id}/start_run/?run_type=non_blocking
+
+    # Status check endpoint
+    GET /api/runs/{run_id}/status/
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Code Examples
+
+The deployment modal provides ready-to-use code examples in various programming languages:
+
+<Tabs>
+  <Tab title="Python">
+    ```python
+    import requests
+
+    # For blocking calls
+    url = 'https://your-pyspur-instance.com/api/wf/{workflow_id}/run/?run_type=blocking'
+    data = {
+        "initial_inputs": {
+            "InputNode_1": {
+                "input_field_1": "example_value",
+                "input_field_2": 123
+            }
+        }
+    }
+
+    response = requests.post(url, json=data)
+    print(response.status_code)
+    print(response.json())
+    ```
+
+    For non-blocking calls:
+
+    ```python
+    # Step 1: Start the workflow
+    url = 'https://your-pyspur-instance.com/api/wf/{workflow_id}/start_run/?run_type=non_blocking'
+    response = requests.post(url, json=data)
+    run_id = response.json()['id']
+
+    # Step 2: Check status later
+    status_url = f'https://your-pyspur-instance.com/api/runs/{run_id}/status/'
+    status_response = requests.get(status_url)
+    print(status_response.json())
+    ```
+  </Tab>
+  <Tab title="JavaScript">
+    ```javascript
+    // For blocking calls
+    fetch('https://your-pyspur-instance.com/api/wf/{workflow_id}/run/?run_type=blocking', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        initial_inputs: {
+          InputNode_1: {
+            input_field_1: "example_value",
+            input_field_2: 123
+          }
+        }
+      })
+    })
+      .then(response => response.json())
+      .then(data => console.log(data))
+      .catch(error => console.error('Error:', error));
+    ```
+  </Tab>
+  <Tab title="Shell">
+    ```bash
+    # For blocking calls
+    curl -X POST 'https://your-pyspur-instance.com/api/wf/{workflow_id}/run/?run_type=blocking' \
+      -H "Content-Type: application/json" \
+      -d '{
+        "initial_inputs": {
+          "InputNode_1": {
+            "input_field_1": "example_value",
+            "input_field_2": 123
+          }
+        }
+      }'
+    ```
+  </Tab>
+</Tabs>
+
+## Advanced Deployment Options
+
+<CardGroup>
+  <Card title="Batch Processing" icon="layer-group">
+    Run your workflow over a dataset with the batch processing API
+
+    ```
+    POST /api/wf/{workflow_id}/start_batch_run/
+    ```
+
+    Provide a dataset ID and mini-batch size to process large datasets efficiently.
+  </Card>
+  <Card title="Cancellation" icon="stop">
+    Cancel in-progress workflows when needed
+
+    ```
+    POST /api/cancel_workflow/{run_id}/
+    ```
+
+    This is useful for stopping long-running or paused workflows.
+  </Card>
+  <Card title="Run Control" icon="sliders">
+    PySpur provides full control over your deployed workflows with APIs for:
+    - Listing all runs of a workflow
+    - Retrieving run status
+    - Handling human-in-the-loop interventions
+  </Card>
+</CardGroup>
+
+## Security Considerations
+
+When deploying workflows as APIs, consider:
+
+1. **API Authentication**: Add appropriate authentication to your PySpur instance
+2. **Input Validation**: Ensure workflows validate inputs properly
+3. **Error Handling**: Implement robust error handling in your client code
+
+## Next Steps
+
+<CardGroup>
+  <Card title="Add Authentication" icon="lock" href="#">
+    Learn how to secure your deployed APIs
+  </Card>
+  <Card title="Monitor Workflows" icon="chart-line" href="#">
+    Track usage and performance of your deployed Spurs
+  </Card>
+  <Card title="Advanced Configuration" icon="gears" href="#">
+    Explore additional deployment configuration options
+  </Card>
+</CardGroup>

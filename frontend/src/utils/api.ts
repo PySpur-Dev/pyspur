@@ -23,6 +23,8 @@ import {
     VectorIndexResponseSchema,
 } from '@/types/api_types/ragSchemas'
 import { RunResponse } from '@/types/api_types/runSchemas'
+import { SessionCreate, SessionListResponse, SessionResponse } from '@/types/api_types/sessionSchemas'
+import { UserCreate, UserListResponse, UserResponse, UserUpdate } from '@/types/api_types/userSchemas'
 import {
     WorkflowCreateRequest,
     WorkflowDefinition,
@@ -1197,6 +1199,121 @@ export const generateMessage = async (request: MessageGenerationRequest): Promis
         return response.data
     } catch (error) {
         console.error('Error generating message:', error)
+        throw error
+    }
+}
+
+// User Management Functions
+export const createUser = async (userData: UserCreate): Promise<UserResponse> => {
+    try {
+        // Example usage:
+        // const user = await createUser({
+        //     external_id: "user123",
+        //     user_metadata: { name: "John Doe" }
+        // });
+        const response = await axios.post(`${API_BASE_URL}/user/`, userData)
+        return response.data
+    } catch (error) {
+        console.error('Error creating user:', error)
+        throw error
+    }
+}
+
+export const listUsers = async (skip: number = 0, limit: number = 10): Promise<UserListResponse> => {
+    try {
+        const response = await axios.get(`${API_BASE_URL}/user/`, {
+            params: { skip, limit },
+        })
+        return response.data
+    } catch (error) {
+        console.error('Error listing users:', error)
+        throw error
+    }
+}
+
+export const getUser = async (userId: string): Promise<UserResponse> => {
+    try {
+        const response = await axios.get(`${API_BASE_URL}/user/${userId}/`)
+        return response.data
+    } catch (error) {
+        console.error('Error getting user:', error)
+        throw error
+    }
+}
+
+export const updateUser = async (userId: string, userData: UserUpdate): Promise<UserResponse> => {
+    try {
+        const response = await axios.patch(`${API_BASE_URL}/user/${userId}/`, userData)
+        return response.data
+    } catch (error) {
+        console.error('Error updating user:', error)
+        throw error
+    }
+}
+
+export const deleteUser = async (userId: string): Promise<void> => {
+    try {
+        await axios.delete(`${API_BASE_URL}/user/${userId}/`)
+    } catch (error) {
+        console.error('Error deleting user:', error)
+        throw error
+    }
+}
+
+// Session Management Functions
+export const createSession = async (sessionData: SessionCreate): Promise<SessionResponse> => {
+    try {
+        const response = await axios.post(`${API_BASE_URL}/session/`, sessionData)
+        return response.data
+    } catch (error) {
+        console.error('Error creating session:', error)
+        throw error
+    }
+}
+
+export const listSessions = async (
+    skip: number = 0,
+    limit: number = 10,
+    userId?: string
+): Promise<SessionListResponse> => {
+    try {
+        const params: Record<string, any> = { skip, limit }
+        if (userId) {
+            params.user_id = userId
+        }
+        const response = await axios.get(`${API_BASE_URL}/session/`, { params })
+        return response.data
+    } catch (error) {
+        console.error('Error listing sessions:', error)
+        throw error
+    }
+}
+
+export const getSession = async (sessionId: string): Promise<SessionResponse> => {
+    try {
+        const response = await axios.get(`${API_BASE_URL}/session/${sessionId}/`)
+        return response.data
+    } catch (error) {
+        console.error('Error getting session:', error)
+        throw error
+    }
+}
+
+export const deleteSession = async (sessionId: string): Promise<void> => {
+    try {
+        await axios.delete(`${API_BASE_URL}/session/${sessionId}/`)
+    } catch (error) {
+        console.error('Error deleting session:', error)
+        throw error
+    }
+}
+
+export const createTestSession = async (workflowId: string): Promise<SessionResponse> => {
+    try {
+        const response = await axios.post(`${API_BASE_URL}/session/test/?workflow_id=${workflowId}`)
+        return response.data
+    } catch (error) {
+        console.error('Error creating test session:', error)
         throw error
     }
 }

@@ -1,0 +1,121 @@
+# Sessions API
+
+This document outlines the API endpoints for managing user sessions in PySpur.
+Sessions are used to maintain conversation history in agent spurs.
+Each session is tied to a user and a spur.
+For quick testing purposes, use the create test user endpoint. It also creates a default test user if doesn't exist.
+
+## Create Session
+
+**Description**: Creates a new session. If a session with the given external ID already exists, returns the existing session.
+
+**URL**: `/session/`
+
+**Method**: POST
+
+**Request Payload**:
+```python
+class SessionCreate:
+    user_id: str  # User ID
+    workflow_id: str  # Workflow ID
+    external_id: Optional[str] = None  # External identifier for the session
+```
+
+**Response Schema**:
+```python
+class SessionResponse:
+    id: str  # Session ID
+    user_id: str  # User ID
+    workflow_id: str  # Workflow ID
+    external_id: Optional[str]  # External identifier for the session
+    created_at: datetime  # When the session was created
+    updated_at: datetime  # When the session was last updated
+    messages: List[MessageResponse]  # List of messages in the session
+```
+
+## List Sessions
+
+**Description**: Lists sessions with pagination and optional user filtering.
+
+**URL**: `/session/`
+
+**Method**: GET
+
+**Query Parameters**:
+```python
+skip: int = 0  # Number of sessions to skip (min: 0)
+limit: int = 10  # Number of sessions to return (min: 1, max: 100)
+user_id: Optional[str] = None  # Filter sessions by user ID
+```
+
+**Response Schema**:
+```python
+class SessionListResponse:
+    sessions: List[SessionResponse]  # List of sessions
+    total: int  # Total number of sessions
+```
+
+## Get Session
+
+**Description**: Gets a specific session by ID, including all messages.
+
+**URL**: `/session/{session_id}/`
+
+**Method**: GET
+
+**Parameters**:
+```python
+session_id: str  # Session ID
+```
+
+**Response Schema**:
+```python
+class SessionResponse:
+    id: str  # Session ID
+    user_id: str  # User ID
+    workflow_id: str  # Workflow ID
+    external_id: Optional[str]  # External identifier for the session
+    created_at: datetime  # When the session was created
+    updated_at: datetime  # When the session was last updated
+    messages: List[MessageResponse]  # List of messages in the session
+```
+
+## Delete Session
+
+**Description**: Deletes a session.
+
+**URL**: `/session/{session_id}/`
+
+**Method**: DELETE
+
+**Parameters**:
+```python
+session_id: str  # Session ID
+```
+
+**Response**: 204 No Content
+
+## Create Test Session
+
+**Description**: Creates or reuses a test user and session. If a test user exists, it will be reused. If an empty test session exists for the same workflow, it will be reused. Otherwise, a new session will be created.
+
+**URL**: `/session/test/`
+
+**Method**: POST
+
+**Query Parameters**:
+```python
+workflow_id: str  # Workflow ID
+```
+
+**Response Schema**:
+```python
+class SessionResponse:
+    id: str  # Session ID
+    user_id: str  # User ID
+    workflow_id: str  # Workflow ID
+    external_id: Optional[str]  # External identifier for the session
+    created_at: datetime  # When the session was created
+    updated_at: datetime  # When the session was last updated
+    messages: List[MessageResponse]  # List of messages in the session
+``` 

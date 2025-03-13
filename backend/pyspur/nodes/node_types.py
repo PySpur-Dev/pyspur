@@ -148,6 +148,44 @@ SUPPORTED_NODE_TYPES = {
             "module": ".nodes.integrations.jina.jina_reader",
             "class_name": "JinaReaderNode",
         },
+        # Reddit nodes
+        {
+            "node_type_name": "RedditCreatePostNode",
+            "module": ".nodes.integrations.reddit.reddit_create_post",
+            "class_name": "RedditCreatePostNode",
+        },
+        {
+            "node_type_name": "RedditGetTopPostsNode",
+            "module": ".nodes.integrations.reddit.reddit_get_top_posts",
+            "class_name": "RedditGetTopPostsNode",
+        },
+        {
+            "node_type_name": "RedditGetUserInfoNode",
+            "module": ".nodes.integrations.reddit.reddit_get_user_info",
+            "class_name": "RedditGetUserInfoNode",
+        },
+        {
+            "node_type_name": "RedditGetSubredditInfoNode",
+            "module": ".nodes.integrations.reddit.reddit_get_subreddit_info",
+            "class_name": "RedditGetSubredditInfoNode",
+        },
+        {
+            "node_type_name": "RedditGetSubredditStatsNode",
+            "module": ".nodes.integrations.reddit.reddit_get_subreddit_stats",
+            "class_name": "RedditGetSubredditStatsNode",
+        },
+        {
+            "node_type_name": "RedditGetTrendingSubredditsNode",
+            "module": ".nodes.integrations.reddit.reddit_get_trending_subreddits",
+            "class_name": "RedditGetTrendingSubredditsNode",
+        },
+    ],
+    "Search": [
+        {
+            "node_type_name": "ExaSearchNode",
+            "module": ".nodes.search.exa.search",
+            "class_name": "ExaSearchNode",
+        },
     ],
     "Tools": [
         {

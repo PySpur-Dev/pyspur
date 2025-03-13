@@ -358,7 +358,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onOpenChange }) =
     const { theme, setTheme } = useTheme()
 
     return (
-        <Modal isOpen={isOpen} onOpenChange={onOpenChange} size="2xl" scrollBehavior="inside">
+        <Modal isOpen={isOpen} onOpenChange={onOpenChange} size="full" scrollBehavior="inside">
             <ModalContent>
                 {() => (
                     <>

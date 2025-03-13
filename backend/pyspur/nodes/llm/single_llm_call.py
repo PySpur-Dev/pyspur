@@ -108,6 +108,14 @@ class SingleLLMCallNodeConfig(BaseNodeConfig):
         None,
         description="Budget tokens for thinking mode when enabled",
     )
+    enable_message_history: bool = Field(
+        False,
+        description="Whether to include message history from input in the LLM request",
+    )
+    message_history_variable: Optional[str] = Field(
+        None,
+        description="Input variable containing message history (e.g., 'message_history')",
+    )
 
 
 class SingleLLMCallNodeInput(BaseNodeInput):
@@ -159,10 +167,33 @@ class SingleLLMCallNode(BaseNode):
             print(f"[ERROR] user_message: {self.config.user_message} with input: {raw_input_dict}")
             raise e
 
+        # Extract message history from input if enabled
+        history = None
+        if self.config.enable_message_history and self.config.message_history_variable:
+            try:
+                # Try to get history from the specified variable
+                history_var = self.config.message_history_variable
+                if "." in history_var:
+                    # Handle nested fields (e.g., "input_node.message_history")
+                    history = get_nested_field(history_var, input)
+                else:
+                    # Direct field access
+                    history = raw_input_dict.get(history_var)
+
+                if history is not None and not isinstance(history, list):
+                    print(
+                        f"[WARNING] Message history must be a list, but got {type(history).__name__}"
+                    )
+                    history = None
+            except Exception as e:
+                print(f"[ERROR] Failed to extract message history: {e}")
+                history = None
+
         messages = create_messages(
             system_message=system_message,
             user_message=user_message,
             few_shot_examples=self.config.few_shot_examples,
+            history=history,
         )
 
         model_name = LLMModels(self.config.llm_info.model).value
@@ -293,6 +324,8 @@ if __name__ == "__main__":
                 url_variables=None,
                 enable_thinking=False,
                 thinking_budget_tokens=None,
+                enable_message_history=False,
+                message_history_variable=None,
                 output_json_schema=json.dumps(
                     {
                         "type": "object",
@@ -321,5 +354,50 @@ if __name__ == "__main__":
         print("[DEBUG] Testing simple_llm_node now...")
         simple_output = await simple_llm_node(simple_input)
         print("[DEBUG] Test Output from single_llm_call:", simple_output)
+
+        # Example 2: Using message history
+        chat_llm_node = SingleLLMCallNode(
+            name="ChatBot",
+            config=SingleLLMCallNodeConfig(
+                llm_info=ModelInfo(model=LLMModels.GPT_4O, temperature=0.7, max_tokens=100),
+                system_message="You are a helpful and friendly assistant. Maintain conversation context.",
+                user_message="{{ user_message }}",
+                url_variables=None,
+                enable_thinking=False,
+                thinking_budget_tokens=None,
+                enable_message_history=True,
+                message_history_variable="message_history",
+                output_json_schema=json.dumps(
+                    {
+                        "type": "object",
+                        "properties": {"assistant_message": {"type": "string"}},
+                        "required": ["assistant_message"],
+                    }
+                ),
+            ),
+        )
+
+        # Create input with message history
+        chat_input = create_model(
+            "ChatInput",
+            user_message=(str, ...),
+            message_history=(list, ...),
+            __base__=BaseNodeInput,
+        ).model_validate(
+            {
+                "user_message": "What's the capital of France?",
+                "message_history": [
+                    {"role": "user", "content": "Hello, can you help me with geography questions?"},
+                    {
+                        "role": "assistant",
+                        "content": "Of course! I'd be happy to help with geography questions. What would you like to know?",
+                    },
+                ],
+            }
+        )
+
+        print("[DEBUG] Testing chat_llm_node with message history...")
+        chat_output = await chat_llm_node(chat_input)
+        print("[DEBUG] Test Output from chat with history:", chat_output)
 
     asyncio.run(test_llm_nodes())

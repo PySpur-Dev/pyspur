@@ -1,3 +1,9 @@
+export enum SpurType {
+    WORKFLOW = 'workflow',
+    CHATBOT = 'chatbot',
+    AGENT = 'agent',
+}
+
 export interface WorkflowNodeCoordinates {
     x: number
     y: number
@@ -35,6 +41,7 @@ export interface WorkflowDefinition {
     nodes: WorkflowNode[]
     links: WorkflowLink[]
     test_inputs: TestInput[]
+    spur_type?: SpurType
 }
 
 export interface WorkflowCreateRequest {

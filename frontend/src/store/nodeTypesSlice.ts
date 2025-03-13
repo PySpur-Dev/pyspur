@@ -28,12 +28,6 @@ interface RouteCondition {
     conditions: Condition[]
 }
 
-interface RouterNodeConfig {
-    routes: RouteCondition[]
-    input_schema: Record<string, string>
-    output_schema: Record<string, string>
-    title?: string
-}
 
 // Update the NodeMetadata interface to include config fields
 export interface NodeMetadata {
@@ -220,7 +214,7 @@ export const getNodeMissingRequiredFields = (
                             if (nestedField.toLowerCase().includes('schema')) {
                                 return
                             }
-                            
+
                             if (nestedMetadata.required) {
                                 const nestedValue = nodeConfig[field]?.[nestedField]
                                 if (nestedValue === undefined || nestedValue === null || nestedValue === '' ||

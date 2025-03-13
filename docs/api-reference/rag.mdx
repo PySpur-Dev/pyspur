@@ -1,0 +1,354 @@
+# RAG API
+
+This document outlines the API endpoints for managing Retrieval-Augmented Generation (RAG) components in PySpur.
+
+## Document Collections
+
+### Create Document Collection
+
+**Description**: Creates a new document collection from uploaded files and metadata. The files are processed asynchronously in the background.
+
+**URL**: `/rag/collections/`
+
+**Method**: POST
+
+**Form Data**:
+```python
+files: List[UploadFile]  # List of files to upload (optional)
+metadata: str  # JSON string containing collection configuration
+```
+
+Where `metadata` is a JSON string representing:
+```python
+class DocumentCollectionCreateSchema:
+    name: str  # Name of the collection
+    description: str  # Description of the collection
+    text_processing: ChunkingConfigSchema  # Configuration for text processing
+```
+
+**Response Schema**:
+```python
+class DocumentCollectionResponseSchema:
+    id: str  # ID of the document collection
+    name: str  # Name of the collection
+    description: str  # Description of the collection
+    status: str  # Status of the collection (processing, ready, failed)
+    created_at: str  # When the collection was created (ISO format)
+    updated_at: str  # When the collection was last updated (ISO format)
+    document_count: int  # Number of documents in the collection
+    chunk_count: int  # Number of chunks in the collection
+    error_message: Optional[str]  # Error message if processing failed
+```
+
+### List Document Collections
+
+**Description**: Lists all document collections.
+
+**URL**: `/rag/collections/`
+
+**Method**: GET
+
+**Response Schema**:
+```python
+List[DocumentCollectionResponseSchema]
+```
+
+### Get Document Collection
+
+**Description**: Gets details of a specific document collection.
+
+**URL**: `/rag/collections/{collection_id}/`
+
+**Method**: GET
+
+**Parameters**:
+```python
+collection_id: str  # ID of the document collection
+```
+
+**Response Schema**:
+```python
+class DocumentCollectionResponseSchema:
+    id: str  # ID of the document collection
+    name: str  # Name of the collection
+    description: str  # Description of the collection
+    status: str  # Status of the collection (processing, ready, failed)
+    created_at: str  # When the collection was created (ISO format)
+    updated_at: str  # When the collection was last updated (ISO format)
+    document_count: int  # Number of documents in the collection
+    chunk_count: int  # Number of chunks in the collection
+    error_message: Optional[str]  # Error message if processing failed
+```
+
+### Delete Document Collection
+
+**Description**: Deletes a document collection and its associated data.
+
+**URL**: `/rag/collections/{collection_id}/`
+
+**Method**: DELETE
+
+**Parameters**:
+```python
+collection_id: str  # ID of the document collection
+```
+
+**Response**: 200 OK with message
+
+### Get Collection Progress
+
+**Description**: Gets the processing progress of a document collection.
+
+**URL**: `/rag/collections/{collection_id}/progress/`
+
+**Method**: GET
+
+**Parameters**:
+```python
+collection_id: str  # ID of the document collection
+```
+
+**Response Schema**:
+```python
+class ProcessingProgressSchema:
+    id: str  # ID of the collection
+    status: str  # Status of processing
+    progress: float  # Progress percentage (0-100)
+    current_step: Optional[str]  # Current processing step
+    total_files: Optional[int]  # Total number of files
+    processed_files: Optional[int]  # Number of processed files
+    total_chunks: Optional[int]  # Total number of chunks
+    processed_chunks: Optional[int]  # Number of processed chunks
+    error_message: Optional[str]  # Error message if processing failed
+    created_at: str  # When processing started (ISO format)
+    updated_at: str  # When processing was last updated (ISO format)
+```
+
+### Add Documents to Collection
+
+**Description**: Adds documents to an existing collection. The documents are processed asynchronously in the background.
+
+**URL**: `/rag/collections/{collection_id}/documents/`
+
+**Method**: POST
+
+**Parameters**:
+```python
+collection_id: str  # ID of the document collection
+```
+
+**Form Data**:
+```python
+files: List[UploadFile]  # List of files to upload
+```
+
+**Response Schema**:
+```python
+class DocumentCollectionResponseSchema:
+    # Same as Get Document Collection
+```
+
+### Get Collection Documents
+
+**Description**: Gets all documents and their chunks for a collection.
+
+**URL**: `/rag/collections/{collection_id}/documents/`
+
+**Method**: GET
+
+**Parameters**:
+```python
+collection_id: str  # ID of the document collection
+```
+
+**Response Schema**:
+```python
+List[DocumentWithChunksSchema]
+```
+
+Where `DocumentWithChunksSchema` contains:
+```python
+class DocumentWithChunksSchema:
+    id: str  # ID of the document
+    title: str  # Title of the document
+    metadata: Dict[str, Any]  # Metadata about the document
+    chunks: List[DocumentChunkSchema]  # List of chunks in the document
+```
+
+### Delete Document from Collection
+
+**Description**: Deletes a document from a collection.
+
+**URL**: `/rag/collections/{collection_id}/documents/{document_id}/`
+
+**Method**: DELETE
+
+**Parameters**:
+```python
+collection_id: str  # ID of the document collection
+document_id: str  # ID of the document to delete
+```
+
+**Response**: 200 OK with message
+
+### Preview Chunk
+
+**Description**: Previews how a document would be chunked with a given configuration.
+
+**URL**: `/rag/collections/preview_chunk/`
+
+**Method**: POST
+
+**Form Data**:
+```python
+file: UploadFile  # File to preview
+chunking_config: str  # JSON string containing chunking configuration
+```
+
+**Response Schema**:
+```python
+{
+    "chunks": List[Dict[str, Any]],  # Preview of chunks
+    "total_chunks": int  # Total number of chunks
+}
+```
+
+## Vector Indices
+
+### Create Vector Index
+
+**Description**: Creates a new vector index from a document collection. The index is created asynchronously in the background.
+
+**URL**: `/rag/indices/`
+
+**Method**: POST
+
+**Request Payload**:
+```python
+class VectorIndexCreateSchema:
+    name: str  # Name of the index
+    description: str  # Description of the index
+    collection_id: str  # ID of the document collection
+    embedding: EmbeddingConfigSchema  # Configuration for embedding
+```
+
+**Response Schema**:
+```python
+class VectorIndexResponseSchema:
+    id: str  # ID of the vector index
+    name: str  # Name of the index
+    description: str  # Description of the index
+    collection_id: str  # ID of the document collection
+    status: str  # Status of the index (processing, ready, failed)
+    created_at: str  # When the index was created (ISO format)
+    updated_at: str  # When the index was last updated (ISO format)
+    document_count: int  # Number of documents in the index
+    chunk_count: int  # Number of chunks in the index
+    embedding_model: str  # Name of the embedding model
+    vector_db: str  # Name of the vector database
+    error_message: Optional[str]  # Error message if processing failed
+```
+
+### List Vector Indices
+
+**Description**: Lists all vector indices.
+
+**URL**: `/rag/indices/`
+
+**Method**: GET
+
+**Response Schema**:
+```python
+List[VectorIndexResponseSchema]
+```
+
+### Get Vector Index
+
+**Description**: Gets details of a specific vector index.
+
+**URL**: `/rag/indices/{index_id}/`
+
+**Method**: GET
+
+**Parameters**:
+```python
+index_id: str  # ID of the vector index
+```
+
+**Response Schema**:
+```python
+class VectorIndexResponseSchema:
+    # Same as Create Vector Index response
+```
+
+### Delete Vector Index
+
+**Description**: Deletes a vector index and its associated data.
+
+**URL**: `/rag/indices/{index_id}/`
+
+**Method**: DELETE
+
+**Parameters**:
+```python
+index_id: str  # ID of the vector index
+```
+
+**Response**: 200 OK with message
+
+### Get Index Progress
+
+**Description**: Gets the processing progress of a vector index.
+
+**URL**: `/rag/indices/{index_id}/progress/`
+
+**Method**: GET
+
+**Parameters**:
+```python
+index_id: str  # ID of the vector index
+```
+
+**Response Schema**:
+```python
+class ProcessingProgressSchema:
+    # Same as Get Collection Progress response
+```
+
+### Retrieve from Index
+
+**Description**: Retrieves relevant chunks from a vector index based on a query.
+
+**URL**: `/rag/indices/{index_id}/retrieve/`
+
+**Method**: POST
+
+**Parameters**:
+```python
+index_id: str  # ID of the vector index
+```
+
+**Request Payload**:
+```python
+class RetrievalRequestSchema:
+    query: str  # Query to search for
+    top_k: Optional[int] = 5  # Number of results to return
+    score_threshold: Optional[float] = None  # Minimum score threshold
+    semantic_weight: Optional[float] = 1.0  # Weight for semantic search
+    keyword_weight: Optional[float] = 0.0  # Weight for keyword search
+```
+
+**Response Schema**:
+```python
+class RetrievalResponseSchema:
+    results: List[RetrievalResultSchema]  # List of retrieval results
+    total_results: int  # Total number of results
+```
+
+Where `RetrievalResultSchema` contains:
+```python
+class RetrievalResultSchema:
+    text: str  # Text of the chunk
+    score: float  # Relevance score
+    metadata: ChunkMetadataSchema  # Metadata about the chunk
+``` 

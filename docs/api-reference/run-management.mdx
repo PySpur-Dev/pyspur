@@ -1,0 +1,124 @@
+# Runs API
+
+This document outlines the API endpoints for managing individual run instances in PySpur.
+
+## Get Run
+
+**Description**: Retrieves detailed information about a specific run, including its status, inputs, outputs, and associated tasks.
+
+**URL**: `/run/{run_id}/`
+
+**Method**: GET
+
+**Parameters**:
+```python
+run_id: str  # ID of the run to retrieve
+```
+
+**Response Schema**:
+```python
+class RunResponseSchema(BaseModel):
+    id: str  # Run ID
+    workflow_id: str  # ID of the workflow
+    workflow_version_id: Optional[str]  # ID of the workflow version
+    workflow_version: Optional[WorkflowVersionResponseSchema]  # Details of the workflow version
+    status: RunStatus  # Current status of the run
+    start_time: datetime  # When the run started
+    end_time: Optional[datetime]  # When the run ended (if completed)
+    initial_inputs: Optional[Dict[str, Dict[str, Any]]]  # Initial inputs to the workflow
+    outputs: Optional[Dict[str, Dict[str, Any]]]  # Outputs from the workflow
+    tasks: List[TaskResponseSchema]  # List of tasks in the run
+    parent_run_id: Optional[str]  # ID of the parent run (if applicable)
+    run_type: str  # Type of run (e.g., "interactive", "batch")
+    output_file_id: Optional[str]  # ID of the output file
+    input_dataset_id: Optional[str]  # ID of the input dataset
+    message: Optional[str]  # Additional information about the run
+    duration: Optional[float]  # Duration of the run in seconds
+    percentage_complete: float  # Percentage of tasks completed
+```
+
+## List All Runs
+
+**Description**: Lists all runs across all workflows with pagination support, ordered by start time descending. This provides a global view of all workflow executions in the system.
+
+**URL**: `/run/`
+
+**Method**: GET
+
+**Query Parameters**:
+```python
+page: int  # Page number (default: 1, min: 1)
+page_size: int  # Number of items per page (default: 10, min: 1, max: 100)
+```
+
+**Response Schema**:
+```python
+List[RunResponseSchema]  # List of run details
+```
+
+## Get Run Tasks
+
+**Description**: Retrieves all tasks associated with a specific run, showing the execution details of each node in the workflow.
+
+**URL**: `/run/{run_id}/tasks/`
+
+**Method**: GET
+
+**Parameters**:
+```python
+run_id: str  # ID of the run
+```
+
+**Response Schema**:
+```python
+List[TaskResponseSchema]
+```
+
+Where `TaskResponseSchema` contains:
+```python
+class TaskResponseSchema(BaseModel):
+    id: str  # Task ID
+    run_id: str  # ID of the run
+    node_id: str  # ID of the node
+    node_type: str  # Type of the node
+    status: TaskStatus  # Status of the task (PENDING, RUNNING, COMPLETED, FAILED, PAUSED, CANCELED)
+    start_time: Optional[datetime]  # When the task started
+    end_time: Optional[datetime]  # When the task ended
+    inputs: Optional[Dict[str, Any]]  # Inputs to the task
+    outputs: Optional[Dict[str, Any]]  # Outputs from the task
+    error: Optional[str]  # Error message if the task failed
+    is_downstream_of_pause: bool  # Whether this task is downstream of a paused node
+```
+
+## Delete Run
+
+**Description**: Permanently deletes a run and all its associated tasks. This operation cannot be undone.
+
+**URL**: `/run/{run_id}/`
+
+**Method**: DELETE
+
+**Parameters**:
+```python
+run_id: str  # ID of the run to delete
+```
+
+**Response**: 204 No Content
+
+## Get Child Runs
+
+**Description**: Retrieves all child runs of a parent run, useful for tracking nested workflow executions.
+
+**URL**: `/run/{run_id}/children/`
+
+**Method**: GET
+
+**Parameters**:
+```python
+run_id: str  # ID of the parent run
+```
+
+**Response Schema**:
+```python
+List[RunResponseSchema]  # List of child run details
+```

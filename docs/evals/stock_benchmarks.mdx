@@ -1,0 +1,76 @@
+---
+title: 'Stock Benchmarks'
+description: 'Pre-built evaluation benchmarks available in PySpur'
+---
+
+# Stock Benchmarks
+
+PySpur includes several pre-built benchmarks derived from academic and industry standards. These benchmarks help you evaluate your AI workflows against established datasets with known correct answers.
+
+## Available Benchmarks
+
+### GPQA (Google-Proof Questions Answering)
+
+**Description**: A benchmark designed to test the model's ability to answer questions that are difficult to answer through simple Google searches.
+
+**Details**:
+- **Type**: Reasoning
+- **Format**: Multiple choice
+- **Paper**: [GPQA: A Graduate-Level Google-Proof Q&A Benchmark](https://arxiv.org/abs/2311.12022)
+
+This benchmark evaluates a model's deep reasoning capabilities across challenging questions. The model must select from four possible answers (A, B, C, D).
+
+### GSM8K (Grade School Math 8K)
+
+**Description**: GSM8K is a dataset of 8,000+ elementary math word problems designed to test mathematical reasoning skills.
+
+**Details**:
+- **Type**: Reasoning
+- **Format**: Free-form answers (numeric)
+- **Focus**: Step-by-step problem solving for grade school math problems
+- **Paper**: [Training Verifiers to Solve Math Word Problems](https://arxiv.org/abs/2110.14168)
+
+The model is prompted to solve each problem step by step, with the evaluation focused on extracting the final numeric answer.
+
+### Math
+
+**Description**: A dataset of 12,500 math word problems covering various mathematical concepts.
+
+**Details**:
+- **Type**: Reasoning
+- **Format**: Free-form answers
+- **Paper**: [Measuring Mathematical Problem Solving With the MATH Dataset](https://arxiv.org/abs/2103.03874)
+
+This benchmark requires models to work through math problems step by step and provide a clear final answer.
+
+### MMLU (Massive Multitask Language Understanding)
+
+**Description**: A comprehensive benchmark testing knowledge across 57 different subjects spanning STEM, humanities, social sciences, and more.
+
+**Details**:
+- **Type**: Reasoning
+- **Format**: Multiple choice
+- **Subject categories**:
+  - STEM (mathematics, physics, chemistry, biology, computer science, etc.)
+  - Humanities (history, philosophy, law, etc.)
+  - Social Sciences (psychology, sociology, economics, etc.)
+  - Other (medicine, nutrition, business, etc.)
+- **Paper**: [Measuring Massive Multitask Language Understanding](https://arxiv.org/abs/2009.03300)
+
+MMLU evaluates a model's breadth of knowledge across academic and professional subjects, requiring both factual recall and reasoning.
+
+## How to Use Stock Benchmarks
+
+To use these benchmarks for evaluating your workflows:
+
+1. Navigate to the Evaluations section in PySpur
+2. Select one of the stock benchmarks
+3. Choose the workflow you want to evaluate
+4. Configure sample size (up to the maximum available)
+5. Launch the evaluation
+
+After completion, you'll receive detailed metrics on your workflow's performance, including overall accuracy, per-category breakdowns, and example-level results.
+
+## Customizing Evaluations
+
+While stock benchmarks provide a good starting point, the real power of PySpur's evaluation system comes when using data that matches your specific use cases. You can create custom evaluations based on your own datasets by following the same YAML structure as our stock benchmarks.

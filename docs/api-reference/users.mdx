@@ -1,0 +1,118 @@
+# Users API
+
+This document outlines the API endpoints for managing users in PySpur.
+Users and sessions are required for deploying agents and chatbots that maintain message history.
+
+## Create User
+
+**Description**: Creates a new user. If a user with the given external ID already exists, returns the existing user.
+
+**URL**: `/user/`
+
+**Method**: POST
+
+**Request Payload**:
+```python
+class UserCreate:
+    external_id: str  # External identifier for the user
+    user_metadata: Optional[Dict[str, Any]] = None  # Additional metadata about the user
+```
+
+**Response Schema**:
+```python
+class UserResponse:
+    id: str  # User ID (prefixed with 'U')
+    external_id: str  # External identifier for the user
+    user_metadata: Optional[Dict[str, Any]]  # Additional metadata about the user
+    created_at: datetime  # When the user was created
+    updated_at: datetime  # When the user was last updated
+```
+
+## List Users
+
+**Description**: Lists users with pagination.
+
+**URL**: `/user/`
+
+**Method**: GET
+
+**Query Parameters**:
+```python
+skip: int = 0  # Number of users to skip (min: 0)
+limit: int = 10  # Number of users to return (min: 1, max: 100)
+```
+
+**Response Schema**:
+```python
+class UserListResponse:
+    users: List[UserResponse]  # List of users
+    total: int  # Total number of users
+```
+
+## Get User
+
+**Description**: Gets a specific user by ID.
+
+**URL**: `/user/{user_id}/`
+
+**Method**: GET
+
+**Parameters**:
+```python
+user_id: str  # User ID (prefixed with 'U')
+```
+
+**Response Schema**:
+```python
+class UserResponse:
+    id: str  # User ID (prefixed with 'U')
+    external_id: str  # External identifier for the user
+    user_metadata: Optional[Dict[str, Any]]  # Additional metadata about the user
+    created_at: datetime  # When the user was created
+    updated_at: datetime  # When the user was last updated
+```
+
+## Update User
+
+**Description**: Updates a user.
+
+**URL**: `/user/{user_id}/`
+
+**Method**: PATCH
+
+**Parameters**:
+```python
+user_id: str  # User ID (prefixed with 'U')
+```
+
+**Request Payload**:
+```python
+class UserUpdate:
+    external_id: Optional[str] = None  # External identifier for the user
+    user_metadata: Optional[Dict[str, Any]] = None  # Additional metadata about the user
+```
+
+**Response Schema**:
+```python
+class UserResponse:
+    id: str  # User ID (prefixed with 'U')
+    external_id: str  # External identifier for the user
+    user_metadata: Optional[Dict[str, Any]]  # Additional metadata about the user
+    created_at: datetime  # When the user was created
+    updated_at: datetime  # When the user was last updated
+```
+
+## Delete User
+
+**Description**: Deletes a user.
+
+**URL**: `/user/{user_id}/`
+
+**Method**: DELETE
+
+**Parameters**:
+```python
+user_id: str  # User ID (prefixed with 'U')
+```
+
+**Response**: 204 No Content
