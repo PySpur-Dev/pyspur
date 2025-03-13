@@ -17,26 +17,28 @@ def tool(
     visual_tag: Optional[VisualTag] = None,
     has_fixed_output: bool = False,
 ) -> Callable[[Callable[..., Any]], Type[Tool]]:
-    """Decorator to convert a function into a Tool.
-    
+    """Convert a function into a Tool.
+
     This decorator allows you to easily convert any function into a Tool
     without having to create a full class definition. It automatically handles
     input and output validation, and provides a consistent interface for
     working with tools in the workflow system.
-    
+
     Args:
         name: Name for the tool (defaults to function name if not provided)
-        input_model: Pydantic model for input validation (auto-generated from function signature if None)
-        output_model: Pydantic model for output validation (inferred from return type annotation if possible)
+        input_model: Pydantic model for input
+            validation (auto-generated from function signature if None)
+        output_model: Pydantic model for output
+            validation (inferred from return type annotation if possible)
         display_name: Display name for the tool in UI
         category: Category for the tool
         logo: Path to logo image
         visual_tag: Visual tag for the tool
         has_fixed_output: Whether the output schema is fixed
-        
+
     Returns:
         A decorator function that converts the decorated function into a Tool class
-        
+
     Examples:
         >>> @tool(category="Math")
         >>> def add_numbers(a: float, b: float) -> float:
@@ -48,6 +50,7 @@ def tool(
         >>> print(result)  # Output will contain the value 3
 
     """
+
     def decorator(func: Callable[..., Any]) -> Type[Tool]:
         # Generate a name for the tool class
         tool_name: str = name or func.__name__
@@ -59,16 +62,20 @@ def tool(
             sig = inspect.signature(func)
             fields: Dict[str, Any] = {}
             for param_name, param in sig.parameters.items():
-                if param_name == 'self' or param.kind == param.VAR_POSITIONAL or param.kind == param.VAR_KEYWORD:
+                if (
+                    param_name == "self"
+                    or param.kind == param.VAR_POSITIONAL
+                    or param.kind == param.VAR_KEYWORD
+                ):
                     continue
-                annotation = param.annotation if param.annotation != inspect.Parameter.empty else Any
+                annotation = (
+                    param.annotation if param.annotation != inspect.Parameter.empty else Any
+                )
                 default = param.default if param.default != inspect.Parameter.empty else ...
                 fields[param_name] = (annotation, default)
 
             func_input_model = pydantic_utils.create_model(
-                f"{tool_class_name}Input",
-                **fields,
-                __base__=BaseModel
+                f"{tool_class_name}Input", **fields, __base__=BaseModel
             )
 
         # Try to infer output model from return type annotation if not provided
@@ -76,14 +83,13 @@ def tool(
         if func_output_model is None:
             try:
                 type_hints = get_type_hints(func)
-                return_type = type_hints.get('return', None)
+                return_type = type_hints.get("return", None)
 
                 # If return type is not specified or is None, create a generic output model
                 if return_type is None or return_type == type(None):  # noqa
                     # Create an empty output model
                     func_output_model = pydantic_utils.create_model(
-                        f"{tool_class_name}Output",
-                        __base__=BaseModel
+                        f"{tool_class_name}Output", __base__=BaseModel
                     )
                 # Check if return type is a BaseModel subclass
                 elif isinstance(return_type, type) and issubclass(return_type, BaseModel):
@@ -94,36 +100,32 @@ def tool(
                     func_output_model = pydantic_utils.create_model(
                         f"{tool_class_name}Output",
                         __base__=BaseModel,
-                        model_config={"extra": "allow"}
+                        model_config={"extra": "allow"},
                     )
                 else:
                     # For primitive return types, create a model with a single field named "value"
                     func_output_model = pydantic_utils.create_model(
-                        f"{tool_class_name}Output",
-                        value=(return_type, ...),
-                        __base__=BaseModel
+                        f"{tool_class_name}Output", value=(return_type, ...), __base__=BaseModel
                     )
             except (TypeError, AttributeError):
                 # If we can't get type hints, use a generic output model
                 func_output_model = pydantic_utils.create_model(
-                    f"{tool_class_name}Output",
-                    __base__=BaseModel,
-                    model_config={"extra": "allow"}
+                    f"{tool_class_name}Output", __base__=BaseModel, model_config={"extra": "allow"}
                 )
 
         # Create the tool class
         class FunctionTool(Tool):
             def __init__(self, **kwargs: Any) -> None:
-                kwargs['name'] = tool_name
-                kwargs['input_model'] = func_input_model
-                kwargs['output_model'] = func_output_model
-                kwargs['has_fixed_output'] = has_fixed_output
+                kwargs["name"] = tool_name
+                kwargs["input_model"] = func_input_model
+                kwargs["output_model"] = func_output_model
+                kwargs["has_fixed_output"] = has_fixed_output
                 super().__init__(**kwargs)
 
                 if display_name:
                     self.display_name = display_name
                 else:
-                    self.display_name = tool_name.replace('_', ' ').title()
+                    self.display_name = tool_name.replace("_", " ").title()
 
                 if category:
                     self.category = category
@@ -160,9 +162,7 @@ def tool(
                     except Exception:
                         # If validation fails, create a dynamic model with the result
                         dynamic_output = pydantic_utils.create_model(
-                            "DynamicOutput",
-                            __base__=BaseModel,
-                            model_config={"extra": "allow"}
+                            "DynamicOutput", __base__=BaseModel, model_config={"extra": "allow"}
                         )
                         return dynamic_output.model_validate(result)
 
@@ -183,9 +183,7 @@ def tool(
                     # Create a model with a field named after the result type
                     field_dict: Dict[str, Any] = {field_name: (type(result), result)}
                     dynamic_model = pydantic_utils.create_model(
-                        "DynamicOutput",
-                        **field_dict,
-                        __base__=BaseModel
+                        "DynamicOutput", **field_dict, __base__=BaseModel
                     )
                     return dynamic_model()
 
