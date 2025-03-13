@@ -8,7 +8,6 @@ import TextEditor from './TextEditor'
 interface FewShotExample {
     input?: string
     output?: string
-    isExpanded?: boolean
 }
 
 // Individual Example Editor Component
@@ -88,7 +87,7 @@ const FewShotExamples: React.FC<FewShotExamplesProps & { readOnly?: boolean }> =
 
     const handleAddExample = () => {
         if (readOnly) return
-        const updatedExamples = [...examples, { input: '', output: '', isExpanded: true }]
+        const updatedExamples = [...examples, { input: '', output: '' }]
         onChange(updatedExamples)
         setExpandedExampleIndex(examples.length) // Expand the newly added example
     }
