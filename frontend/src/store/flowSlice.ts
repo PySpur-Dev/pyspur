@@ -135,7 +135,7 @@ const flowSlice = createSlice({
             state.spurType = definition.spur_type || SpurType.WORKFLOW
             const { nodes, links } = definition
             state.nodes = nodes.map((node) => {
-                const { node: nodeObj } = createNode(
+                const result = createNode(
                     // @ts-ignore - nodeTypes will be properly typed at runtime
                     state.nodeTypes,
                     node.node_type,
