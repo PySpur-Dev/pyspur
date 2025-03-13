@@ -122,6 +122,17 @@ PROVIDER_CONFIGS = [
             ProviderParameter(name="MISTRAL_API_KEY", description="Mistral AI API Key"),
         ],
     ),
+    # Browser Automation Providers
+    ProviderConfig(
+        id="browser-use",
+        name="Browser Use",
+        description="API for browser automation tasks",
+        category="automation",
+        icon="carbon:bot",
+        parameters=[
+            ProviderParameter(name="BROWSER_USE_API_KEY", description="Browser Use API Key"),
+        ],
+    ),
     # Vector Store Providers
     ProviderConfig(
         id="pinecone",

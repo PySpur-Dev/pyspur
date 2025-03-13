@@ -72,6 +72,13 @@ SUPPORTED_NODE_TYPES = {
             "class_name": "RetrieverNode",
         },
     ],
+    "Browser Automation": [
+        {
+            "node_type_name": "BrowserUseCreateAndRunTaskNode",
+            "module": ".nodes.cua.browser_use.browser_use_create_and_run_task_node",
+            "class_name": "BrowserUseCreateAndRunTaskNode",
+        },
+    ],
     "Integrations": [
         {
             "node_type_name": "SlackNotifyNode",
