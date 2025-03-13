@@ -41,7 +41,7 @@ class EvalRunRequest:
     eval_name: str  # Name of the evaluation to run
     workflow_id: str  # ID of the workflow to evaluate
     output_variable: str  # Output variable to evaluate
-    num_samples: int = 100  # Number of samples to evaluate
+    num_samples: int = 100  # Number of random samples to evaluate
 ```
 
 **Response Schema**:
@@ -104,4 +104,4 @@ class EvalRunResponse:
     start_time: datetime  # When the evaluation started
     end_time: Optional[datetime]  # When the evaluation ended (if completed)
     results: Optional[Dict[str, Any]]  # Results of the evaluation (if completed)
-``` 
+```

@@ -363,54 +363,62 @@ export const useStyledEdges = ({
     const { theme } = useTheme()
     const isDark = theme === 'dark'
 
-    return useMemo(() => {
-        return edges.map((edge) => ({
-            ...edge,
-            type: 'custom',
-            style: {
-                stroke: readOnly
-                    ? edge.id === hoveredEdge || edge.id === selectedEdgeId
-                        ? isDark
-                            ? '#fff'
-                            : '#000'
-                        : edge.source === hoveredNode || edge.target === hoveredNode
-                          ? isDark
-                              ? '#fff'
-                              : '#000'
-                          : isDark
-                            ? '#888'
-                            : '#555'
-                    : hoveredEdge === edge.id ||
-                        edge.id === selectedEdgeId ||
-                        hoveredNode === edge.source ||
-                        hoveredNode === edge.target
+    // Memoized style calculation function for better performance
+    const getEdgeStyle = useCallback(
+        (edge: Edge) => {
+            const isHovered = edge.id === hoveredEdge || edge.id === selectedEdgeId
+            const isSourceOrTargetHovered = edge.source === hoveredNode || edge.target === hoveredNode
+
+            let stroke
+            let strokeWidth
+
+            if (readOnly) {
+                stroke = isHovered
+                    ? isDark
+                        ? '#fff'
+                        : '#000'
+                    : isSourceOrTargetHovered
                       ? isDark
                           ? '#fff'
-                          : '#555'
+                          : '#000'
                       : isDark
-                        ? '#666'
-                        : '#999',
-                strokeWidth: readOnly
-                    ? edge.id === hoveredEdge || edge.id === selectedEdgeId
-                        ? 4
-                        : edge.source === hoveredNode || edge.target === hoveredNode
-                          ? 4
-                          : 2
-                    : hoveredEdge === edge.id ||
-                        edge.id === selectedEdgeId ||
-                        hoveredNode === edge.source ||
-                        hoveredNode === edge.target
-                      ? 3
-                      : 1.5,
-            },
-            data: {
-                ...edge.data,
-                showPlusButton: edge.id === hoveredEdge || edge.id === selectedEdgeId,
-                onPopoverOpen: handlePopoverOpen,
-            },
-            key: edge.id,
-        }))
-    }, [edges, hoveredNode, hoveredEdge, selectedEdgeId, handlePopoverOpen, readOnly, isDark])
+                        ? '#888'
+                        : '#555'
+
+                strokeWidth = isHovered ? 4 : isSourceOrTargetHovered ? 4 : 2
+            } else {
+                stroke = isHovered || isSourceOrTargetHovered ? (isDark ? '#fff' : '#555') : isDark ? '#666' : '#999'
+
+                strokeWidth = isHovered || isSourceOrTargetHovered ? 3 : 1.5
+            }
+
+            return {
+                stroke,
+                strokeWidth,
+            }
+        },
+        [hoveredNode, hoveredEdge, selectedEdgeId, readOnly, isDark]
+    )
+
+    // Process each edge once with the memoized style function
+    return useMemo(() => {
+        return edges.map((edge) => {
+            // Get the styles only when needed
+            const edgeStyle = getEdgeStyle(edge)
+
+            return {
+                ...edge,
+                type: 'custom',
+                style: edgeStyle,
+                data: {
+                    ...edge.data,
+                    showPlusButton: edge.id === hoveredEdge || edge.id === selectedEdgeId,
+                    onPopoverOpen: handlePopoverOpen,
+                },
+                key: edge.id,
+            }
+        })
+    }, [edges, getEdgeStyle, hoveredEdge, selectedEdgeId, handlePopoverOpen])
 }
 
 interface NodesWithModeOptions {
@@ -466,9 +474,14 @@ export const useFlowEventHandlers = ({ dispatch, nodes, setHelperLines }: FlowEv
 
     const onNodesChange: OnNodesChange = useCallback(
         (changes: NodeChange[]) => {
-            // Clear helper lines if not a position change
-            if (!changes.some((c) => c.type === 'position')) {
-                setHelperLines?.({ horizontal: null, vertical: null })
+            // For performance: only process helper lines when there are few nodes
+            const shouldProcessHelperLines = nodes.length <= 10 && setHelperLines
+
+            // Clear helper lines if not a position change or if we have too many nodes
+            if (!changes.some((c) => c.type === 'position') || !shouldProcessHelperLines) {
+                if (shouldProcessHelperLines) {
+                    setHelperLines({ horizontal: null, vertical: null })
+                }
                 dispatch(nodesChange({ changes }))
                 return
             }
@@ -503,6 +516,7 @@ export const useFlowEventHandlers = ({ dispatch, nodes, setHelperLines }: FlowEv
         [dispatch]
     )
 
+    // Memoize connect function to avoid recreating it on every render
     const onConnect: OnConnect = useCallback(
         (connection: Connection) => {
             if (!connection.targetHandle || connection.targetHandle === 'node-body') {
@@ -585,7 +599,7 @@ export const getPredecessorFields = (nodeId: string, nodes: FlowWorkflowNode[], 
 // Add throttled position update utilities
 export const createThrottledPositionChange = () => {
     let lastUpdate = 0
-    const throttleInterval = 16 // Reduced to 16ms (roughly 60fps) for more responsive updates
+    const throttleInterval = 32 // Increased to 32ms (roughly 30fps) for better performance
     let pendingChanges: NodeChange[] = []
     let animationFrame: number | null = null
 
@@ -604,16 +618,26 @@ export const createThrottledPositionChange = () => {
             // If enough time has passed, schedule update on next animation frame
             if (now - lastUpdate >= throttleInterval) {
                 animationFrame = requestAnimationFrame(() => {
-                    // Only take the latest position for each node
+                    // Only take the latest position for each node to reduce updates
                     const latestPositions = new Map<string, NodeChange>()
+
                     pendingChanges.forEach((change) => {
                         if (change.type === 'position' && change.id) {
                             latestPositions.set(change.id, change)
                         }
                     })
 
-                    const optimizedChanges = [...latestPositions.values()]
-                    dispatch(nodesChange({ changes: optimizedChanges }))
+                    // Include non-position changes
+                    const nonPositionChanges = pendingChanges.filter((change) => change.type !== 'position')
+
+                    // Combine optimized position changes with other changes
+                    const optimizedChanges = [...latestPositions.values(), ...nonPositionChanges]
+
+                    // Only dispatch if we have changes
+                    if (optimizedChanges.length > 0) {
+                        dispatch(nodesChange({ changes: optimizedChanges }))
+                    }
+
                     pendingChanges = []
                     lastUpdate = now
                     animationFrame = null
@@ -637,8 +661,16 @@ export const createThrottledPositionChange = () => {
                     }
                 })
 
-                const optimizedChanges = [...latestPositions.values()]
-                dispatch(nodesChange({ changes: optimizedChanges }))
+                // Include non-position changes
+                const nonPositionChanges = pendingChanges.filter((change) => change.type !== 'position')
+
+                const optimizedChanges = [...latestPositions.values(), ...nonPositionChanges]
+
+                // Only dispatch if we have changes
+                if (optimizedChanges.length > 0) {
+                    dispatch(nodesChange({ changes: optimizedChanges }))
+                }
+
                 pendingChanges = []
                 lastUpdate = Date.now()
             }

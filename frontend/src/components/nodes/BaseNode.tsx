@@ -470,17 +470,13 @@ const BaseNode: React.FC<BaseNodeProps> = ({
     }, [edges, nodes, connection, id])
 
     useEffect(() => {
-        // Check if finalPredecessors differ from predecessorNodes
-        // (We do a deeper comparison to detect config/title changes, not just ID changes)
-        const hasChanged =
-            finalPredecessors.length !== predecessorNodes.length ||
-            finalPredecessors.some((newNode, i) => !isEqual(newNode, predecessorNodes[i]))
-
-        if (hasChanged) {
+        // Use lodash's isEqual for efficient deep comparison
+        if (!isEqual(finalPredecessors, predecessorNodes)) {
             setPredecessorNodes(finalPredecessors)
+            // Only update node internals when predecessors actually change
             updateNodeInternals(id)
         }
-    }, [finalPredecessors, predecessorNodes, updateNodeInternals, id])
+    }, [finalPredecessors, predecessorNodes, id, updateNodeInternals])
 
     const renderHandles = () => {
         if (!nodeData) {
@@ -685,4 +681,4 @@ const BaseNode: React.FC<BaseNodeProps> = ({
     )
 }
 
-export default BaseNode
+export default React.memo(BaseNode, baseNodeComparator)
