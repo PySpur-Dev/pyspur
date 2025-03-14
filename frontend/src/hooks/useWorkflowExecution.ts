@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useDispatch, useSelector } from 'react-redux'
 import { updateNodeDataOnly, resetRun } from '../store/flowSlice'
-import { getRunStatus, startRun, getWorkflowRuns, validateGoogleAccessToken, registerNodesAsTools } from '../utils/api'
+import { getRunStatus, startRun, getWorkflowRuns, validateGoogleAccessToken } from '../utils/api'
 import { RootState } from '../store/store'
 import store from '../store/store'
 import { AlertColor } from '../types/alert'
@@ -167,13 +167,13 @@ export const useWorkflowExecution = ({ onAlert }: UseWorkflowExecutionProps) => 
             onAlert('Starting workflow run...', 'default')
             
             // First, register any nodes as tools that need to be registered
-            try {
-                // Register nodes as tools using the workflow ID
-                await registerNodesAsTools(workflowId)
-            } catch (toolError) {
-                console.error('Error registering nodes as tools:', toolError)
-                // Continue with workflow execution even if tool registration fails
-            }
+            // try {
+            //     // Register nodes as tools using the workflow ID
+            //     await registerNodesAsTools(workflowId)
+            // } catch (toolError) {
+            //     console.error('Error registering nodes as tools:', toolError)
+            //     // Continue with workflow execution even if tool registration fails
+            // }
             
             // Now start the workflow run
             const result = await startRun(workflowId, inputValues, null, 'interactive')
