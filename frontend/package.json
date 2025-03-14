@@ -36,7 +36,7 @@
         "@xyflow/react": "^12.3.4",
         "ajv": "^8.17.1",
         "ajv-formats": "^3.0.1",
-        "axios": "^1.7.7",
+        "axios": "^1.8.2",
         "class-variance-authority": "^0.7.0",
         "clsx": "^2.1.1",
         "cmdk": "1.0.0",

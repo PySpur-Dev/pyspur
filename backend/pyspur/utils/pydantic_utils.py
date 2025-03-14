@@ -4,9 +4,7 @@ from pydantic import BaseModel, Field, create_model
 
 
 def get_nested_field(field_name_with_dots: str, model: BaseModel) -> Any:
-    """
-    Get the value of a nested field from a Pydantic model.
-    """
+    """Get the value of a nested field from a Pydantic model."""
     field_names = field_name_with_dots.split(".")
     value = model
     for field_name in field_names:
@@ -18,9 +16,7 @@ def get_nested_field(field_name_with_dots: str, model: BaseModel) -> Any:
 
 
 def get_jinja_template_for_model(model: BaseModel) -> str:
-    """
-    Generate a Jinja template for a Pydantic model.
-    """
+    """Generate a Jinja template for a Pydantic model."""
     template = "{\n"
     for field_name, _field in model.model_fields.items():
         template += f'"{field_name}": {{{{field_name}}}},\n'
@@ -33,16 +29,17 @@ def json_schema_to_model(
     model_class_name: str = "Output",
     base_class: Type[BaseModel] = BaseModel,
 ) -> Type[BaseModel]:
-    """
-    Converts a JSON schema to a Pydantic BaseModel class.
+    """Convert a JSON schema to a Pydantic BaseModel class.
 
     Args:
         json_schema: The JSON schema to convert.
+        model_class_name: The name of the model class to create.
+        base_class: The base class for the model (default is BaseModel).
 
     Returns:
         A Pydantic BaseModel class.
-    """
 
+    """
     # Extract the model name from the schema title.
     model_name = model_class_name
 
@@ -59,17 +56,17 @@ def json_schema_to_model(
 def json_schema_to_pydantic_field(
     name: str, json_schema: Dict[str, Any], required: List[str]
 ) -> Any:
-    """
-    Converts a JSON schema property to a Pydantic field definition.
+    """Convert a JSON schema property to a Pydantic field definition.
 
     Args:
         name: The field name.
         json_schema: The JSON schema property.
+        required: A list of required fields.
 
     Returns:
         A Pydantic field definition.
-    """
 
+    """
     # Get the field type.
     type_ = json_schema_to_pydantic_type(json_schema)
 
@@ -92,16 +89,15 @@ def json_schema_to_pydantic_field(
 
 
 def json_schema_to_pydantic_type(json_schema: Dict[str, Any]) -> Any:
-    """
-    Converts a JSON schema type to a Pydantic type.
+    """Convert a JSON schema type to a Pydantic type.
 
     Args:
         json_schema: The JSON schema to convert.
 
     Returns:
         A Pydantic type.
-    """
 
+    """
     type_ = json_schema.get("type")
 
     if type_ == "string":
@@ -134,14 +130,14 @@ def json_schema_to_pydantic_type(json_schema: Dict[str, Any]) -> Any:
 
 
 def json_schema_to_simple_schema(json_schema: Dict[str, Any]) -> Dict[str, str]:
-    """
-    Converts a JSON schema to a simple schema.
+    """Convert a JSON schema to a simple schema.
 
     Args:
         json_schema: The JSON schema to convert.
 
     Returns:
         A simple schema.
+
     """
     simple_schema: Dict[str, str] = {}
 

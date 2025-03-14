@@ -37,7 +37,7 @@ dependencies = [
     "genanki==0.13.1",
     "google-api-python-client==2.159.0",
     "grpcio==1.69.0",
-    "Jinja2==3.1.5",
+    "Jinja2==3.1.6",
     "litellm==1.57.5",
     "loguru==0.7.3",
     "numpy==2.2.1",

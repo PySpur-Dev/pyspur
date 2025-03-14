@@ -19,6 +19,7 @@ from .run_management import router as run_management_router
 from .session_management import router as session_management_router
 from .template_management import router as template_management_router
 from .user_management import router as user_management_router
+from .workflow_code_convert import router as workflow_code_router
 from .workflow_management import router as workflow_management_router
 from .workflow_run import router as workflow_run_router
 
@@ -33,6 +34,7 @@ api_app = FastAPI(
 api_app.include_router(node_management_router, prefix="/node", tags=["nodes"])
 api_app.include_router(workflow_management_router, prefix="/wf", tags=["workflows"])
 api_app.include_router(workflow_run_router, prefix="/wf", tags=["workflow runs"])
+api_app.include_router(workflow_code_router, prefix="/code_convert", tags=["workflow code (beta)"])
 api_app.include_router(dataset_management_router, prefix="/ds", tags=["datasets"])
 api_app.include_router(run_management_router, prefix="/run", tags=["runs"])
 api_app.include_router(output_file_management_router, prefix="/of", tags=["output files"])

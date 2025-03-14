@@ -1317,7 +1317,7 @@ const NodeSidebar: React.FC<NodeSidebarProps> = ({ nodeID, readOnly }) => {
         // Prioritize system_message, user_message, and template fields to appear first
         const priorityFields = ['system_message', 'user_message']
         const templateFields = keys
-            .filter((key) => key.includes('template') || key.includes('message') || key.includes('prompt'))
+            .filter((key) => (key.includes('template') || key.includes('message') || key.includes('prompt')) && key !== 'enable_message_history' && key !== 'message_history_variable')
             .filter((key) => !priorityFields.includes(key))
 
         // Filter out thinking-related fields if not using Claude 3.7 Sonnet

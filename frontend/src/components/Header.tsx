@@ -48,7 +48,6 @@ const Header: React.FC<HeaderProps> = ({ activePage, associatedWorkflowId, runId
     const nodes = useSelector((state: RootState) => state.flow.nodes)
     const projectName = useSelector((state: RootState) => state.flow.projectName)
     const spurType = useSelector((state: RootState) => state.flow.spurType)
-    const nodeTypesConfig = useSelector((state: RootState) => state.nodeTypes.data)
     const [isDebugModalOpen, setIsDebugModalOpen] = useState<boolean>(false)
     const [isDeployModalOpen, setIsDeployModalOpen] = useState<boolean>(false)
     const [isHistoryOpen, setIsHistoryOpen] = useState<boolean>(false)

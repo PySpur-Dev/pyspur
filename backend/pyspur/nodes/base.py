@@ -1,7 +1,7 @@
 import json
 from abc import ABC, abstractmethod
 from hashlib import md5
-from typing import Any, Dict, List, Optional, Type
+from typing import Any, Dict, List, Optional, Type, cast
 
 from pydantic import BaseModel, Field, create_model
 
@@ -21,6 +21,7 @@ class VisualTag(BaseModel):
 
 class BaseNodeConfig(BaseModel):
     """Base class for node configuration models.
+
     Each node must define its output_schema.
     """
 
@@ -38,11 +39,14 @@ class BaseNodeConfig(BaseModel):
         default=False,
         description="Whether the node has a fixed output schema defined in config",
     )
-    pass
+    model_config = {
+        "extra": "allow",
+    }
 
 
 class BaseNodeOutput(BaseModel):
     """Base class for all node outputs.
+
     Each node type will define its own output model that inherits from this.
     """
 
@@ -51,6 +55,7 @@ class BaseNodeOutput(BaseModel):
 
 class BaseNodeInput(BaseModel):
     """Base class for node inputs.
+
     Each node's input model will be dynamically created based on its predecessor nodes,
     with fields named after node IDs and types being the corresponding NodeOutputModels.
     """
@@ -60,6 +65,7 @@ class BaseNodeInput(BaseModel):
 
 class BaseNode(ABC):
     """Base class for all nodes.
+
     Each node receives inputs as a Pydantic model where:
     - Field names are predecessor node IDs
     - Field types are the corresponding NodeOutputModels
@@ -95,7 +101,8 @@ class BaseNode(ABC):
         self.setup()
 
     def setup(self) -> None:
-        """Setup method to define output_model and any other initialization.
+        """Define output_model and any other initialization.
+
         For dynamic schema nodes, these can be created based on self.config.
         """
         if self._config.has_fixed_output:
@@ -140,21 +147,22 @@ class BaseNode(ABC):
         )
 
     def create_composite_model_instance(
-        self, model_name: str, instances: List[BaseModel]
+        self, model_name: str, instances: Dict[str, BaseModel]
     ) -> Type[BaseNodeInput]:
         """Create a new Pydantic model that combines all the given models based on their instances.
 
         Args:
-            instances: A list of Pydantic model instances.
+            model_name: The name of the new model.
+            instances: A dictionary of Pydantic model instances.
 
         Returns:
-            A new Pydantic model with fields named after the class names of the instances.
+            A new Pydantic model with fields named after the keys of the dictionary.
 
         """
         # Create the new model class
         return create_model(
             model_name,
-            **{instance.__class__.__name__: (instance.__class__, ...) for instance in instances},
+            **{key: (instance.__class__, ...) for key, instance in instances.items()},
             __base__=BaseNodeInput,
             __config__=None,
             __doc__=f"Input model for {self.name} node",
@@ -172,10 +180,11 @@ class BaseNode(ABC):
             | BaseNodeInput
         ),
     ) -> BaseNodeOutput:
-        """Validates inputs and runs the node's logic.
+        """Validate inputs and run the node's logic.
 
         Args:
-            inputs: Pydantic model containing predecessor outputs or a dictionary of node_id : NodeOutputModels
+            input: Pydantic model containing predecessor
+                outputs or a Dict[str<predecessor node name>, NodeOutputModel]
 
         Returns:
             The node's output model
@@ -185,18 +194,29 @@ class BaseNode(ABC):
             if all(isinstance(value, BaseNodeOutput) for value in input.values()) or all(
                 isinstance(value, BaseNodeInput) for value in input.values()
             ):
-                # Input is a dictionary of BaseNodeOutput instances, creating a composite model
+                # Input is a dictionary of BaseNodeOutput or BaseNodeInput instances,
+                # creating a composite model
+                composite_inputs: Dict[str, BaseModel] = cast(Dict[str, BaseModel], input)
                 self.input_model = self.create_composite_model_instance(
                     model_name=self.input_model.__name__,
-                    instances=list(input.values()),  # type: ignore we already checked that all values are BaseNodeOutput instances
+                    instances=composite_inputs,  # preserve original keys
                 )
-                data = {  # type: ignore
-                    instance.__class__.__name__: instance.model_dump()  # type: ignore
-                    for instance in input.values()
-                }
+                data: Dict[str, Any] = {}
+                for key, value in composite_inputs.items():
+                    data[key] = value.model_dump()
                 input = self.input_model.model_validate(data)
             else:
-                # Input is not a dictionary of BaseNodeOutput instances, validating as BaseNodeInput
+                # Input is a dictionary of primitive types
+                self.input_model = pydantic_utils.create_model(
+                    f"{self.name}Input",
+                    **{field_name: (type(value), value) for field_name, value in input.items()},
+                    __base__=BaseNodeInput,
+                    __config__=None,
+                    __doc__=f"Input model for {self.name} node",
+                    __module__=self.__module__,
+                    __validators__=None,
+                    __cls_kwargs__=None,
+                )
                 input = self.input_model.model_validate(input)
 
         self._input = input
@@ -216,7 +236,7 @@ class BaseNode(ABC):
                     f"Validation failed for node {self.name}. Could not dump result: {dump_error}"
                 )
                 print(f"Result type: {type(result)}")
-            raise ValueError(f"Output validation error in {self.name}: {e}")
+            raise ValueError(f"Output validation error in {self.name}: {e}") from e
 
         self._output = output_validated
         return output_validated
@@ -226,7 +246,7 @@ class BaseNode(ABC):
         """Abstract method where the node's core logic is implemented.
 
         Args:
-            inputs: Pydantic model containing predecessor outputs
+            input: Pydantic model containing predecessor outputs
 
         Returns:
             An instance compatible with output_model

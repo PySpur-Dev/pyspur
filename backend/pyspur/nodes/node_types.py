@@ -31,6 +31,11 @@ SUPPORTED_NODE_TYPES = {
             "class_name": "BestOfNNode",
         },
         {
+            "node_type_name": "RetrieverNode",
+            "module": ".nodes.llm.retriever",
+            "class_name": "RetrieverNode",
+        },
+        {
             "node_type_name": "ToolCallNode",
             "module": ".nodes.llm.tool_call_node",
             "class_name": "ToolCallNode",
@@ -75,12 +80,7 @@ SUPPORTED_NODE_TYPES = {
             "node_type_name": "ForLoopNode",
             "module": ".nodes.loops.for_loop_node",
             "class_name": "ForLoopNode",
-        },
-        {
-            "node_type_name": "RetrieverNode",
-            "module": ".nodes.llm.retriever",
-            "class_name": "RetrieverNode",
-        },
+        }
     ],
     "Integrations": [
         {
