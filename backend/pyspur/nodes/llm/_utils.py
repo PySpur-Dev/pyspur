@@ -20,6 +20,7 @@ from ...utils.path_utils import is_external_url, resolve_file_path
 from ._model_info import LLMModels
 from ._providers import OllamaOptions, setup_azure_configuration
 from ...api.mcp_management import get_mcp_client
+from ...nodes.factory import NodeFactory
 
 # uncomment for debugging litellm issues
 # litellm.set_verbose=True
@@ -456,6 +457,19 @@ async def completion_with_backoff_with_tools(**kwargs) -> str:
         logging.info(f"Requested Model: {model}")
 
         messages = kwargs.get("messages", [])
+        node_configs = kwargs.get("node_configs", {})  # Get node_configs from kwargs
+
+        # Debug logging for initial messages
+        logging.info("=== Initial Messages ===")
+        for i, msg in enumerate(messages):
+            logging.info(f"Message {i}: {msg['role']} - {msg.get('content', 'None')}")
+            if msg.get("tool_calls"):
+                logging.info(f"  Tool calls: {msg['tool_calls']}")
+            if msg.get("tool_call_id"):
+                logging.info(f"  Tool call ID: {msg['tool_call_id']}")
+
+        # remove node_configs from kwargs
+        kwargs.pop("node_configs", None)
 
         # Use Azure if either 'azure/' is prefixed or if an Azure API key is provided and not using Ollama
         if model.startswith("azure/") or (
@@ -488,29 +502,48 @@ async def completion_with_backoff_with_tools(**kwargs) -> str:
         print("tool_calls", tool_calls)
 
         if tool_calls:
-            client = await get_mcp_client()
+            # client = await get_mcp_client()
             for tool_call in tool_calls:
                 try:
                     tool_name = tool_call.function.name
                     tool_args = json.loads(tool_call.function.arguments)
-                    tool_args = {
-                        "input_data": {
-                            'input_node': {
-                                'input_1': 'Hello, world!'
-                            }
-                        }
-                    }
+                    # Hardcoded tool_args for testing
+                    tool_args = {"input_data": {"input_node": {"input_1": "Hello, world!"}}}
                     tool_id = tool_call.id
-                    # print("tool_name", tool_name)
-                    tool_result = await client.tool_call(tool_name, cast(Dict[str, Any], tool_args))
-                    # print(tool_result.content)
-                    tool_result_type = tool_result.content[0].type
-                    if tool_result.content[0].type == "text":
-                        function_result = str(tool_result.content[0].text)
+
+                    # Check if we have a config for this tool/node
+                    if node_configs and tool_name in node_configs:
+                        node_config = node_configs[tool_name]
+                        print("node_config", node_config)
+                        # Create a node instance directly using NodeFactory
+                        node_instance = NodeFactory.create_node(
+                            node_name=tool_name,
+                            node_type_name=node_config.get("node_type", ""),
+                            config=node_config,
+                        )
+
+                        # Call the node with the tool arguments
+                        result = await node_instance(tool_args.get("input_data", {}))
+
+                        # Convert result to string if it's not already
+                        if hasattr(result, "model_dump"):
+                            function_result = json.dumps(result.model_dump())
+                        else:
+                            function_result = str(result)
                     else:
-                        function_result = tool_result[0].content.get(tool_result_type)
-                
-                    # print("function_result", function_result)
+                        # Fallback for backward compatibility or if node_configs is not provided
+                        # tool_result = await client.tool_call(tool_name, cast(Dict[str, Any], tool_args))
+                        # tool_result_type = tool_result.content[0].type
+                        # if tool_result.content[0].type == "text":
+                        #     function_result = str(tool_result.content[0].text)
+                        # else:
+                        #     function_result = tool_result[0].content.get(tool_result_type)
+
+                        # Just return a placeholder if we can't find the node
+                        function_result = json.dumps(
+                            {"error": f"Node {tool_name} not found or no config provided"}
+                        )
+
                     messages.append(
                         {
                             "role": "assistant",
@@ -528,17 +561,41 @@ async def completion_with_backoff_with_tools(**kwargs) -> str:
                         }
                     )
                     messages.append(
+                        {"role": "tool", "tool_call_id": tool_id, "content": function_result}
+                    )
+                except Exception as e:
+                    logging.error(f"Error calling tool {tool_name}: {str(e)}")
+                    messages.append(
                         {
-                            "role": "tool",
-                            "content": function_result,
-                            "tool_call_id": tool_id,
-                            "name": tool_name,
+                            "role": "assistant",
+                            "content": None,
+                            "tool_calls": [
+                                {
+                                    "id": tool_id,
+                                    "type": "function",
+                                    "function": {
+                                        "name": tool_name,
+                                        "arguments": json.dumps(tool_args),
+                                    },
+                                }
+                            ],
                         }
                     )
-                    # print(messages)
-                except Exception as e:
-                    logging.error(f"Error calling tool use: {e}")
-                    raise
+                    messages.append(
+                        {"role": "tool", "tool_call_id": tool_id, "content": f"Error: {str(e)}"}
+                    )
+
+            # Continue the conversation with the tool results
+            kwargs["messages"] = messages
+
+            # Debug logging
+            logging.info("=== Messages for second LLM call ===")
+            for i, msg in enumerate(messages):
+                logging.info(f"Message {i}: {msg['role']} - {msg.get('content', 'None')}")
+                if msg.get("tool_calls"):
+                    logging.info(f"  Tool calls: {msg['tool_calls']}")
+                if msg.get("tool_call_id"):
+                    logging.info(f"  Tool call ID: {msg['tool_call_id']}")
 
             # Use Azure if either 'azure/' is prefixed or if an Azure API key is provided and not using Ollama
             if model.startswith("azure/") or (
@@ -564,19 +621,16 @@ async def completion_with_backoff_with_tools(**kwargs) -> str:
 
             # print(second_response_message.content)
             # print(type(second_response_message.content))
-
-            return second_response_message.content
-
-        return response_message.content
-
+            if second_response_message.content:
+                return second_response_message.content
+            else:
+                return json.dumps({"error": "No content in response"})
+        else:
+            if response_message.content:
+                return response_message.content
+            else:
+                return json.dumps({"error": "No content in response"})
     except Exception as e:
-        logging.error("=== LLM Request Error ===")
-        # Create a save copy of kwargs without sensitive information
-        save_config = kwargs.copy()
-        save_config["api_key"] = "********" if "api_key" in save_config else None
-        logging.error(f"Error occurred with configuration: {save_config}")
-        logging.error(f"Error type: {type(e).__name__}")
-        logging.error(f"Error message: {str(e)}")
         if hasattr(e, "response"):
             logging.error(f"Response status: {getattr(e.response, 'status_code', 'N/A')}")
             logging.error(f"Response body: {getattr(e.response, 'text', 'N/A')}")
@@ -595,6 +649,7 @@ async def generate_text_with_tools(
     functions: Optional[List[Dict[str, Any]]] = None,
     function_call: Optional[str] = None,
     thinking: Optional[Dict[str, Any]] = None,
+    node_configs: Optional[Dict[str, Any]] = None,  # Add node_configs parameter
 ) -> str:
     # print(functions)
     kwargs = {
@@ -609,6 +664,10 @@ async def generate_text_with_tools(
         kwargs["tools"] = functions
         if function_call:
             kwargs["tool_choice"] = function_call
+
+    # Add node_configs if provided
+    if node_configs:
+        kwargs["node_configs"] = node_configs
 
     # print("kwargs", kwargs)
 

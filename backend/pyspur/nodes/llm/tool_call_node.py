@@ -4,7 +4,8 @@ from typing import ClassVar, Dict, List, Optional, Any
 from jinja2 import Template
 from pydantic import BaseModel, Field
 
-from ...api.mcp_management import get_mcp_client
+# Comment out MCP import but keep for reference
+# from ...api.mcp_management import get_mcp_client
 from ...utils.pydantic_utils import json_schema_to_model
 from ..base import BaseNode, BaseNodeConfig, BaseNodeInput, BaseNodeOutput
 from ._utils import (
@@ -32,6 +33,7 @@ class ToolCall(BaseModel):
 
 class ToolCallNodeOutput(BaseNodeOutput):
     """Output for the MCP Tool node."""
+
     pass
 
 
@@ -53,13 +55,19 @@ class ToolCallNodeConfig(BaseNodeConfig):
         description="The user message for the LLM, serialized from input_schema",
     )
 
-    tool_names: Optional[List[str]] = Field(
-        None,
-        description="List of tool names to enable for this node. If None, all tools will be used.",
+    # Keep tool_names for backward compatibility
+    # tool_names: Optional[List[str]] = Field(
+    #     None,
+    #     description="List of tool names to enable for this node. If None, all tools will be used.",
+    # )
+
+    # Add node_configs field to store the configs of connected nodes
+    node_configs: Optional[Dict[str, Any]] = Field(
+        default_factory=dict,
+        description="Dictionary of node_id to node config for connected nodes",
     )
 
     few_shot_examples: Optional[List[Dict[str, str]]] = None
-
 
 
 class ToolCallNode(BaseNode):
@@ -77,7 +85,7 @@ class ToolCallNode(BaseNode):
     output_model = ToolCallNodeOutput
 
     _available_tools: ClassVar[List[str]] = []
-   
+
     def setup(self) -> None:
         super().setup()
         if self.config.output_json_schema:
@@ -89,28 +97,55 @@ class ToolCallNode(BaseNode):
 
     async def run(self, input: BaseModel) -> BaseModel:
         """Process user message using litellm with the configured tools."""
-        # Get the MCP client for tool definitions
-        client = await get_mcp_client()
+        # Comment out MCP client code but keep for reference
+        # # Get the MCP client for tool definitions
+        # client = await get_mcp_client()
+        #
+        # # Enable specific tools if configured
+        # if self.config.tool_names is not None:
+        #     client.filter_tools(self.config.tool_names)
+        # else:
+        #     # Enable all tools if none specified
+        #     client.filter_tools()
+        #
+        # # Get available tools in the format litellm expects
+        # tools = [
+        #     {
+        #         "type": "function",
+        #         "function": {
+        #             "name": tool.name,
+        #             "description": tool.description,
+        #             "parameters": tool.inputSchema,
+        #         },
+        #     }
+        #     for tool in client.enabled_tools
+        # ]
 
-        # Enable specific tools if configured
-        if self.config.tool_names is not None:
-            client.filter_tools(self.config.tool_names)
-        else:
-            # Enable all tools if none specified
-            client.filter_tools()
-
-        # Get available tools in the format litellm expects
-        tools = [
-            {
-                "type": "function",
-                "function": {
-                    "name": tool.name,
-                    "description": tool.description,
-                    "parameters": tool.inputSchema,
-                },
-            }
-            for tool in client.enabled_tools
-        ]
+        # Create tools from node_configs
+        tools = []
+        # Ensure node_configs is not None
+        node_configs = {} if self.config.node_configs is None else self.config.node_configs
+        if node_configs:
+            for node_id, _ in node_configs.items():
+                # Create a tool for each connected node
+                tool = {
+                    "type": "function",
+                    "function": {
+                        "name": node_id,
+                        "description": f"Tool for node {node_id}",
+                        "parameters": {
+                            "type": "object",
+                            "properties": {
+                                "input_data": {
+                                    "type": "object",
+                                    "description": "Input data for the node",
+                                }
+                            },
+                            "required": ["input_data"],
+                        },
+                    },
+                }
+                tools.append(tool)
 
         # Grab the entire dictionary from the input
         raw_input_dict = input.model_dump()
@@ -134,7 +169,15 @@ class ToolCallNode(BaseNode):
             few_shot_examples=self.config.few_shot_examples,
         )
 
-        # Process the user message using generate_text
+        # print("toolss", tools)
+        print("node_configs", node_configs)
+
+        # # Debug logging for messages
+        # print("=== Messages being sent to LLM ===")
+        # for i, msg in enumerate(messages):
+        #     print(f"Message {i}: {msg['role']} - {msg.get('content', 'None')}")
+
+        # Process the user message using generate_text_with_tools
         response_str = await generate_text_with_tools(
             messages=messages,
             model_name=self.config.llm_info.model.value,
@@ -143,6 +186,7 @@ class ToolCallNode(BaseNode):
             output_json_schema=self.config.output_json_schema,
             functions=tools if tools else None,
             function_call="auto",
+            node_configs=node_configs,  # Pass node_configs to generate_text_with_tools
         )
 
         # Parse the response
