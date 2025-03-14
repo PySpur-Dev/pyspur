@@ -642,11 +642,11 @@ const NodeSidebar: React.FC<NodeSidebarProps> = ({ nodeID, readOnly }) => {
     }, [node?.type])
 
     // Add useEffect to sync selected tools with node config
-    useEffect(() => {
-        if (node?.type === 'ToolCallNode' && currentNodeConfig?.tool_names) {
-            setSelectedToolKeys(new Set(currentNodeConfig.tool_names))
-        }
-    }, [node?.type, currentNodeConfig?.tool_names])
+    // useEffect(() => {
+    //     if (node?.type === 'ToolCallNode' && currentNodeConfig?.tool_names) {
+    //         setSelectedToolKeys(new Set(currentNodeConfig.tool_names))
+    //     }
+    // }, [node?.type, currentNodeConfig?.tool_names])
 
     // Update renderField to handle vector index selection
     const renderField = (key: string, field: any, value: any, parentPath: string = '', isLast: boolean = false) => {
@@ -730,104 +730,105 @@ const NodeSidebar: React.FC<NodeSidebarProps> = ({ nodeID, readOnly }) => {
         }
 
         // Handle tool selection
-        if (key === 'tool_names' && node?.type === 'ToolCallNode') {
-            const selectedValue = React.useMemo(
-                () => Array.from(selectedToolKeys).join(", ") || "Select Tools",
-                [selectedToolKeys]
-            )
+        // if (key === 'tool_names' && node?.type === 'ToolCallNode') {
+        //     const selectedValue = React.useMemo(
+        //         () => Array.from(selectedToolKeys).join(", ") || "Select Tools",
+        //         [selectedToolKeys]
+        //     )
 
-            return (
-                <div key={key} className="my-4">
-                    <div className="flex items-center justify-between mb-2">
-                        <div className="flex items-center gap-2">
-                            <h3 className="font-semibold">Available Tools</h3>
-                            <Tooltip
-                                content="Select which tools should be available for this node. If none selected, all tools will be used."
-                                placement="left-start"
-                                showArrow={true}
-                                className="max-w-xs"
-                            >
-                                <Icon
-                                    icon="solar:question-circle-linear"
-                                    className="text-default-400 cursor-help"
-                                    width={20}
-                                />
-                            </Tooltip>
-                        </div>
-                        <Button
-                            size="sm"
-                            variant="light"
-                            startContent={<Icon icon="solar:add-circle-linear" />}
-                            onPress={() => {
-                                setEditingTool(null)
-                                setIsToolEditorOpen(true)
-                            }}
-                            isDisabled={readOnly}
-                        >
-                            New Tool
-                        </Button>
-                    </div>
-                    <Dropdown isDisabled={readOnly || isLoadingTools}>
-                        <DropdownTrigger>
-                            <Button 
-                                className="w-full justify-start text-left"
-                                variant="bordered"
-                                isDisabled={readOnly || isLoadingTools}
-                            >
-                                {isLoadingTools ? "Loading tools..." : selectedValue}
-                            </Button>
-                        </DropdownTrigger>
-                        <DropdownMenu
-                            aria-label="Select tools"
-                            closeOnSelect={false}
-                            selectedKeys={selectedToolKeys}
-                            selectionMode="multiple"
-                            onSelectionChange={(keys) => {
-                                setSelectedToolKeys(keys)
-                                handleInputChange(key, Array.from(keys))
-                            }}
-                        >
-                            {availableTools.map((tool) => (
-                                <DropdownItem 
-                                    key={tool}
-                                    endContent={
-                                        <Button
-                                            isIconOnly
-                                            size="sm"
-                                            variant="light"
-                                            onPress={(e) => {
-                                                e.preventDefault()
-                                                handleEditTool(tool)
-                                            }}
-                                        >
-                                            <Icon icon="solar:pen-2-linear" />
-                                        </Button>
-                                    }
-                                >
-                                    {tool}
-                                </DropdownItem>
-                            ))}
-                        </DropdownMenu>
-                    </Dropdown>
-                    {availableTools.length === 0 && !isLoadingTools && (
-                        <p className="text-sm text-default-500 mt-2">
-                            No tools available. Click "New Tool" to create one.
-                        </p>
-                    )}
-                    {!isLast && <hr className="my-2" />}
-                    <ToolEditor
-                        isOpen={isToolEditorOpen}
-                        onClose={() => {
-                            setIsToolEditorOpen(false)
-                            setEditingTool(null)
-                        }}
-                        onSave={handleSaveTool}
-                        initialFilename={editingTool?.filename || ''}
-                        initialContent={editingTool?.content || defaultToolTemplate}
-                    />
-                </div>
-            )
-        }
+        //     return (
+        //         <div key={key} className="my-4">
+        //             {/* <div className="flex items-center justify-between mb-2">
+        //                 <div className="flex items-center gap-2">
+        //                     <h3 className="font-semibold">Available Tools</h3>
+        //                     <Tooltip
+        //                         content="Select which tools should be available for this node. If none selected, all tools will be used."
+        //                         placement="left-start"
+        //                         showArrow={true}
+        //                         className="max-w-xs"
+        //                     >
+        //                         <Icon
+        //                             icon="solar:question-circle-linear"
+        //                             className="text-default-400 cursor-help"
+        //                             width={20}
+        //                         />
+        //                     </Tooltip>
+        //                 </div>
+        //                 <Button
+        //                     size="sm"
+        //                     variant="light"
+        //                     startContent={<Icon icon="solar:add-circle-linear" />}
+        //                     onPress={() => {
+        //                         setEditingTool(null)
+        //                         setIsToolEditorOpen(true)
+        //                     }}
+        //                     isDisabled={readOnly}
+        //                 >
+        //                     New Tool
+        //                 </Button>
+        //             </div>
+        //             <Dropdown isDisabled={readOnly || isLoadingTools}>
+        //                 <DropdownTrigger>
+        //                     <Button 
+        //                         className="w-full justify-start text-left"
+        //                         variant="bordered"
+        //                         isDisabled={readOnly || isLoadingTools}
+        //                     >
+        //                         {isLoadingTools ? "Loading tools..." : selectedValue}
+        //                     </Button>
+        //                 </DropdownTrigger>
+        //                 <DropdownMenu
+        //                     aria-label="Select tools"
+        //                     closeOnSelect={false}
+        //                     selectedKeys={selectedToolKeys}
+        //                     selectionMode="multiple"
+        //                     onSelectionChange={(keys) => {
+        //                         setSelectedToolKeys(keys)
+        //                         handleInputChange(key, Array.from(keys))
+        //                     }}
+        //                 >
+        //                     {availableTools.map((tool) => (
+        //                         <DropdownItem 
+        //                             key={tool}
+        //                             endContent={
+        //                                 <Button
+        //                                     isIconOnly
+        //                                     size="sm"
+        //                                     variant="light"
+        //                                     onPress={(e) => {
+        //                                         e.preventDefault()
+        //                                         handleEditTool(tool)
+        //                                     }}
+        //                                 >
+        //                                     <Icon icon="solar:pen-2-linear" />
+        //                                 </Button>
+        //                             }
+        //                         >
+        //                             {tool}
+        //                         </DropdownItem>
+        //                     ))}
+        //                 </DropdownMenu>
+        //             </Dropdown>
+        //             {availableTools.length === 0 && !isLoadingTools && (
+        //                 <p className="text-sm text-default-500 mt-2">
+        //                     No tools available. Click "New Tool" to create one.
+        //                 </p>
+        //             )} */}
+        //             {!isLast && <hr className="my-2" />}
+        //             {/* <ToolEditor
+        //                 isOpen={isToolEditorOpen}
+        //                 onClose={() => {
+        //                     setIsToolEditorOpen(false)
+        //                     setEditingTool(null)
+        //                 }}
+        //                 onSave={handleSaveTool}
+        //                 initialFilename={editingTool?.filename || ''}
+        //                 initialContent={editingTool?.content || defaultToolTemplate}
+        //             /> */}
+        //         </div>
+        //     )
+        
+        // }
 
         // Skip api_base field if the selected model is not an Ollama model
         if (key === 'api_base') {

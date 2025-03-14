@@ -228,15 +228,30 @@ const flowSlice = createSlice({
             // If it's a ToolCallNode, update tool_names based on incoming connections
             if (targetNode.type === 'ToolCallNode') {
                 const incomingEdges = state.edges.filter((edge) => edge.target === targetNode.id)
-                const toolNames = incomingEdges.map((edge) => {
+                // Instead of just storing node IDs, create a dictionary of node_id -> config
+                const nodeConfigsDict: Record<string, any> = {}
+                
+                incomingEdges.forEach((edge) => {
                     const sourceNode = state.nodes.find((n) => n.id === edge.source)
-                    return sourceNode?.id || ''
-                }).filter(id => id !== '')
+                    if (sourceNode && sourceNode.id) {
+                        // Get the source node's config
+                        const sourceNodeConfig = state.nodeConfigs[sourceNode.id]
+                        if (sourceNodeConfig) {
+                            // Store the node's config with its ID as the key
+                            nodeConfigsDict[sourceNode.id] = {
+                                ...sourceNodeConfig,
+                                node_type: sourceNode.type,
+                            }
+                        }
+                    }
+                })
 
-                // Update the node's config with the new tool_names
+                // Update the node's config with the new node_configs dictionary
                 state.nodeConfigs[targetNode.id] = {
                     ...state.nodeConfigs[targetNode.id],
-                    tool_names: toolNames
+                    // Keep tool_names for backward compatibility but commented out
+                    // tool_names: toolNames,
+                    node_configs: nodeConfigsDict
                 }
             }
         },
@@ -394,15 +409,36 @@ const flowSlice = createSlice({
                 if (targetNode?.type === 'ToolCallNode') {
                     // Get remaining incoming edges after deletion
                     const remainingEdges = state.edges.filter((e) => e.target === targetNode.id && e.id !== edgeId)
+                    
+                    // Instead of just storing node IDs, create a dictionary of node_id -> config
+                    const nodeConfigsDict: Record<string, any> = {}
+                    
+                    remainingEdges.forEach((e) => {
+                        const sourceNode = state.nodes.find((n) => n.id === e.source)
+                        if (sourceNode && sourceNode.id) {
+                            // Get the source node's config
+                            const sourceNodeConfig = state.nodeConfigs[sourceNode.id]
+                            if (sourceNodeConfig) {
+                                // Store the node's config with its ID as the key
+                                nodeConfigsDict[sourceNode.id] = {
+                                    ...sourceNodeConfig,
+                                    node_type: sourceNode.type,
+                                }
+                            }
+                        }
+                    })
+
+                    // For backward compatibility, also update tool_names
                     const toolNames = remainingEdges.map((e) => {
                         const sourceNode = state.nodes.find((n) => n.id === e.source)
                         return sourceNode?.id || ''
                     }).filter(id => id !== '')
 
-                    // Update the node's config with the remaining tool_names
+                    // Update the node's config with the remaining node_configs
                     state.nodeConfigs[targetNode.id] = {
                         ...targetNodeConfig,
-                        tool_names: toolNames
+                        tool_names: toolNames,
+                        node_configs: nodeConfigsDict
                     }
                 }
 
