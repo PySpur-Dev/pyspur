@@ -1,11 +1,11 @@
-import { useEffect, useCallback, useState } from 'react'
-import { v4 as uuidv4 } from 'uuid'
-import { addNode, setNodes, setSelectedNode } from '../store/flowSlice'
-import { FlowWorkflowNode } from '@/types/api_types/nodeTypeSchemas'
-import { createNode } from '../utils/nodeFactory'
-import { AppDispatch } from '../store/store' // Import AppDispatch type
-import { NodeTypes } from '@xyflow/react'
 import { FlowWorkflowNodeTypesByCategory } from '@/store/nodeTypesSlice'
+import { FlowWorkflowNode } from '@/types/api_types/nodeTypeSchemas'
+import { NodeTypes } from '@xyflow/react'
+import { useCallback, useEffect, useState } from 'react'
+import { v4 as uuidv4 } from 'uuid'
+import { addNode, setSelectedNode } from '../store/flowSlice'
+import { AppDispatch } from '../store/store' // Import AppDispatch type
+import { createNode } from '../utils/nodeFactory'
 
 export const useKeyboardShortcuts = (
     selectedNodeID: string | null,
@@ -22,7 +22,8 @@ export const useKeyboardShortcuts = (
             // Check if target is an input or textarea to avoid interfering with typing
             const target = event.target as HTMLElement
             const tagName = target.tagName.toLowerCase()
-            const isEditing = target.isContentEditable || tagName === 'input' || tagName === 'textarea' || tagName === 'select'
+            const isEditing =
+                target.isContentEditable || tagName === 'input' || tagName === 'textarea' || tagName === 'select'
 
             // Handle Escape key to close the sidebar if a node is selected
             if (event.key === 'Escape' && selectedNodeID && !isEditing) {

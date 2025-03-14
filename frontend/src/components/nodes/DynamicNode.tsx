@@ -1,17 +1,14 @@
 import { FlowWorkflowNode } from '@/types/api_types/nodeTypeSchemas'
 import { NodeProps } from '@xyflow/react'
-import React, { useState, useMemo } from 'react'
+import isEqual from 'lodash/isEqual'
+import React, { useMemo, useState } from 'react'
 import BaseNode from './BaseNode'
 import styles from './DynamicNode.module.css'
 import NodeOutputModal from './NodeOutputModal'
 import { OutputHandleRow } from './shared/OutputHandleRow'
-import isEqual from 'lodash/isEqual'
 
 // Define a comparator for the memo
-const dynamicNodeComparator = (
-    prevProps: DynamicNodeProps,
-    nextProps: DynamicNodeProps
-): boolean => {
+const dynamicNodeComparator = (prevProps: DynamicNodeProps, nextProps: DynamicNodeProps): boolean => {
     return (
         prevProps.id === nextProps.id &&
         prevProps.selected === nextProps.selected &&
@@ -67,9 +64,9 @@ const DynamicNode: React.FC<DynamicNodeProps> = ({
                     <OutputHandleRow id={id} keyName={String(nodeData?.title)} isCollapsed={isCollapsed} />
                 )}
             </div>
-        );
-        OutputHandlesComponent.displayName = 'OutputHandlesComponent';
-        return OutputHandlesComponent;
+        )
+        OutputHandlesComponent.displayName = 'OutputHandlesComponent'
+        return OutputHandlesComponent
     }, [id, nodeData?.title, isCollapsed])
 
     return (

@@ -6,7 +6,6 @@ import {
 } from '@/types/api_types/nodeTypeSchemas'
 import { SpurType, TestInput } from '@/types/api_types/workflowSchemas'
 
-
 export interface FlowState {
     nodeTypes: NodeTypesConfig
     nodes: FlowWorkflowNode[]

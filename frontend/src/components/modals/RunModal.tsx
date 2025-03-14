@@ -353,11 +353,17 @@ const RunModal: React.FC<RunModalProps> = ({ isOpen, onOpenChange, onRun, onSave
                                         >
                                             <TableHeader>
                                                 {[
-                                                    <TableColumn key="id" width={60}>ID</TableColumn>,
+                                                    <TableColumn key="id" width={60}>
+                                                        ID
+                                                    </TableColumn>,
                                                     ...workflowInputVariableNames.map((field) => (
-                                                        <TableColumn key={field} className="flex-1">{field}</TableColumn>
+                                                        <TableColumn key={field} className="flex-1">
+                                                            {field}
+                                                        </TableColumn>
                                                     )),
-                                                    <TableColumn key="actions" width={80}>Actions</TableColumn>,
+                                                    <TableColumn key="actions" width={80}>
+                                                        Actions
+                                                    </TableColumn>,
                                                 ]}
                                             </TableHeader>
                                             <TableBody>

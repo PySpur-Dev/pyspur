@@ -1,16 +1,15 @@
-import React, { useState, useRef, useEffect, useMemo } from 'react'
-import {NodeProps, useConnection } from '@xyflow/react'
-import BaseNode from '../BaseNode'
+import { FlowWorkflowNode } from '@/types/api_types/nodeTypeSchemas'
 import { Card, Divider, Select, SelectItem } from '@heroui/react'
+import { NodeProps, useConnection } from '@xyflow/react'
+import isEqual from 'lodash/isEqual'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { useDispatch, useSelector } from 'react-redux'
 import { updateNodeConfigOnly } from '../../../store/flowSlice'
-import styles from '../DynamicNode.module.css'
 import { RootState } from '../../../store/store'
-import isEqual from 'lodash/isEqual'
-import { FlowWorkflowNode } from '@/types/api_types/nodeTypeSchemas'
+import BaseNode from '../BaseNode'
+import styles from '../DynamicNode.module.css'
 import NodeOutputModal from '../NodeOutputModal'
 import { OutputHandleRow } from '../shared/OutputHandleRow'
-
 
 export interface CoalesceNodeProps extends NodeProps<FlowWorkflowNode> {
     displayOutput?: boolean
@@ -223,7 +222,9 @@ export const CoalesceNode: React.FC<CoalesceNodeProps> = ({ id, data }) => {
     const renderOutputHandles = () => {
         return (
             <div className={`${styles.handlesColumn} ${styles.outputHandlesColumn}`} id="output-handle">
-                {nodeData?.title && <OutputHandleRow id={id} keyName={String(nodeData?.title)} isCollapsed={isCollapsed} />}
+                {nodeData?.title && (
+                    <OutputHandleRow id={id} keyName={String(nodeData?.title)} isCollapsed={isCollapsed} />
+                )}
             </div>
         )
     }

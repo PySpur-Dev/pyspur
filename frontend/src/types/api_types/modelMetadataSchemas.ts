@@ -2,13 +2,13 @@ export interface FieldMetadata {
     enum?: string[]
     default?: any
     title?: string
-    description?: string  // Field description from the backend
+    description?: string // Field description from the backend
     minimum?: number
     maximum?: number
     type?: string
     required?: boolean
     properties?: Record<string, FieldMetadata>
-    template?: boolean  // Flag to indicate if this field supports template variables
+    template?: boolean // Flag to indicate if this field supports template variables
 }
 
 export interface ModelConstraints {

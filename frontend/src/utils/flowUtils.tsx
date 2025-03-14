@@ -364,40 +364,47 @@ export const useStyledEdges = ({
     const isDark = theme === 'dark'
 
     // Memoized style calculation function for better performance
-    const getEdgeStyle = useCallback((edge: Edge) => {
-        const isHovered = edge.id === hoveredEdge || edge.id === selectedEdgeId;
-        const isSourceOrTargetHovered = edge.source === hoveredNode || edge.target === hoveredNode;
+    const getEdgeStyle = useCallback(
+        (edge: Edge) => {
+            const isHovered = edge.id === hoveredEdge || edge.id === selectedEdgeId
+            const isSourceOrTargetHovered = edge.source === hoveredNode || edge.target === hoveredNode
 
-        let stroke;
-        let strokeWidth;
+            let stroke
+            let strokeWidth
 
-        if (readOnly) {
-            stroke = isHovered
-                ? isDark ? '#fff' : '#000'
-                : isSourceOrTargetHovered
-                    ? isDark ? '#fff' : '#000'
-                    : isDark ? '#888' : '#555';
+            if (readOnly) {
+                stroke = isHovered
+                    ? isDark
+                        ? '#fff'
+                        : '#000'
+                    : isSourceOrTargetHovered
+                      ? isDark
+                          ? '#fff'
+                          : '#000'
+                      : isDark
+                        ? '#888'
+                        : '#555'
 
-            strokeWidth = isHovered ? 4 : isSourceOrTargetHovered ? 4 : 2;
-        } else {
-            stroke = isHovered || isSourceOrTargetHovered
-                ? isDark ? '#fff' : '#555'
-                : isDark ? '#666' : '#999';
+                strokeWidth = isHovered ? 4 : isSourceOrTargetHovered ? 4 : 2
+            } else {
+                stroke = isHovered || isSourceOrTargetHovered ? (isDark ? '#fff' : '#555') : isDark ? '#666' : '#999'
 
-            strokeWidth = isHovered || isSourceOrTargetHovered ? 3 : 1.5;
-        }
+                strokeWidth = isHovered || isSourceOrTargetHovered ? 3 : 1.5
+            }
 
-        return {
-            stroke,
-            strokeWidth,
-        };
-    }, [hoveredNode, hoveredEdge, selectedEdgeId, readOnly, isDark]);
+            return {
+                stroke,
+                strokeWidth,
+            }
+        },
+        [hoveredNode, hoveredEdge, selectedEdgeId, readOnly, isDark]
+    )
 
     // Process each edge once with the memoized style function
     return useMemo(() => {
         return edges.map((edge) => {
             // Get the styles only when needed
-            const edgeStyle = getEdgeStyle(edge);
+            const edgeStyle = getEdgeStyle(edge)
 
             return {
                 ...edge,
@@ -409,9 +416,9 @@ export const useStyledEdges = ({
                     onPopoverOpen: handlePopoverOpen,
                 },
                 key: edge.id,
-            };
-        });
-    }, [edges, getEdgeStyle, hoveredEdge, selectedEdgeId, handlePopoverOpen]);
+            }
+        })
+    }, [edges, getEdgeStyle, hoveredEdge, selectedEdgeId, handlePopoverOpen])
 }
 
 interface NodesWithModeOptions {
@@ -468,38 +475,41 @@ export const useFlowEventHandlers = ({ dispatch, nodes, setHelperLines }: FlowEv
     const onNodesChange: OnNodesChange = useCallback(
         (changes: NodeChange[]) => {
             // For performance: only process helper lines when there are few nodes
-            const shouldProcessHelperLines = nodes.length <= 10 && setHelperLines;
+            const shouldProcessHelperLines = nodes.length <= 10 && setHelperLines
 
             // Clear helper lines if not a position change or if we have too many nodes
             if (!changes.some((c) => c.type === 'position') || !shouldProcessHelperLines) {
                 if (shouldProcessHelperLines) {
-                    setHelperLines({ horizontal: null, vertical: null });
+                    setHelperLines({ horizontal: null, vertical: null })
                 }
-                dispatch(nodesChange({ changes }));
-                return;
+                dispatch(nodesChange({ changes }))
+                return
             }
 
             // Handle position changes with throttling
-            const positionChanges = changes.filter(c => c.type === 'position');
-            const otherChanges = changes.filter(c => c.type !== 'position');
+            const positionChanges = changes.filter((c) => c.type === 'position')
+            const otherChanges = changes.filter((c) => c.type !== 'position')
 
             // Immediately dispatch non-position changes
             if (otherChanges.length > 0) {
-                dispatch(nodesChange({ changes: otherChanges }));
+                dispatch(nodesChange({ changes: otherChanges }))
             }
 
             // Throttle position changes
             if (positionChanges.length > 0) {
-                throttledPosition.handlePositionChange(positionChanges, dispatch);
+                throttledPosition.handlePositionChange(positionChanges, dispatch)
             }
         },
         [dispatch, nodes, setHelperLines, throttledPosition]
     )
 
     // Handle drag end to flush any pending position changes
-    const onNodeDragStop = useCallback((event: React.MouseEvent, node: Node) => {
-        throttledPosition.flushChanges(dispatch);
-    }, [dispatch, throttledPosition])
+    const onNodeDragStop = useCallback(
+        (event: React.MouseEvent, node: Node) => {
+            throttledPosition.flushChanges(dispatch)
+        },
+        [dispatch, throttledPosition]
+    )
 
     const onEdgesChange: OnEdgesChange = useCallback(
         (changes: EdgeChange[]) => dispatch(edgesChange({ changes })),
@@ -550,7 +560,7 @@ export const useFlowEventHandlers = ({ dispatch, nodes, setHelperLines }: FlowEv
         onNodesChange,
         onEdgesChange,
         onConnect,
-        onNodeDragStop
+        onNodeDragStop,
     }
 }
 
@@ -611,16 +621,14 @@ export const createThrottledPositionChange = () => {
                     // Only take the latest position for each node to reduce updates
                     const latestPositions = new Map<string, NodeChange>()
 
-                    pendingChanges.forEach(change => {
+                    pendingChanges.forEach((change) => {
                         if (change.type === 'position' && change.id) {
                             latestPositions.set(change.id, change)
                         }
                     })
 
                     // Include non-position changes
-                    const nonPositionChanges = pendingChanges.filter(
-                        change => change.type !== 'position'
-                    )
+                    const nonPositionChanges = pendingChanges.filter((change) => change.type !== 'position')
 
                     // Combine optimized position changes with other changes
                     const optimizedChanges = [...latestPositions.values(), ...nonPositionChanges]
@@ -647,16 +655,14 @@ export const createThrottledPositionChange = () => {
             if (pendingChanges.length > 0) {
                 // Optimize final update
                 const latestPositions = new Map<string, NodeChange>()
-                pendingChanges.forEach(change => {
+                pendingChanges.forEach((change) => {
                     if (change.type === 'position' && change.id) {
                         latestPositions.set(change.id, change)
                     }
                 })
 
                 // Include non-position changes
-                const nonPositionChanges = pendingChanges.filter(
-                    change => change.type !== 'position'
-                )
+                const nonPositionChanges = pendingChanges.filter((change) => change.type !== 'position')
 
                 const optimizedChanges = [...latestPositions.values(), ...nonPositionChanges]
 
@@ -668,7 +674,7 @@ export const createThrottledPositionChange = () => {
                 pendingChanges = []
                 lastUpdate = Date.now()
             }
-        }
+        },
     }
 }
 
@@ -680,11 +686,11 @@ interface NodesWithStatusOptions {
 export const useNodesWithStatus = ({ nodes, nodeOutputs }: NodesWithStatusOptions) => {
     return useMemo(() => {
         return nodes.filter(Boolean).map((node) => {
-            const nodeTitle = node.data?.title || node.id;
+            const nodeTitle = node.data?.title || node.id
 
             // If this node already has a defined status, keep it
             if (node.data?.taskStatus) {
-                return node;
+                return node
             }
 
             // If node has outputs in nodeOutputs, check if it's completed or paused
@@ -696,9 +702,9 @@ export const useNodesWithStatus = ({ nodes, nodeOutputs }: NodesWithStatusOption
                         data: {
                             ...node.data,
                             taskStatus: 'PAUSED',
-                            run: nodeOutputs[nodeTitle]
-                        }
-                    };
+                            run: nodeOutputs[nodeTitle],
+                        },
+                    }
                 }
 
                 // Regular completed node
@@ -707,9 +713,9 @@ export const useNodesWithStatus = ({ nodes, nodeOutputs }: NodesWithStatusOption
                     data: {
                         ...node.data,
                         taskStatus: 'COMPLETED',
-                        run: nodeOutputs[nodeTitle]
-                    }
-                };
+                        run: nodeOutputs[nodeTitle],
+                    },
+                }
             }
 
             // Otherwise, mark as pending
@@ -717,9 +723,9 @@ export const useNodesWithStatus = ({ nodes, nodeOutputs }: NodesWithStatusOption
                 ...node,
                 data: {
                     ...node.data,
-                    taskStatus: 'PENDING'
-                }
-            };
-        });
-    }, [nodes, nodeOutputs]);
-};
+                    taskStatus: 'PENDING',
+                },
+            }
+        })
+    }, [nodes, nodeOutputs])
+}

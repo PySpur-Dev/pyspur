@@ -1,9 +1,9 @@
-import React, { useState } from 'react'
-import TextEditor from './TextEditor'
 import { Button, Card, CardBody, Tab, Tabs } from '@heroui/react'
-import _ from 'lodash'
 import { Icon } from '@iconify/react'
+import _ from 'lodash'
+import React, { useState } from 'react'
 import { FewShotExamplesProps } from '../../types/fewShot'
+import TextEditor from './TextEditor'
 
 interface FewShotExample {
     input?: string
@@ -28,7 +28,7 @@ const ExampleEditorModal: React.FC<ExampleEditorModalProps> = ({
     onSave,
     onDiscard,
     onContentChange,
-    readOnly = false
+    readOnly = false,
 }) => {
     const [activeTab, setActiveTab] = useState<'input' | 'output'>('input')
 
@@ -77,25 +77,30 @@ const ExampleEditorModal: React.FC<ExampleEditorModalProps> = ({
 }
 
 // Main Few Shot Examples Component
-const FewShotExamples: React.FC<FewShotExamplesProps & { readOnly?: boolean }> = ({ nodeID, examples, onChange, readOnly = false }) => {
+const FewShotExamples: React.FC<FewShotExamplesProps & { readOnly?: boolean }> = ({
+    nodeID,
+    examples,
+    onChange,
+    readOnly = false,
+}) => {
     const [expandedExampleIndex, setExpandedExampleIndex] = useState<number | null>(null)
 
     const handleAddExample = () => {
-        if (readOnly) return;
+        if (readOnly) return
         const updatedExamples = [...examples, { input: '', output: '' }]
         onChange(updatedExamples)
         setExpandedExampleIndex(examples.length) // Expand the newly added example
     }
 
     const handleDeleteExample = (index: number) => {
-        if (readOnly) return;
+        if (readOnly) return
         const updatedExamples = examples.filter((_, idx) => idx !== index)
         onChange(updatedExamples)
         setExpandedExampleIndex(null)
     }
 
     const handleContentChange = (content: string, tab: 'input' | 'output', index: number) => {
-        if (readOnly) return;
+        if (readOnly) return
         const updatedExamples = _.cloneDeep(examples)
         if (!updatedExamples[index]) {
             updatedExamples[index] = {}
@@ -122,7 +127,11 @@ const FewShotExamples: React.FC<FewShotExamplesProps & { readOnly?: boolean }> =
                                     isDisabled={readOnly}
                                 >
                                     <Icon
-                                        icon={expandedExampleIndex === index ? "solar:alt-arrow-up-linear" : "solar:alt-arrow-down-linear"}
+                                        icon={
+                                            expandedExampleIndex === index
+                                                ? 'solar:alt-arrow-up-linear'
+                                                : 'solar:alt-arrow-down-linear'
+                                        }
                                         width={20}
                                     />
                                 </Button>
@@ -157,7 +166,10 @@ const FewShotExamples: React.FC<FewShotExamplesProps & { readOnly?: boolean }> =
                         {/* Expanded editor */}
                         {expandedExampleIndex === index && (
                             <div className="mt-4">
-                                <Tabs aria-label="Input/Output Options" disabledKeys={readOnly ? ['input', 'output'] : []}>
+                                <Tabs
+                                    aria-label="Input/Output Options"
+                                    disabledKeys={readOnly ? ['input', 'output'] : []}
+                                >
                                     <Tab key="input" title="Input">
                                         <TextEditor
                                             content={example.input || ''}

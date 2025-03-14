@@ -1,4 +1,4 @@
-import { Modal, ModalContent, ModalHeader, ModalBody, ModalFooter, Button } from '@heroui/react'
+import { Button, Modal, ModalBody, ModalContent, ModalFooter, ModalHeader } from '@heroui/react'
 import NodeOutputDisplay from './NodeOutputDisplay' // Import NodeOutputDisplay
 
 const NodeOutputModal = ({ isOpen, onOpenChange, title, data }) => {
@@ -13,7 +13,13 @@ const NodeOutputModal = ({ isOpen, onOpenChange, title, data }) => {
                     <h3>{title}</h3>
                 </ModalHeader>
                 <ModalBody className="h-[calc(90vh-120px)] overflow-y-auto">
-                    <div>{data ? <NodeOutputDisplay output={data.run} maxHeight="100%" /> : <div>No output available</div>}</div>
+                    <div>
+                        {data ? (
+                            <NodeOutputDisplay output={data.run} maxHeight="100%" />
+                        ) : (
+                            <div>No output available</div>
+                        )}
+                    </div>
                 </ModalBody>
                 <ModalFooter>
                     <Button onPress={handleOpenChange}>Close</Button>

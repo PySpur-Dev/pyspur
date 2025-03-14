@@ -1,13 +1,16 @@
 import json
 from abc import ABC, abstractmethod
 from hashlib import md5
-from typing import Any, Dict, List, Optional, Type
+from typing import Any, Dict, Optional, Type, TypeVar, Union
 
-from pydantic import BaseModel, Field, create_model
+from pydantic import BaseModel, Field, PrivateAttr
 
 from ..execution.workflow_execution_context import WorkflowExecutionContext
 from ..schemas.workflow_schemas import WorkflowDefinitionSchema
 from ..utils import pydantic_utils
+
+# Define TypeVar for Tool reference
+T = TypeVar("T", bound="Tool")
 
 
 class VisualTag(BaseModel):
@@ -19,214 +22,221 @@ class VisualTag(BaseModel):
     )  # Hex color code validation using regex
 
 
-class BaseNodeConfig(BaseModel):
-    """Base class for node configuration models.
-    Each node must define its output_schema.
+class ToolOutput(BaseModel):
+    """Base class for all tool outputs.
+
+    Each tool type will define its own output model that inherits from this.
     """
 
-    output_schema: Dict[str, str] = Field(
-        default={"output": "string"},
-        title="Output schema",
-        description="The schema for the output of the node",
+    pass
+
+
+class ToolInput(BaseModel):
+    """Base class for tool inputs.
+
+    Each tool's input model will be dynamically created based on its predecessor tools,
+    with fields named after tool IDs and types being the corresponding ToolOutputModels.
+    """
+
+    pass
+
+
+# Define a type for the input parameter of __call__
+ToolInputType = Union[Dict[str, Any], Dict[str, BaseModel], BaseModel]
+
+
+class Tool(BaseModel, ABC):
+    """Base class for all tools.
+
+    Each tool receives inputs as a Pydantic model and produces outputs as a Pydantic model.
+    Subclasses can define their own input and output model types:
+
+    >>> class MyTool(Tool):
+    >>>     my_config_param: int = 42
+    >>>     async def run(self, input: BaseModel) -> BaseModel:
+    >>>         return MyOutputModel(...)
+
+    You can define the output schema using either a JSON schema string or a Pydantic model:
+
+    Using JSON schema string:
+    >>> class MyTool(Tool):
+    >>>     output_json_schema = '{"type": "object", "properties": {"result": {"type": "string"}}}'
+    >>>     async def run(self, input: BaseModel) -> BaseModel:
+    >>>         # ...
+
+    Using Pydantic model (preferred for better developer experience):
+    >>> class MyOutputModel(BaseModel):
+    >>>     result: str
+    >>>
+    >>> class MyTool(Tool):
+    >>>     output_json_schema = MyOutputModel
+    >>>     async def run(self, input: BaseModel) -> BaseModel:
+    >>>         return MyOutputModel(result="some result")
+
+    Required parameters for all tools:
+    - name: Unique identifier for the tool
+    - output_json_schema: Define using either a JSON schema string or a Pydantic model class
+    - has_fixed_output: If True, output schema cannot be modified at runtime
+    """
+
+    # Tool configuration parameters
+    name: str = Field(description="Unique identifier for the tool")
+    input_model: Type[BaseModel] = Field(
+        default=BaseModel,
+        description=(
+            "Defines the structure of tool's input using"
+            " either a JSON schema string or a Pydantic model class"
+        ),
     )
-    output_json_schema: str = Field(
-        default='{"type": "object", "properties": {"output": {"type": "string"} } }',
-        title="Output JSON schema",
-        description="The JSON schema for the output of the node",
+    output_model: Type[BaseModel] = Field(
+        default=BaseModel,
+        description=(
+            "Defines the structure of tool's output using"
+            " either a JSON schema string or a Pydantic model class"
+        ),
     )
     has_fixed_output: bool = Field(
-        default=False,
-        description="Whether the node has a fixed output schema defined in config",
+        default=False, description="If True, output schema cannot be modified at runtime"
     )
-    pass
 
+    # Internal properties (not exposed to users)
+    _context: Optional[WorkflowExecutionContext] = PrivateAttr(default=None)
+    # Will be used for config title, defaults to class name if not set
+    _display_name: str = PrivateAttr(default="")
+    _logo: Optional[str] = PrivateAttr(default=None)
+    _category: Optional[str] = PrivateAttr(default=None)
 
-class BaseNodeOutput(BaseModel):
-    """Base class for all node outputs.
-    Each node type will define its own output model that inherits from this.
-    """
+    _input_data: Optional[BaseModel] = PrivateAttr(default=None)
+    _output_data: Optional[BaseModel] = PrivateAttr(default=None)
+    _visual_tag: Optional[VisualTag] = PrivateAttr(default=None)
+    _subworkflow: Optional[WorkflowDefinitionSchema] = PrivateAttr(default=None)
+    _subworkflow_output: Optional[Dict[str, Any]] = PrivateAttr(default=None)
 
-    pass
+    model_config = {
+        "arbitrary_types_allowed": True,
+        "extra": "allow",  # Allow extra fields for flexibility
+    }
 
+    def model_post_init(self, _: Any) -> None:
+        """Initialize internal properties after Pydantic model initialization.
 
-class BaseNodeInput(BaseModel):
-    """Base class for node inputs.
-    Each node's input model will be dynamically created based on its predecessor nodes,
-    with fields named after node IDs and types being the corresponding NodeOutputModels.
-    """
+        This is called automatically by Pydantic after the model is initialized.
+        It extracts internal properties from the extra fields and sets them as private attributes.
 
-    pass
+        Internal properties that can be set:
+        - context: The workflow execution context
+        - display_name: The display name for the tool (used in UI)
+        - logo: Path to the tool's logo
+        - category: The category the tool belongs to
 
+        It also initializes default input and output models if not set by subclasses.
+        """
+        # Extract and set internal properties if provided in model_extra
+        # Get model_extra from Pydantic v2
+        model_extra = getattr(self, "model_extra", {}) or {}
 
-class BaseNode(ABC):
-    """Base class for all nodes.
-    Each node receives inputs as a Pydantic model where:
-    - Field names are predecessor node IDs
-    - Field types are the corresponding NodeOutputModels
-    """
+        self._context = model_extra.pop("context", None)
 
-    name: str
-    display_name: str = ""  # Will be used for config title, defaults to class name if not set
-    logo: Optional[str] = None
-    category: Optional[str] = None
-    config_model: Type[BaseModel]
-    output_model: Type[BaseNodeOutput]
-    input_model: Type[BaseNodeInput]
-    _config: BaseNodeConfig
-    _input: BaseNodeInput
-    _output: BaseNodeOutput
-    visual_tag: VisualTag
-    subworkflow: Optional[WorkflowDefinitionSchema]
-    subworkflow_output: Optional[Dict[str, Any]]
+        if self._visual_tag is None:
+            self._visual_tag = self.get_default_visual_tag()
 
-    def __init__(
-        self,
-        name: str,
-        config: BaseNodeConfig,
-        context: Optional[WorkflowExecutionContext] = None,
-    ) -> None:
-        self.name = name
-        self._config = config
-        self.context = context
-        self.subworkflow = None
-        self.subworkflow_output = None
-        if not hasattr(self, "visual_tag"):
-            self.visual_tag = self.get_default_visual_tag()
+        # Store the JSON schema representation for serialization purposes
+        try:
+            if isinstance(self.input_model, str):
+                self._input_model = pydantic_utils.json_schema_to_model(
+                    json_schema=json.loads(self.input_model),
+                    base_class=BaseModel,
+                    model_class_name=self.name + "InputModel",
+                )
+            else:
+                self._input_model = self.input_model
+            if isinstance(self.output_model, str):
+                self._output_model = pydantic_utils.json_schema_to_model(
+                    json_schema=json.loads(self.output_model),
+                    base_class=BaseModel,
+                    model_class_name=self.name,
+                )
+            else:
+                self._output_model = self.output_model
+
+        except Exception as e:
+            raise ValueError(f"Invalid JSON schema for {self.name}: {e}") from e
+
         self.setup()
 
     def setup(self) -> None:
-        """Setup method to define output_model and any other initialization.
-        For dynamic schema nodes, these can be created based on self.config.
+        """Define output_model and any other initialization.
+
+        For dynamic schema tools, these can be created based on the tool's configuration.
         """
-        if self._config.has_fixed_output:
-            schema = json.loads(self._config.output_json_schema)
-            model = pydantic_utils.json_schema_to_model(
-                schema, model_class_name=self.name, base_class=BaseNodeOutput
-            )
-            self.output_model = model  # type: ignore
-
-    def create_output_model_class(self, output_schema: Dict[str, str]) -> Type[BaseNodeOutput]:
-        """Dynamically creates an output model based on the node's output schema."""
-        field_type_to_python_type = {
-            "string": str,
-            "str": str,
-            "integer": int,
-            "int": int,
-            "number": float,
-            "float": float,
-            "boolean": bool,
-            "bool": bool,
-            "list": list,
-            "dict": dict,
-            "array": list,
-            "object": dict,
-        }
-        return create_model(
-            f"{self.name}",
-            **{
-                field_name: (
-                    (field_type_to_python_type[field_type], ...)
-                    if field_type in field_type_to_python_type
-                    else (field_type, ...)  # try as is
-                )
-                for field_name, field_type in output_schema.items()
-            },
-            __base__=BaseNodeOutput,
-            __config__=None,
-            __doc__=f"Output model for {self.name} node",
-            __module__=self.__module__,
-            __validators__=None,
-            __cls_kwargs__=None,
-        )
-
-    def create_composite_model_instance(
-        self, model_name: str, instances: List[BaseModel]
-    ) -> Type[BaseNodeInput]:
-        """Create a new Pydantic model that combines all the given models based on their instances.
-
-        Args:
-            instances: A list of Pydantic model instances.
-
-        Returns:
-            A new Pydantic model with fields named after the class names of the instances.
-
-        """
-        # Create the new model class
-        return create_model(
-            model_name,
-            **{instance.__class__.__name__: (instance.__class__, ...) for instance in instances},
-            __base__=BaseNodeInput,
-            __config__=None,
-            __doc__=f"Input model for {self.name} node",
-            __module__=self.__module__,
-            __validators__=None,
-            __cls_kwargs__=None,
-        )
+        pass
 
     async def __call__(
         self,
-        input: (
-            Dict[str, str | int | bool | float | Dict[str, Any] | List[Any]]
-            | Dict[str, BaseNodeOutput]
-            | Dict[str, BaseNodeInput]
-            | BaseNodeInput
-        ),
-    ) -> BaseNodeOutput:
-        """Validates inputs and runs the node's logic.
+        input: ToolInputType,
+    ) -> BaseModel:
+        """Validate inputs and runs the tool's logic.
 
         Args:
-            inputs: Pydantic model containing predecessor outputs or a dictionary of node_id : NodeOutputModels
+            input: Pydantic model or dictionary containing inputs
 
         Returns:
-            The node's output model
+            The tool's output model
 
         """
-        if isinstance(input, dict):
-            if all(isinstance(value, BaseNodeOutput) for value in input.values()) or all(
-                isinstance(value, BaseNodeInput) for value in input.values()
-            ):
-                # Input is a dictionary of BaseNodeOutput instances, creating a composite model
-                self.input_model = self.create_composite_model_instance(
-                    model_name=self.input_model.__name__,
-                    instances=list(input.values()),  # type: ignore we already checked that all values are BaseNodeOutput instances
-                )
-                data = {  # type: ignore
-                    instance.__class__.__name__: instance.model_dump()  # type: ignore
-                    for instance in input.values()
-                }
-                input = self.input_model.model_validate(data)
-            else:
-                # Input is not a dictionary of BaseNodeOutput instances, validating as BaseNodeInput
-                input = self.input_model.model_validate(input)
+        validated_input: BaseModel
 
-        self._input = input
-        result = await self.run(input)
+        if isinstance(input, dict):
+            if all(isinstance(value, BaseModel) for value in input.values()):
+                # Input is a dictionary of BaseModel instances
+                model_instances = [v for v in input.values() if isinstance(v, BaseModel)]
+
+                # Create a new input model based on these instances
+                input_model_name = getattr(self._input_model, "__name__", "DynamicInputModel")
+                new_input_model = pydantic_utils.create_composite_model_instance(
+                    model_name=input_model_name,
+                    instances=model_instances,
+                    base_class=BaseModel,
+                )
+                self._input_model = new_input_model
+
+                # Create data for validation
+                data = {}
+                for _, instance in input.items():
+                    if isinstance(instance, BaseModel):
+                        data[instance.__class__.__name__] = instance.model_dump()
+
+                validated_input = self._input_model.model_validate(data)
+            else:
+                # Input is a dictionary of primitive values
+                validated_input = self._input_model.model_validate(input)
+        else:
+            # Input is already a BaseModel instance
+            validated_input = input
+
+        # Store the validated input
+        self._input_data = validated_input
+
+        # Run the tool's logic
+        result = await self.run(validated_input)
 
         try:
-            output_validated = self.output_model.model_validate(result.model_dump())
+            output_validated = self._output_model.model_validate(result.model_dump())
         except AttributeError:
-            output_validated = self.output_model.model_validate(result)
+            output_validated = self._output_model.model_validate(result)
         except Exception as e:
-            # Print the result for better debuggability
-            try:
-                result_dump = result.model_dump() if hasattr(result, "model_dump") else result
-                print(f"Validation failed for node {self.name}. Result: {result_dump}")
-            except Exception as dump_error:
-                print(
-                    f"Validation failed for node {self.name}. Could not dump result: {dump_error}"
-                )
-                print(f"Result type: {type(result)}")
-            raise ValueError(f"Output validation error in {self.name}: {e}")
+            raise ValueError(f"Output validation error in {self.name}: {e}") from e
 
-        self._output = output_validated
+        # Store the validated output
+        self._output_data = output_validated
         return output_validated
 
     @abstractmethod
     async def run(self, input: BaseModel) -> BaseModel:
-        """Abstract method where the node's core logic is implemented.
+        """Abstract method where the tool's core logic is implemented.
 
         Args:
-            inputs: Pydantic model containing predecessor outputs
+            input: Validated input model
 
         Returns:
             An instance compatible with output_model
@@ -234,30 +244,106 @@ class BaseNode(ABC):
         """
         pass
 
+    # Property getters for internal attributes
     @property
-    def config(self) -> Any:
-        """Return the node's configuration."""
-        return self.config_model.model_validate(self._config.model_dump())
+    def context(self) -> Optional[WorkflowExecutionContext]:
+        """Return the tool's execution context."""
+        return self._context
 
-    def update_config(self, config: BaseNodeConfig) -> None:
-        """Update the node's configuration."""
-        self._config = config
-
-    @property
-    def input(self) -> Any:
-        """Return the node's input."""
-        return self.input_model.model_validate(self._input.model_dump())
+    @context.setter
+    def context(self, value: Optional[WorkflowExecutionContext]) -> None:
+        """Set the tool's execution context."""
+        self._context = value
 
     @property
-    def output(self) -> Any:
-        """Return the node's output."""
-        return self.output_model.model_validate(self._output.model_dump())
+    def display_name(self) -> str:
+        """Return the tool's display name."""
+        return self._display_name
+
+    @display_name.setter
+    def display_name(self, value: str) -> None:
+        """Set the tool's display name."""
+        self._display_name = value
+
+    @property
+    def logo(self) -> Optional[str]:
+        """Return the tool's logo."""
+        return self._logo
+
+    @logo.setter
+    def logo(self, value: Optional[str]) -> None:
+        """Set the tool's logo."""
+        self._logo = value
+
+    @property
+    def category(self) -> Optional[str]:
+        """Return the tool's category."""
+        return self._category
+
+    @category.setter
+    def category(self, value: Optional[str]) -> None:
+        """Set the tool's category."""
+        self._category = value
+
+    @property
+    def config_model(self) -> Type["Tool"]:
+        """Return the tool's config model."""
+        return self.__class__
+
+    @property
+    def config(self) -> "Tool":
+        """Return the tool's config."""
+        return self
+
+    @property
+    def input(self) -> Optional[BaseModel]:
+        """Return the tool's input."""
+        if self._input_data is None:
+            return None
+        return self._input_model.model_validate(self._input_data.model_dump())
+
+    @property
+    def output(self) -> Optional[BaseModel]:
+        """Return the tool's output."""
+        if self._output_data is None:
+            return None
+        return self._output_model.model_validate(self._output_data.model_dump())
+
+    @property
+    def visual_tag(self) -> Optional[VisualTag]:
+        """Return the tool's visual tag."""
+        return self._visual_tag
+
+    @visual_tag.setter
+    def visual_tag(self, value: VisualTag) -> None:
+        """Set the tool's visual tag."""
+        self._visual_tag = value
+
+    @property
+    def subworkflow(self) -> Optional[WorkflowDefinitionSchema]:
+        """Return the tool's subworkflow."""
+        return self._subworkflow
+
+    @subworkflow.setter
+    def subworkflow(self, value: Optional[WorkflowDefinitionSchema]) -> None:
+        """Set the tool's subworkflow."""
+        self._subworkflow = value
+
+    @property
+    def subworkflow_output(self) -> Optional[Dict[str, Any]]:
+        """Return the tool's subworkflow output."""
+        return self._subworkflow_output
+
+    @subworkflow_output.setter
+    def subworkflow_output(self, value: Optional[Dict[str, Any]]) -> None:
+        """Set the tool's subworkflow output."""
+        self._subworkflow_output = value
 
     @classmethod
     def get_default_visual_tag(cls) -> VisualTag:
-        """Set a default visual tag for the node."""
-        # default acronym is the first letter of each word in the node name
-        acronym = "".join([word[0] for word in cls.name.split("_")]).upper()
+        """Set a default visual tag for the tool."""
+        # default acronym is the first letter of each word in the tool name
+        acronym = "".join([word[0] for word in cls.__name__.split("_")]).upper()
 
         # default color is randomly picked from a list of pastel colors
         colors = [
