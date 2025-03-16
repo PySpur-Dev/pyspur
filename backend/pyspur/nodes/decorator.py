@@ -8,6 +8,7 @@ from typing import (
     Protocol,
     Set,
     Type,
+    cast,
     get_type_hints,
     runtime_checkable,
 )
@@ -21,6 +22,73 @@ from ..execution.workflow_execution_context import WorkflowExecutionContext
 from .base import BaseNode, BaseNodeConfig, BaseNodeInput, BaseNodeOutput, VisualTag
 
 
+class FunctionToolNode(BaseNode):
+    """Node class for function-based tools.
+
+    This class is used to wrap Python functions as PySpur nodes. It handles parameter extraction,
+    template rendering, and function execution.
+    """
+
+    name: str
+    display_name: str
+    config_model: Type[BaseNodeConfig]
+    output_model: Type[BaseNodeOutput]
+    input_model: Type[BaseNodeInput]
+    function_param_names: Set[str]
+    is_output_model_defined: bool
+    _func: Callable[..., Any]
+    _visual_tag: Optional[Dict[str, str]]
+
+    def __init__(
+        self,
+        name: str,
+        config: Optional[BaseNodeConfig] = None,
+        context: Optional[WorkflowExecutionContext] = None,
+        func: Optional[Callable[..., Any]] = None,
+        visual_tag: Optional[Dict[str, str]] = None,
+    ):
+        # Create default config if none provided
+        if config is None:
+            config = self.config_model()
+
+        # Call parent init first
+        super().__init__(name=name, config=config, context=context)
+
+        # Store the function and visual tag
+        if func is not None:
+            self._func = func
+        if visual_tag:
+            self.visual_tag = VisualTag(**visual_tag)
+        self._visual_tag = visual_tag
+
+    async def run(self, input: BaseModel) -> BaseModel:
+        # Extract parameters from config directly using the stored parameter names
+        # This is more efficient than checking sig.parameters each time
+        kwargs: Dict[str, Any] = {}
+
+        for param_name in self.function_param_names:
+            if hasattr(self.config, param_name):
+                kwargs[param_name] = getattr(self.config, param_name)
+
+        # config values can be jinja2 templates so we need to render them
+        for param_name, param_value in kwargs.items():
+            if isinstance(param_value, str):
+                template = Template(param_value)
+                kwargs[param_name] = template.render(input=input)
+
+        # Call the original function
+        result = self._func(**kwargs)
+
+        # Handle async functions
+        if hasattr(result, "__await__"):
+            result = await result
+
+        if self.is_output_model_defined:
+            return self.output_model.model_validate(result)
+        else:
+            return self.output_model.model_validate({"output": result})
+
+
 @runtime_checkable
 class ToolFunction(Protocol):
     """Protocol for functions decorated with @tool."""
@@ -28,6 +96,7 @@ class ToolFunction(Protocol):
     node_class: Type[BaseNode]
     config_model: Type[BaseNodeConfig]
     output_model: Type[BaseNodeOutput]
+    func_name: str
 
     def create_node(
         self,
@@ -186,17 +255,16 @@ def tool_function(
         _is_output_model_defined = is_output_model_defined
 
         # Create a Node class for this function
-        class FunctionToolNode(BaseNode):
-            # Class attributes
+        class CustomFunctionToolNode(FunctionToolNode):
             name = func_name
             display_name = func_display_name
-            category = _category
+            category = _category or "FunctionTools"
             config_model = _config_model
-            # ignore the type check for output_model, we know it is a BaseNodeOutput
             output_model = _output_model  # type: ignore
             input_model = _input_model
             function_param_names = _function_param_names
             is_output_model_defined = _is_output_model_defined
+            __doc__ = func_doc
 
             def __init__(
                 self,
@@ -204,55 +272,34 @@ def tool_function(
                 config: Optional[BaseNodeConfig] = None,
                 context: Optional[WorkflowExecutionContext] = None,
             ):
-                # Create default config if none provided
-                if config is None:
-                    config = _config_model()
+                super().__init__(
+                    name=name,
+                    config=config,
+                    context=context,
+                    func=func,
+                    visual_tag=visual_tag,
+                )
 
-                # Call parent init first
-                super().__init__(name=name, config=config, context=context)
-
-                # Initialize with custom visual tag if provided after parent init
-                if visual_tag:
-                    self.visual_tag = VisualTag(**visual_tag)
-
-            async def run(self, input: BaseModel) -> BaseModel:
-                # Extract parameters from config directly using the stored parameter names
-                # This is more efficient than checking sig.parameters each time
-                kwargs: Dict[str, Any] = {}
-
-                for param_name in self.function_param_names:
-                    if hasattr(self.config, param_name):
-                        kwargs[param_name] = getattr(self.config, param_name)
-
-                # config values can be jinja2 templates so we need to render them
-                for param_name, param_value in kwargs.items():
-                    if isinstance(param_value, str):
-                        template = Template(param_value)
-                        kwargs[param_name] = template.render(input=input)
-
-                # Call the original function
-                result = func(**kwargs)
-
-                # Handle async functions
-                if hasattr(result, "__await__"):
-                    result = await result
-
-                if self.is_output_model_defined:
-                    return self.output_model.model_validate(result)
-                else:
-                    return self.output_model.model_validate({"output": result})
-
-        # Update the class with the function's docstring
-        FunctionToolNode.__doc__ = func_doc
+        # Change the name of the class to the function name and bind it to the module
+        new_class_name = type(
+            f"{func_name}",
+            (CustomFunctionToolNode,),
+            {
+                "__module__": func.__module__  # Set the module to match the decorated func's module
+            },
+        )
 
         # Set NodeClass attribute to the function
-        func.node_class = FunctionToolNode  # type: ignore
+        func.node_class = new_class_name  # type: ignore
 
         # Set the config model to the config_model
-        func.config_model = _config_model  # type: ignore
+        func.config_model = config_model  # type: ignore
 
         # Set the output model to the output_model
         func.output_model = _output_model  # type: ignore
+
+        # Set the func_name attribute to the function name
+        func.func_name = func.__name__  # type: ignore
 
         # Set the create_node function to the func
         def create_node(
@@ -260,11 +307,11 @@ def tool_function(
             config: Optional[BaseNodeConfig] = None,
             context: Optional[WorkflowExecutionContext] = None,
         ) -> FunctionToolNode:
-            return FunctionToolNode(name=name, config=config, context=context)
+            return new_class_name(name=name, config=config, context=context)
 
         func.create_node = create_node  # type: ignore
 
-        return func  # type: ignore
+        return cast(ToolFunction, func)
 
     return decorator
 

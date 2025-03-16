@@ -89,6 +89,8 @@ const OutputSchemaEditor: React.FC<OutputSchemaEditorProps> = ({
             const newSchema = JSON.stringify(response.data, null, 2)
             onChange(newSchema)
             resetModalState()
+            // Return to previous tab after successful generation
+            setSelectedTab(selectedTab === 'ai-generate' ? 'simple' : selectedTab)
         } catch (error: any) {
             setGenerationError(error.response?.data?.detail || 'Failed to generate schema')
         } finally {
@@ -96,35 +98,30 @@ const OutputSchemaEditor: React.FC<OutputSchemaEditorProps> = ({
         }
     }
 
-    const renderGenerateButton = () => {
-        if (readOnly) return null
-
-        const button = (
-            <Button
-                size="sm"
-                color="primary"
-                variant="light"
-                startContent={<Icon icon="solar:magic-stick-linear" width={20} />}
-                onClick={onOpen}
-                isDisabled={!hasOpenAIKey || readOnly}
-            >
-                AI Generate
-            </Button>
-        )
-
-        if (!hasOpenAIKey) {
-            return (
-                <Tooltip
-                    content="OpenAI API key is required for AI schema generation. Please add your API key in the settings."
-                    placement="top"
-                >
-                    {button}
-                </Tooltip>
-            )
+    // Handle tab selection changes
+    const handleTabChange = (key: React.Key) => {
+        if (readOnly) {
+            return; // Prevent switching in readOnly mode
         }
 
-        return button
-    }
+        const tabKey = key as string;
+
+        if (tabKey === 'ai-generate') {
+            // Open the modal when AI Generate tab is selected
+            onOpen();
+            // Don't change the actual selected tab
+        } else {
+            setSelectedTab(tabKey);
+        }
+    };
+
+    // Create the AI Generate tab title content
+    const aiGenerateTabTitle = (
+        <div className="flex items-center gap-1">
+            <Icon icon="solar:magic-stick-3-linear" width={16} />
+            <span>AI Generate</span>
+        </div>
+    );
 
     return (
         <div>
@@ -142,14 +139,13 @@ const OutputSchemaEditor: React.FC<OutputSchemaEditorProps> = ({
                     </div>
                 </Alert>
             )}
-            <div className="flex items-center gap-2 mb-2">
-                {renderGenerateButton()}
-            </div>
 
             <Modal
                 isOpen={isOpen}
-                onClose={resetModalState}
-                size="2xl"
+                onClose={() => {
+                    resetModalState();
+                }}
+                size="5xl"
                 isDismissable={!isGenerating}
                 hideCloseButton={isGenerating}
             >
@@ -228,14 +224,9 @@ const OutputSchemaEditor: React.FC<OutputSchemaEditorProps> = ({
 
             <Tabs
                 aria-label="Schema Editor Options"
-                disabledKeys={readOnly ? ['simple', 'json'] : []}
+                disabledKeys={readOnly ? ['simple', 'json', 'ai-generate'] : (!hasOpenAIKey ? ['ai-generate'] : [])}
                 selectedKey={selectedTab}
-                onSelectionChange={(key) => {
-                    if (readOnly) {
-                        return; // Prevent switching in readOnly mode
-                    }
-                    setSelectedTab(key as string);
-                }}
+                onSelectionChange={handleTabChange}
             >
                 <Tab key="simple" title="Simple Editor">
                     {parsedSchema && (
@@ -266,6 +257,11 @@ const OutputSchemaEditor: React.FC<OutputSchemaEditorProps> = ({
                         </CardBody>
                     </Card>
                 </Tab>
+                {!readOnly && (
+                    <Tab key="ai-generate" title={aiGenerateTabTitle}>
+                        <div></div>
+                    </Tab>
+                )}
             </Tabs>
         </div>
     )

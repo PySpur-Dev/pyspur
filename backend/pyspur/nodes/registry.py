@@ -2,16 +2,23 @@
 import importlib
 import importlib.util
 import os
+import traceback
 from pathlib import Path
-from typing import Dict, List, Optional, Set, Type, Union
+from typing import Any, Dict, List, Optional, Set, Type, Union
 
 from loguru import logger
 
+from ..schemas.node_type_schemas import NodeTypeSchema
 from .base import BaseNode
+from .decorator import FunctionToolNode, ToolFunction
+
+
+class NodeInfo(NodeTypeSchema):
+    subcategory: Optional[str] = None
 
 
 class NodeRegistry:
-    _nodes: Dict[str, List[Dict[str, Union[str, Optional[str]]]]] = {}
+    _nodes: Dict[str, List[NodeInfo]] = {}
     _decorator_registered_classes: Set[Type[BaseNode]] = (
         set()
     )  # Track classes registered via decorator
@@ -53,7 +60,7 @@ class NodeRegistry:
 
             # Store subcategory as class attribute without type checking
             if subcategory:
-                node_class.subcategory = subcategory  # type: ignore
+                node_class.subcategory = subcategory
 
             # Initialize category if not exists
             if category not in cls._nodes:
@@ -65,12 +72,12 @@ class NodeRegistry:
             if module_path.startswith("pyspur."):
                 module_path = module_path.replace("pyspur.", "", 1)
 
-            node_info: Dict[str, Union[str, Optional[str]]] = {
-                "node_type_name": node_class.__name__,
-                "module": f".{module_path}",
-                "class_name": node_class.__name__,
-                "subcategory": subcategory,
-            }
+            node_info = NodeInfo(
+                node_type_name=node_class.__name__,
+                module=f".{module_path}",
+                class_name=node_class.__name__,
+                subcategory=subcategory,
+            )
 
             # Handle positioning
             nodes_list = cls._nodes[category]
@@ -82,7 +89,7 @@ class NodeRegistry:
                 elif position.startswith("after:"):
                     target_node = position[6:]
                     for i, n in enumerate(nodes_list):
-                        if n["node_type_name"] == target_node:
+                        if n.node_type_name == target_node:
                             nodes_list.insert(i + 1, node_info)
                             break
                     else:
@@ -90,7 +97,7 @@ class NodeRegistry:
                 elif position.startswith("before:"):
                     target_node = position[7:]
                     for i, n in enumerate(nodes_list):
-                        if n["node_type_name"] == target_node:
+                        if n.node_type_name == target_node:
                             nodes_list.insert(i, node_info)
                             break
                     else:
@@ -99,7 +106,7 @@ class NodeRegistry:
                     nodes_list.append(node_info)
             else:
                 # Add to end if no position specified
-                if not any(n["node_type_name"] == node_class.__name__ for n in nodes_list):
+                if not any(n.node_type_name == node_class.__name__ for n in nodes_list):
                     nodes_list.append(node_info)
                     logger.debug(f"Registered node {node_class.__name__} in category {category}")
                     cls._decorator_registered_classes.add(node_class)
@@ -111,8 +118,9 @@ class NodeRegistry:
     @classmethod
     def get_registered_nodes(
         cls,
-    ) -> Dict[str, List[Dict[str, Union[str, Optional[str]]]]]:
+    ) -> Dict[str, List[NodeInfo]]:
         """Get all registered nodes."""
+        cls.discover_nodes()
         return cls._nodes
 
     @classmethod
@@ -159,6 +167,9 @@ class NodeRegistry:
             # Start recursive discovery
             cls._discover_in_directory(base_path, package_path)
 
+            # Also discover tool function nodes
+            cls.discover_tool_functions()
+
             logger.info(
                 "Node discovery complete."
                 f" Found {len(cls._decorator_registered_classes)} decorated nodes."
@@ -173,7 +184,7 @@ class NodeRegistry:
 
         This method searches recursively through Python files in the PROJECT_ROOT/tools directory
         for functions decorated with @tool_function and registers their node classes.
-        Works with both package (with __init__.py) and non-package Python files.
+        Only works with proper Python packages (directories with __init__.py).
         """
         # Get PROJECT_ROOT from environment variable
         project_root = os.getenv("PROJECT_ROOT")
@@ -194,105 +205,72 @@ class NodeRegistry:
             """Check if a directory is a Python package (has __init__.py)."""
             return (path / "__init__.py").exists()
 
-        def _get_module_path(file_path: Path, base_path: Path) -> str:
-            """Get the appropriate module path for importing.
+        def _register_tool_function_node(func: ToolFunction, category: str) -> None:
+            """Register a tool function node in the NodeRegistry."""
+            node_class = func.node_class
+            category = "Custom Tools"
+            if category not in cls._nodes:
+                cls._nodes[category] = []
 
-            For files in a package (directory with __init__.py), returns the full package path.
-            For standalone files, returns the absolute file path.
-            """
-            try:
-                rel_path = file_path.relative_to(base_path)
-                parts = list(rel_path.parts)
+            node_info = NodeInfo(
+                node_type_name=node_class.__name__,
+                module=node_class.__module__,
+                # Using dot notation for nested attribute
+                class_name=f"{func.func_name}.node_class",
+                subcategory=getattr(node_class, "subcategory", None),
+            )
 
-                # Build the module path by checking each parent directory
-                module_parts: List[str] = []
-                current_path = base_path
+            if not any(n.node_type_name == node_class.__name__ for n in cls._nodes[category]):
+                cls._nodes[category].append(node_info)
+                nonlocal registered_tools
+                registered_tools += 1
+                logger.debug(
+                    f"Registered tool function {node_class.__name__} in category {category}"
+                )
 
-                # Handle the directory parts
-                for part in parts[:-1]:  # Exclude the file name
-                    current_path = current_path / part
-                    if _is_package_dir(current_path):
-                        module_parts.append(part)
-                    else:
-                        # If we hit a non-package directory, we'll use absolute path
-                        return str(file_path)
+        def _is_valid_tool_function(attr: Any) -> bool:
+            """Check if an attribute is a properly decorated tool function."""
+            if not isinstance(attr, ToolFunction):
+                return False
+            if not issubclass(attr.node_class, FunctionToolNode):
+                return False  # Skip regular functions
+            # Must have all required node attributes
+            required_attrs = {"display_name", "config_model", "input_model", "output_model"}
+            return all(hasattr(attr.node_class, attr_name) for attr_name in required_attrs)
 
-                # Add the file name without .py
-                module_parts.append(parts[-1][:-3])  # Remove .py extension
-
-                # If we have a valid package path, return it with dots
-                if module_parts:
-                    return ".".join(module_parts)
-
-                # Fallback to absolute path
-                return str(file_path)
-            except Exception:
-                # Fallback to absolute path if anything goes wrong
-                return str(file_path)
-
-        def _discover_tools_in_directory(path: Path) -> None:
-            nonlocal registered_tools
+        def _discover_tools_in_directory(path: Path, base_package: str = "tools") -> None:
+            """Recursively discover tool functions in package directories."""
+            # Skip if not a package directory
+            if not _is_package_dir(path):
+                return
 
             for item in path.iterdir():
                 if item.is_file() and item.suffix == ".py" and not item.name.startswith("_"):
                     try:
-                        # Get the appropriate module path/name
-                        module_path = _get_module_path(item, tools_dir)
+                        # Get the module path relative to project root
+                        module_path = f"{base_package}.{item.stem}"
 
-                        # Create a spec for the module
-                        if module_path.endswith(".py"):
-                            # For non-package files, use spec_from_file_location
-                            spec = importlib.util.spec_from_file_location(item.stem, str(item))
-                        else:
-                            # For package files, use find_spec
-                            spec = importlib.util.find_spec(module_path)
+                        # Import the module using standard import_module
+                        module = importlib.import_module(module_path)
 
-                        if spec is None or spec.loader is None:
-                            logger.warning(f"Could not create module spec for {item}")
-                            continue
-
-                        # Create and execute the module
-                        module = importlib.util.module_from_spec(spec)
-                        spec.loader.exec_module(module)
-
-                        # Look for tool functions in module attributes
+                        # Register any valid tool functions found in the module
                         for attr_name in dir(module):
                             attr = getattr(module, attr_name)
-                            # Check if attribute has node_class (indicating it's a tool function)
-                            if hasattr(attr, "node_class"):
+                            if _is_valid_tool_function(attr):
                                 node_class = attr.node_class
-                                # Register the node class if it has a category
                                 category = getattr(node_class, "category", "Uncategorized")
-                                if category not in cls._nodes:
-                                    cls._nodes[category] = []
-
-                                # Create node registration info
-                                node_info = {
-                                    "node_type_name": node_class.__name__,
-                                    "module": module_path,  # Use the full module path
-                                    "class_name": node_class.__name__,
-                                    "subcategory": getattr(node_class, "subcategory", None),
-                                }
-
-                                # Add to registry if not already present
-                                if not any(
-                                    n["node_type_name"] == node_class.__name__
-                                    for n in cls._nodes[category]
-                                ):
-                                    cls._nodes[category].append(node_info)
-                                    registered_tools += 1
-                                    logger.debug(
-                                        f"Registered tool function node {node_class.__name__}"
-                                        f" from {module_path} in category {category}"
-                                    )
+                                _register_tool_function_node(attr, category)
 
                     except Exception as e:
                         logger.error(f"Failed to load module {item}: {e}")
+                        logger.error(traceback.format_exc())
 
                 # Recursively process subdirectories
                 elif item.is_dir() and not item.name.startswith("_"):
-                    _discover_tools_in_directory(item)
+                    # Update the base package for the subdirectory
+                    subpackage = f"{base_package}.{item.name}"
+                    _discover_tools_in_directory(item, subpackage)
 
-        # Start recursive discovery
+        # Start recursive discovery from tools directory
         _discover_tools_in_directory(tools_dir)
         logger.info(f"Tool function discovery complete. Found {registered_tools} tool functions.")

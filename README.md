@@ -1,6 +1,6 @@
 ![PySpur](./docs/images/hero.png)
 
-<p align="center"><strong>PySpur is an AI agent builder in Python. AI engineers use it to build agents, execute them step-by-step and inspect past runs.</strong></p>
+<p align="center"><strong>Iterate over your agents 10x faster. AI engineers use PySpur to iterate over AI agents visually without reinventing the wheel.</strong></p>
 
 <p align="center">
   <a href="./README.md"><img alt="README in English" src="https://img.shields.io/badge/English-blue"></a>
@@ -27,14 +27,39 @@
   </a>
 </p>
 
-https://github.com/user-attachments/assets/1ebf78c9-94b2-468d-bbbb-566311df16fe
-
+https://github.com/user-attachments/assets/54d0619f-22fd-476c-bf19-9be083d7e710
 
 # 🕸️ Why PySpur?
 
-PySpur's primary purpose is to simplify building **reliable** agents by making testing and debugging really easy. You can set up test cases, execute them step-by-step, and visually inspect each run. Once an agent is deployed to production, execution traces become automatically available.
+## Problem: Reliable AI demands enduring a thousand tiny cuts
 
-Core features:
+AI engineers today face three problems of building agents: 
+
+* **Prompt Hell**: Hours of prompt tweaking and trial-and-error frustration.
+* **Workflow Blindspots**: Lack of visibility into step interactions causing hidden failures and confusion.
+* **Terminal Testing Nightmare** Squinting at raw outputs and manually parsing JSON.
+
+We've been there ourselves, too. We launched a graphic design agent early 2024 and quickly reached thousands of users, yet, struggled with the lack of its reliability and existing debugging tools. 
+
+## Solution: A playground for agents that saves time
+
+### Step 1: Define Test Cases
+
+https://github.com/user-attachments/assets/ed9ca45f-7346-463f-b8a4-205bf2c4588f
+ 
+### Step 2: Build the agent in Python code or via UI
+
+https://github.com/user-attachments/assets/7043aae4-fad1-42bd-953a-80c94fce8253
+
+### Step 3: Iterate obsessively
+
+https://github.com/user-attachments/assets/72c9901d-a39c-4f80-85a5-f6f76e55f473
+
+### Step 4: Deploy
+
+https://github.com/user-attachments/assets/b14f34b2-9f16-4bd0-8a0f-1c26e690af93
+
+# ✨ Core features:
 
 - 👤 **Human in the Loop**: Persistent workflows that wait for human approval.
 - 🔄 **Loops**: Iterative tool calling with memory.
@@ -77,7 +102,7 @@ This is the quickest way to get started. Python 3.11 or higher is required.
     - **Manual**: Edit `.env` file (recommended: configure postgres) and restart with `pyspur serve`
 
 
-# ✨ Core Benefits
+# 😎 Feature Reel
 
 ## Human-in-the-loop breakpoints:
 

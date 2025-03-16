@@ -12,8 +12,8 @@ from .registry import NodeRegistry
 
 
 class NodeFactory:
-    """
-    Factory for creating node instances from a configuration.
+    """Create node instances from a configuration.
+
     Supports both decorator-based registration and legacy configured registration.
 
     Conventions:
@@ -30,8 +30,8 @@ class NodeFactory:
 
     @staticmethod
     def get_all_node_types() -> Dict[str, List[NodeTypeSchema]]:
-        """
-        Returns a dictionary of all available node types grouped by category.
+        """Return a dictionary of all available node types grouped by category.
+
         Combines both decorator-registered and configured nodes.
         """
         # Get nodes from both sources
@@ -45,9 +45,9 @@ class NodeFactory:
                 converted_nodes[category] = []
             for node in nodes:
                 schema = NodeTypeSchema(
-                    node_type_name=node["node_type_name"],
-                    module=node["module"],
-                    class_name=node["class_name"],
+                    node_type_name=node.node_type_name,
+                    module=node.module,
+                    class_name=node.class_name,
                 )
                 converted_nodes[category].append(schema)
 
@@ -65,8 +65,8 @@ class NodeFactory:
 
     @staticmethod
     def create_node(node_name: str, node_type_name: str, config: Any) -> BaseNode:
-        """
-        Creates a node instance from a configuration.
+        """Create a node instance from a configuration.
+
         Checks both registration methods for the node type.
         """
         if not is_valid_node_type(node_type_name):
@@ -90,9 +90,9 @@ class NodeFactory:
             registered_nodes = NodeRegistry.get_registered_nodes()
             for nodes in registered_nodes.values():
                 for node in nodes:
-                    if node["node_type_name"] == node_type_name:
-                        module_name = node["module"]
-                        class_name = node["class_name"]
+                    if node.node_type_name == node_type_name:
+                        module_name = node.module
+                        class_name = node.class_name
                         break
                 if module_name and class_name:
                     break

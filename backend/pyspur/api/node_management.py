@@ -13,9 +13,7 @@ router = APIRouter()
     description="Get the schemas for all available node types",
 )
 async def get_node_types() -> Dict[str, List[Dict[str, Any]]]:
-    """
-    Returns the schemas for all available node types.
-    """
+    """Return the schemas for all available node types."""
     # get the schemas for each node class
     node_groups = NodeFactory.get_all_node_types()
 

@@ -51,6 +51,11 @@ const TextEditor = forwardRef<TextEditorRef, TextEditorProps>(
         const [selectedVariables, setSelectedVariables] = React.useState<string[]>([])
         const [isAIGenerated, setIsAIGenerated] = React.useState(false)
 
+        // Define button styling constants at component level for consistent use
+        const buttonSize = 'sm'
+        const buttonClassName = 'w-4 h-4'
+        const modalSize = 'full'
+
         // Check for OpenAI API key on mount
         useEffect(() => {
             const checkOpenAIKey = async () => {
@@ -231,7 +236,7 @@ const TextEditor = forwardRef<TextEditorRef, TextEditorProps>(
                 return (
                     <div className="flex items-center gap-2 mb-2 px-2">
                         <span className="text-foreground-500 text-sm flex items-center gap-1">
-                            <Icon icon="solar:info-circle-linear" className="w-4 h-4" />
+                            <Icon icon="solar:info-circle-linear" className={buttonClassName} />
                             Connect nodes to use variables
                         </span>
                     </div>
@@ -253,7 +258,7 @@ const TextEditor = forwardRef<TextEditorRef, TextEditorProps>(
                 <div className="flex flex-wrap gap-2 mb-2 px-2">
                     {Array.isArray(inputSchema) && inputSchema.length > 0 && (
                         <Button
-                            size="sm"
+                            size={buttonSize}
                             variant="flat"
                             color="primary"
                             onPress={() => {
@@ -263,14 +268,14 @@ const TextEditor = forwardRef<TextEditorRef, TextEditorProps>(
                             }}
                             isIconOnly
                         >
-                            <Icon icon="solar:document-add-linear" className="w-4 h-4" />
+                            <Icon icon="solar:document-add-linear" className={buttonClassName} />
                         </Button>
                     )}
                     {Array.isArray(inputSchema)
                         ? inputSchema.map((variable) => (
                               <Button
                                   key={variable}
-                                  size="sm"
+                                  size={buttonSize}
                                   variant="flat"
                                   color="primary"
                                   onPress={() => {
@@ -290,8 +295,6 @@ const TextEditor = forwardRef<TextEditorRef, TextEditorProps>(
         const renderToolbar = (editorInstance: Editor | null, isFullScreen = false) => {
             if (!editorInstance) return null
 
-            const buttonSize = isFullScreen ? 'sm' : 'md'
-            const buttonClassName = isFullScreen ? 'w-4 h-4' : 'w-3 h-3'
             const toolbarClassName = `px-2 py-2 rounded-t-medium flex flex-col gap-2 w-full bg-content2 border-b border-divider`
 
             return (
@@ -384,18 +387,16 @@ const TextEditor = forwardRef<TextEditorRef, TextEditorProps>(
         const renderGenerateButton = () => {
             if (readOnly || !enableAIGeneration) return null
 
-            const buttonLabel = `AI Generate ${messageType === 'system' ? 'System Message' : 'Prompt'}`
-
             const button = (
                 <Button
-                    size="sm"
+                    size={buttonSize}
                     color="primary"
-                    variant="light"
-                    startContent={<Icon icon="solar:magic-stick-linear" width={20} />}
+                    variant="flat"
                     onClick={() => setIsOpen(true)}
                     isDisabled={!hasOpenAIKey || readOnly}
+                    isIconOnly
                 >
-                    AI Generate
+                    <Icon icon="solar:magic-stick-3-linear" className={buttonClassName} />
                 </Button>
             )
 
@@ -440,7 +441,7 @@ const TextEditor = forwardRef<TextEditorRef, TextEditorProps>(
                 <Modal
                     isOpen={modalIsOpen}
                     onOpenChange={modalOnOpenChange}
-                    size="full"
+                    size={modalSize}
                     scrollBehavior="inside"
                     placement="center"
                 >
@@ -457,10 +458,10 @@ const TextEditor = forwardRef<TextEditorRef, TextEditorProps>(
                                     </div>
                                 </ModalBody>
                                 <ModalFooter>
-                                    <Button color="danger" variant="light" onPress={() => handleCancel(onClose)}>
+                                    <Button color="danger" variant="light" onPress={() => handleCancel(onClose)} size={buttonSize}>
                                         Cancel
                                     </Button>
-                                    <Button color="primary" onPress={() => handleSave(onClose)}>
+                                    <Button color="primary" onPress={() => handleSave(onClose)} size={buttonSize}>
                                         Save
                                     </Button>
                                 </ModalFooter>
@@ -472,7 +473,7 @@ const TextEditor = forwardRef<TextEditorRef, TextEditorProps>(
                 <Modal
                     isOpen={isOpen}
                     onClose={resetModalState}
-                    size="2xl"
+                    size={modalSize}
                     isDismissable={!isGenerating}
                     hideCloseButton={isGenerating}
                 >
@@ -531,7 +532,7 @@ const TextEditor = forwardRef<TextEditorRef, TextEditorProps>(
                                                     </div>
                                                     <div className="flex gap-2">
                                                         <Button
-                                                            size="sm"
+                                                            size={buttonSize}
                                                             variant="flat"
                                                             onClick={() => setSelectedVariables([...inputSchema])}
                                                             isDisabled={isGenerating}
@@ -539,7 +540,7 @@ const TextEditor = forwardRef<TextEditorRef, TextEditorProps>(
                                                             Select All
                                                         </Button>
                                                         <Button
-                                                            size="sm"
+                                                            size={buttonSize}
                                                             variant="flat"
                                                             onClick={() => setSelectedVariables([])}
                                                             isDisabled={isGenerating}
@@ -587,7 +588,7 @@ const TextEditor = forwardRef<TextEditorRef, TextEditorProps>(
                                 </ModalBody>
                                 <ModalFooter>
                                     <Button
-                                        size="sm"
+                                        size={buttonSize}
                                         variant="light"
                                         onClick={resetModalState}
                                         isDisabled={isGenerating}
@@ -595,7 +596,7 @@ const TextEditor = forwardRef<TextEditorRef, TextEditorProps>(
                                         Cancel
                                     </Button>
                                     <Button
-                                        size="sm"
+                                        size={buttonSize}
                                         color="primary"
                                         onClick={handleGenerateMessage}
                                         isLoading={isGenerating}

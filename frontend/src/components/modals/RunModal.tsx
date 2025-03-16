@@ -182,6 +182,90 @@ const RunModal: React.FC<RunModalProps> = ({ isOpen, onOpenChange, onRun, onSave
         // Handle file paths
         if (field.toLowerCase().includes('file') && content) {
             const fileName = content.split('/').pop() // Get just the filename from the path
+            const extension = (fileName?.split('.').pop() || '').toLowerCase()
+
+            // Convert local file paths to API endpoints
+            let filePath = content
+            if (filePath.startsWith('test_files/') || filePath.startsWith('run_files/')) {
+                filePath = window.location.origin + '/' + 'api/files/' + filePath
+            }
+
+            // Handle images
+            if (['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg'].includes(extension)) {
+                return (
+                    <div className="w-full">
+                        <img
+                            src={filePath}
+                            alt={fileName}
+                            style={{ maxWidth: '100%', maxHeight: '240px', objectFit: 'contain' }}
+                            className="rounded-md"
+                        />
+                        <div className="flex items-center gap-2 mt-1">
+                            <Icon icon="material-symbols:image" className="text-primary" />
+                            <Tooltip content={content} showArrow={true}>
+                                <span className="truncate text-xs">{fileName}</span>
+                            </Tooltip>
+                        </div>
+                    </div>
+                )
+            }
+
+            // Handle videos
+            if (['mp4', 'webm', 'ogg', 'ogv', 'mov'].includes(extension)) {
+                return (
+                    <div className="w-full">
+                        <video
+                            controls
+                            src={filePath}
+                            style={{ maxWidth: '100%', maxHeight: '240px' }}
+                            className="rounded-md"
+                        />
+                        <div className="flex items-center gap-2 mt-1">
+                            <Icon icon="material-symbols:video-file" className="text-primary" />
+                            <Tooltip content={content} showArrow={true}>
+                                <span className="truncate text-xs">{fileName}</span>
+                            </Tooltip>
+                        </div>
+                    </div>
+                )
+            }
+
+            // Handle PDFs
+            if (extension === 'pdf') {
+                return (
+                    <div className="w-full">
+                        <iframe
+                            src={filePath}
+                            style={{ width: '100%', height: '240px', border: 'none' }}
+                            className="rounded-md"
+                            title={`PDF: ${fileName}`}
+                        />
+                        <div className="flex items-center gap-2 mt-1">
+                            <Icon icon="material-symbols:description" className="text-primary" />
+                            <Tooltip content={content} showArrow={true}>
+                                <span className="truncate text-xs">{fileName}</span>
+                            </Tooltip>
+                        </div>
+                    </div>
+                )
+            }
+
+            // Handle audio
+            if (['mp3', 'wav', 'ogg', 'm4a'].includes(extension)) {
+                return (
+                    <div className="w-full">
+                        <audio controls className="w-full" src={filePath} />
+                        <div className="flex items-center gap-2 mt-1">
+                            <Icon icon="material-symbols:audio-file" className="text-primary" />
+                            <Tooltip content={content} showArrow={true}>
+                                <span className="truncate text-xs">{fileName}</span>
+                            </Tooltip>
+                        </div>
+                    </div>
+                )
+            }
+
+            // Default file icon for other file types
             return (
                 <div className="flex items-center gap-2">
                     <Icon icon="material-symbols:file-present" className="text-primary" />
@@ -329,9 +413,6 @@ const RunModal: React.FC<RunModalProps> = ({ isOpen, onOpenChange, onRun, onSave
                         <ModalBody>
                             <div className="flex flex-col gap-4 p-4 overflow-y-auto w-full">
                                 <div className="border rounded-lg w-full">
-                                    <div className="p-4 border-b bg-default-50">
-                                        <h3 className="text-lg font-semibold">Test Cases</h3>
-                                    </div>
                                     <div className="p-4 overflow-x-auto w-full">
                                         <Table
                                             aria-label="Test cases table"

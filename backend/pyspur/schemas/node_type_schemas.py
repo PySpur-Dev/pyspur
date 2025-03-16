@@ -10,8 +10,20 @@ class NodeTypeSchema(BaseModel):
 
     @property
     def node_class(self):
+        # Import the module
         module = importlib.import_module(name=f"{self.module}", package="pyspur")
-        return getattr(module, self.class_name)
+
+        # Split the class name into parts for attribute traversal
+        parts = self.class_name.split(".")
+
+        # Start with the module
+        obj = module
+
+        # Traverse the attribute chain
+        for part in parts:
+            obj = getattr(obj, part)
+
+        return obj
 
     @property
     def input_model(self):

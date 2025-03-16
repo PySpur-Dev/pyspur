@@ -71,11 +71,12 @@ class BaseNode(ABC):
     - Field types are the corresponding NodeOutputModels
     """
 
-    name: str
-    display_name: str = ""  # Will be used for config title, defaults to class name if not set
-    logo: Optional[str] = None
+    name: str = ""
+    display_name: str = ""
     category: Optional[str] = None
-    config_model: Type[BaseModel]
+    subcategory: Optional[str] = None
+    logo: Optional[str] = None
+    config_model: Type[BaseNodeConfig]
     output_model: Type[BaseNodeOutput]
     input_model: Type[BaseNodeInput]
     _config: BaseNodeConfig

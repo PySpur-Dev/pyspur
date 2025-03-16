@@ -2,7 +2,7 @@ import { FlowWorkflowNodeType } from '@/store/nodeTypesSlice'
 import { FlowWorkflowEdge, FlowWorkflowNode } from '@/types/api_types/nodeTypeSchemas'
 import { WorkflowCreateRequest } from '@/types/api_types/workflowSchemas'
 import { getLayoutedNodes } from '@/utils/nodeLayoutUtils'
-import { Dropdown, DropdownItem, DropdownMenu, DropdownTrigger } from '@heroui/react'
+import { Alert, Dropdown, DropdownItem, DropdownMenu, DropdownTrigger } from '@heroui/react'
 import { Icon } from '@iconify/react'
 import {
     Background,
@@ -23,7 +23,7 @@ import '@xyflow/react/dist/style.css'
 import { toPng } from 'html-to-image'
 import { throttle } from 'lodash'
 import isEqual from 'lodash/isEqual'
-import React, { MouseEvent as ReactMouseEvent, useCallback, useEffect, useState } from 'react'
+import React, { MouseEvent as ReactMouseEvent, useCallback, useEffect, useRef, useState } from 'react'
 import { useDispatch, useSelector } from 'react-redux'
 import { useKeyboardShortcuts } from '../../hooks/useKeyboardShortcuts'
 import { useSaveWorkflow } from '../../hooks/useSaveWorkflow'
@@ -47,6 +47,14 @@ import { onNodeDragOverGroupNode, onNodeDragStopOverGroupNode } from '../nodes/l
 import NodeSidebar from '../nodes/nodeSidebar/NodeSidebar'
 import CustomEdge from './Edge'
 import Operator from './footer/Operator'
+import { AlertState } from '@/types/alert'
+
+// Create a context for the alert function
+export const AlertContext = React.createContext<{
+    showAlert: (message: string, color: AlertState['color']) => void;
+}>({
+    showAlert: () => {},
+});
 
 interface EditorCanvasProps {
     workflowData?: WorkflowCreateRequest
@@ -108,6 +116,43 @@ const EditorCanvasContent: React.FC<EditorCanvasProps> = ({
 }) => {
     const dispatch = useDispatch()
     const projectName = useSelector((state: RootState) => state.flow.projectName)
+
+    // Add local alert state
+    const [alert, setAlert] = useState<AlertState>({
+        message: '',
+        color: 'default',
+        isVisible: false,
+    })
+
+    // Use a ref to store the timeout ID
+    const alertTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+
+    // Create a showAlert function with improved timeout handling
+    const showAlert = useCallback((message: string, color: AlertState['color']) => {
+        // Clear any existing timeout to prevent race conditions
+        if (alertTimeoutRef.current) {
+            clearTimeout(alertTimeoutRef.current)
+            alertTimeoutRef.current = null
+        }
+
+        // Show the alert
+        setAlert({ message, color, isVisible: true })
+
+        // Set a new timeout and store its ID in the ref
+        alertTimeoutRef.current = setTimeout(() => {
+            setAlert((prev) => ({ ...prev, isVisible: false }))
+            alertTimeoutRef.current = null
+        }, 3000)
+    }, [])
+
+    // Clean up the timeout when the component unmounts
+    useEffect(() => {
+        return () => {
+            if (alertTimeoutRef.current) {
+                clearTimeout(alertTimeoutRef.current)
+            }
+        }
+    }, [])
 
     const nodeTypesConfig = useSelector((state: RootState) => state.nodeTypes.data)
 
@@ -473,276 +518,285 @@ const EditorCanvasContent: React.FC<EditorCanvasProps> = ({
     }
 
     return (
-        <div style={{ position: 'relative', height: '100%' }}>
-            {isPopoverContentVisible && selectedEdge && (
-                <div
-                    style={{
-                        position: 'absolute',
-                        left: `${popoverPosition.x}px`,
-                        top: `${popoverPosition.y}px`,
-                        transform: 'translate(-50%, -50%)',
-                        zIndex: 1000,
-                    }}
-                >
-                    <Dropdown
-                        isOpen={isPopoverContentVisible}
-                        onOpenChange={(isOpen) => {
-                            if (!isOpen) {
-                                setPopoverContentVisible(false)
-                            }
-                        }}
-                        placement="bottom"
-                    >
-                        <DropdownTrigger>
-                            <div></div>
-                        </DropdownTrigger>
-                        <DropdownMenu
-                            aria-label="Add node options"
-                            closeOnSelect={false}
-                            onAction={(key) => {
-                                const keyStr = key.toString()
-                                if (keyStr.startsWith('toggle-category-')) {
-                                    toggleCategory(keyStr.replace('toggle-category-', ''))
-                                    return
-                                }
-                                if (keyStr.startsWith('toggle-')) {
-                                    toggleIntegration(keyStr.replace('toggle-', ''))
-                                    return
-                                }
-                                handleAddNodeBetween(
-                                    keyStr,
-                                    selectedEdge.sourceNode,
-                                    selectedEdge.targetNode,
-                                    selectedEdge.edgeId
-                                )
-                                setPopoverContentVisible(false)
-                            }}
-                        >
-                            {nodeTypesConfig &&
-                                Object.keys(nodeTypesConfig)
-                                    .filter((category) => category !== 'Input/Output')
-                                    .map((category) => {
-                                        const nodes = nodeTypesConfig[category]
-                                        const hasSubcategories = nodes.some((node) => node.category)
+        <AlertContext.Provider value={{ showAlert }}>
+            <div style={{ position: 'relative', height: '100%' }}>
+                {/* Global Alert */}
+                {alert.isVisible && (
+                    <div className="fixed bottom-4 right-4 z-50">
+                        <Alert color={alert.color}>{alert.message}</Alert>
+                    </div>
+                )}
 
-                                        return (
-                                            <React.Fragment key={category}>
-                                                <DropdownItem
-                                                    key={`toggle-category-${category}`}
-                                                    className="font-bold opacity-70 flex items-center gap-2"
-                                                    startContent={
-                                                        <Icon
-                                                            icon={
-                                                                expandedCategories.has(category)
-                                                                    ? 'solar:alt-arrow-down-linear'
-                                                                    : 'solar:alt-arrow-right-linear'
-                                                            }
-                                                            className="text-default-500"
-                                                        />
-                                                    }
-                                                >
-                                                    {category}
-                                                </DropdownItem>
-                                                {expandedCategories.has(category) &&
-                                                    (category === 'Integrations'
-                                                        ? Object.entries(groupNodesBySubcategory(nodes)).map(
-                                                              ([subcategory, { nodes: subcategoryNodes }]) => (
-                                                                  <React.Fragment key={subcategory}>
-                                                                      <DropdownItem
-                                                                          key={`toggle-${subcategory}`}
-                                                                          className="font-semibold pl-4 flex items-center gap-2"
-                                                                          startContent={
-                                                                              <Icon
-                                                                                  icon={
-                                                                                      expandedIntegrations.has(
-                                                                                          subcategory
-                                                                                      )
-                                                                                          ? 'solar:alt-arrow-down-linear'
-                                                                                          : 'solar:alt-arrow-right-linear'
-                                                                                  }
-                                                                                  className="text-default-500"
-                                                                              />
-                                                                          }
-                                                                      >
-                                                                          {subcategory}
-                                                                      </DropdownItem>
-                                                                      {expandedIntegrations.has(subcategory) &&
-                                                                          subcategoryNodes.map((node) => (
-                                                                              <DropdownItem
-                                                                                  key={node.name}
-                                                                                  className="pl-8"
-                                                                                  startContent={
-                                                                                      node.logo ? (
-                                                                                          <img
-                                                                                              src={node.logo}
-                                                                                              alt={`${node.config.title} Logo`}
-                                                                                              className="w-5 h-5"
-                                                                                          />
-                                                                                      ) : (
-                                                                                          <div
-                                                                                              className="node-acronym-tag text-white px-2 py-1 rounded-full text-xs"
-                                                                                              style={{
-                                                                                                  backgroundColor:
-                                                                                                      node.visual_tag
-                                                                                                          ?.color,
-                                                                                              }}
-                                                                                          >
-                                                                                              {node.visual_tag?.acronym}
-                                                                                          </div>
-                                                                                      )
-                                                                                  }
-                                                                              >
-                                                                                  {node.config.title}
-                                                                              </DropdownItem>
-                                                                          ))}
-                                                                  </React.Fragment>
+                {isPopoverContentVisible && selectedEdge && (
+                    <div
+                        style={{
+                            position: 'absolute',
+                            left: `${popoverPosition.x}px`,
+                            top: `${popoverPosition.y}px`,
+                            transform: 'translate(-50%, -50%)',
+                            zIndex: 1000,
+                        }}
+                    >
+                        <Dropdown
+                            isOpen={isPopoverContentVisible}
+                            onOpenChange={(isOpen) => {
+                                if (!isOpen) {
+                                    setPopoverContentVisible(false)
+                                }
+                            }}
+                            placement="bottom"
+                        >
+                            <DropdownTrigger>
+                                <div></div>
+                            </DropdownTrigger>
+                            <DropdownMenu
+                                aria-label="Add node options"
+                                closeOnSelect={false}
+                                onAction={(key) => {
+                                    const keyStr = key.toString()
+                                    if (keyStr.startsWith('toggle-category-')) {
+                                        toggleCategory(keyStr.replace('toggle-category-', ''))
+                                        return
+                                    }
+                                    if (keyStr.startsWith('toggle-')) {
+                                        toggleIntegration(keyStr.replace('toggle-', ''))
+                                        return
+                                    }
+                                    handleAddNodeBetween(
+                                        keyStr,
+                                        selectedEdge.sourceNode,
+                                        selectedEdge.targetNode,
+                                        selectedEdge.edgeId
+                                    )
+                                    setPopoverContentVisible(false)
+                                }}
+                            >
+                                {nodeTypesConfig &&
+                                    Object.keys(nodeTypesConfig)
+                                        .filter((category) => category !== 'Input/Output')
+                                        .map((category) => {
+                                            const nodes = nodeTypesConfig[category]
+                                            const hasSubcategories = nodes.some((node) => node.category)
+
+                                            return (
+                                                <React.Fragment key={category}>
+                                                    <DropdownItem
+                                                        key={`toggle-category-${category}`}
+                                                        className="font-bold opacity-70 flex items-center gap-2"
+                                                        startContent={
+                                                            <Icon
+                                                                icon={
+                                                                    expandedCategories.has(category)
+                                                                        ? 'solar:alt-arrow-down-linear'
+                                                                        : 'solar:alt-arrow-right-linear'
+                                                                }
+                                                                className="text-default-500"
+                                                            />
+                                                        }
+                                                    >
+                                                        {category}
+                                                    </DropdownItem>
+                                                    {expandedCategories.has(category) &&
+                                                        (category === 'Integrations'
+                                                            ? Object.entries(groupNodesBySubcategory(nodes)).map(
+                                                                  ([subcategory, { nodes: subcategoryNodes }]) => (
+                                                                      <React.Fragment key={subcategory}>
+                                                                          <DropdownItem
+                                                                              key={`toggle-${subcategory}`}
+                                                                              className="font-semibold pl-4 flex items-center gap-2"
+                                                                              startContent={
+                                                                                  <Icon
+                                                                                      icon={
+                                                                                          expandedIntegrations.has(
+                                                                                              subcategory
+                                                                                          )
+                                                                                              ? 'solar:alt-arrow-down-linear'
+                                                                                              : 'solar:alt-arrow-right-linear'
+                                                                                      }
+                                                                                      className="text-default-500"
+                                                                                  />
+                                                                              }
+                                                                          >
+                                                                              {subcategory}
+                                                                          </DropdownItem>
+                                                                          {expandedIntegrations.has(subcategory) &&
+                                                                              subcategoryNodes.map((node) => (
+                                                                                  <DropdownItem
+                                                                                      key={node.name}
+                                                                                      className="pl-8"
+                                                                                      startContent={
+                                                                                          node.logo ? (
+                                                                                              <img
+                                                                                                  src={node.logo}
+                                                                                                  alt={`${node.config.title} Logo`}
+                                                                                                  className="w-5 h-5"
+                                                                                              />
+                                                                                          ) : (
+                                                                                              <div
+                                                                                                  className="node-acronym-tag text-white px-2 py-1 rounded-full text-xs"
+                                                                                                  style={{
+                                                                                                      backgroundColor:
+                                                                                                          node.visual_tag
+                                                                                                              ?.color,
+                                                                                                  }}
+                                                                                              >
+                                                                                                  {node.visual_tag?.acronym}
+                                                                                              </div>
+                                                                                          )
+                                                                                      }
+                                                                                  >
+                                                                                      {node.config.title}
+                                                                                  </DropdownItem>
+                                                                              ))}
+                                                                      </React.Fragment>
+                                                                  )
                                                               )
-                                                          )
-                                                        : hasSubcategories
-                                                          ? Object.entries(groupNodesBySubcategory(nodes)).map(
-                                                                ([subcategory, { nodes: subcategoryNodes }]) => (
-                                                                    <React.Fragment key={subcategory}>
-                                                                        <DropdownItem
-                                                                            key={`${subcategory}-header`}
-                                                                            className="font-semibold opacity-70 pl-4"
-                                                                            isReadOnly
-                                                                        >
-                                                                            {subcategory}
-                                                                        </DropdownItem>
-                                                                        {subcategoryNodes.map((node) => (
+                                                            : hasSubcategories
+                                                              ? Object.entries(groupNodesBySubcategory(nodes)).map(
+                                                                    ([subcategory, { nodes: subcategoryNodes }]) => (
+                                                                        <React.Fragment key={subcategory}>
                                                                             <DropdownItem
-                                                                                key={node.name}
-                                                                                className="pl-8"
-                                                                                startContent={
-                                                                                    node.logo ? (
-                                                                                        <img
-                                                                                            src={node.logo}
-                                                                                            alt={`${node.config.title} Logo`}
-                                                                                            className="w-5 h-5"
-                                                                                        />
-                                                                                    ) : (
-                                                                                        <div
-                                                                                            className="node-acronym-tag text-white px-2 py-1 rounded-full text-xs"
-                                                                                            style={{
-                                                                                                backgroundColor:
-                                                                                                    node.visual_tag
-                                                                                                        ?.color,
-                                                                                            }}
-                                                                                        >
-                                                                                            {node.visual_tag?.acronym}
-                                                                                        </div>
-                                                                                    )
-                                                                                }
+                                                                                key={`${subcategory}-header`}
+                                                                                className="font-semibold opacity-70 pl-4"
+                                                                                isReadOnly
                                                                             >
-                                                                                {node.config.title}
+                                                                                {subcategory}
                                                                             </DropdownItem>
-                                                                        ))}
-                                                                    </React.Fragment>
+                                                                            {subcategoryNodes.map((node) => (
+                                                                                <DropdownItem
+                                                                                    key={node.name}
+                                                                                    className="pl-8"
+                                                                                    startContent={
+                                                                                        node.logo ? (
+                                                                                            <img
+                                                                                                src={node.logo}
+                                                                                                alt={`${node.config.title} Logo`}
+                                                                                                className="w-5 h-5"
+                                                                                            />
+                                                                                        ) : (
+                                                                                            <div
+                                                                                                className="node-acronym-tag text-white px-2 py-1 rounded-full text-xs"
+                                                                                                style={{
+                                                                                                    backgroundColor:
+                                                                                                        node.visual_tag
+                                                                                                            ?.color,
+                                                                                                }}
+                                                                                            >
+                                                                                                {node.visual_tag?.acronym}
+                                                                                            </div>
+                                                                                        )
+                                                                                    }
+                                                                                >
+                                                                                    {node.config.title}
+                                                                                </DropdownItem>
+                                                                            ))}
+                                                                        </React.Fragment>
+                                                                    )
                                                                 )
-                                                            )
-                                                          : nodes.map((node) => (
-                                                                <DropdownItem
-                                                                    key={node.name}
-                                                                    className="pl-4"
-                                                                    startContent={
-                                                                        node.logo ? (
-                                                                            <img
-                                                                                src={node.logo}
-                                                                                alt={`${node.config.title} Logo`}
-                                                                                className="w-5 h-5"
-                                                                            />
-                                                                        ) : (
-                                                                            <div
-                                                                                className="node-acronym-tag text-white px-2 py-1 rounded-full text-xs"
-                                                                                style={{
-                                                                                    backgroundColor:
-                                                                                        node.visual_tag?.color,
-                                                                                }}
-                                                                            >
-                                                                                {node.visual_tag?.acronym}
-                                                                            </div>
-                                                                        )
-                                                                    }
-                                                                >
-                                                                    {node.config.title}
-                                                                </DropdownItem>
-                                                            )))}
+                                                              : nodes.map((node) => (
+                                                                    <DropdownItem
+                                                                        key={node.name}
+                                                                        className="pl-4"
+                                                                        startContent={
+                                                                            node.logo ? (
+                                                                                <img
+                                                                                    src={node.logo}
+                                                                                    alt={`${node.config.title} Logo`}
+                                                                                    className="w-5 h-5"
+                                                                                />
+                                                                            ) : (
+                                                                                <div
+                                                                                    className="node-acronym-tag text-white px-2 py-1 rounded-full text-xs"
+                                                                                    style={{
+                                                                                        backgroundColor:
+                                                                                            node.visual_tag?.color,
+                                                                                    }}
+                                                                                >
+                                                                                    {node.visual_tag?.acronym}
+                                                                                </div>
+                                                                            )
+                                                                        }
+                                                                    >
+                                                                        {node.config.title}
+                                                                    </DropdownItem>
+                                                                )))}
                                             </React.Fragment>
                                         )
                                     })}
-                        </DropdownMenu>
-                    </Dropdown>
-                </div>
-            )}
-
-            <div style={{ width: '100%', height: '100%', overflow: 'hidden' }}>
-                <div
-                    style={{
-                        height: '100%',
-                        overflow: 'auto',
-                        position: 'relative',
-                        zIndex: 1,
-                    }}
-                >
-                    <ReactFlow
-                        nodes={nodesWithAdjustedZIndex}
-                        edges={styledEdges}
-                        onNodesChange={onNodesChange}
-                        onEdgesChange={onEdgesChange}
-                        onConnect={onConnect}
-                        nodeTypes={nodeTypes}
-                        edgeTypes={edgeTypes}
-                        fitView
-                        onInit={onInit}
-                        onNodeClick={onNodeClick}
-                        onEdgeClick={onEdgeClick}
-                        onPaneClick={onPaneClick}
-                        onNodesDelete={onNodesDelete}
-                        proOptions={proOptions}
-                        panOnDrag={mode === 'hand' && !nodes.filter(Boolean).some((n) => n.selected)}
-                        panOnScroll={true}
-                        zoomOnScroll={true}
-                        minZoom={0.1}
-                        maxZoom={2}
-                        selectionMode={mode === 'pointer' ? SelectionMode.Full : SelectionMode.Partial}
-                        selectNodesOnDrag={mode === 'pointer'}
-                        selectionOnDrag={mode === 'pointer'}
-                        selectionKeyCode={mode === 'pointer' ? null : 'Shift'}
-                        multiSelectionKeyCode={mode === 'pointer' ? null : 'Shift'}
-                        deleteKeyCode="Delete"
-                        nodesConnectable={true}
-                        connectionMode={ConnectionMode.Loose}
-                        onNodeMouseEnter={onNodeMouseEnter}
-                        onNodeMouseLeave={onNodeMouseLeave}
-                        onEdgeMouseEnter={onEdgeMouseEnter}
-                        onEdgeMouseLeave={onEdgeMouseLeave}
-                        snapToGrid={false}
-                        onNodeDrag={onNodeDrag}
-                        onNodeDragStop={onNodeDragStop}
-                    >
-                        <Background />
-                        {showHelperLines && (
-                            <HelperLinesRenderer horizontal={helperLines.horizontal} vertical={helperLines.vertical} />
-                        )}
-                        <Operator handleLayout={handleLayout} handleDownloadImage={handleDownloadImage} />
-
-                        {/* Extra Panel Buttons (from props) */}
-                        {extraPanelButtons && <Panel position="top-right">{extraPanelButtons}</Panel>}
-                    </ReactFlow>
-                </div>
-                {selectedNodeID && !renderNodeSidebarExternally && (
-                    <div
-                        className="absolute top-0 right-0 h-full bg-background dark:bg-background/80 border-l border-divider"
-                        style={{ zIndex: 30 }}
-                    >
-                        <NodeSidebar nodeID={selectedNodeID} key={selectedNodeID} readOnly={false} />
+                            </DropdownMenu>
+                        </Dropdown>
                     </div>
                 )}
-                <div className="border-divider absolute top-4 left-4" style={{ zIndex: 15 }}>
-                    <CollapsibleNodePanel />
+
+                <div style={{ width: '100%', height: '100%', overflow: 'hidden' }}>
+                    <div
+                        style={{
+                            height: '100%',
+                            overflow: 'auto',
+                            position: 'relative',
+                            zIndex: 1,
+                        }}
+                    >
+                        <ReactFlow
+                            nodes={nodesWithAdjustedZIndex}
+                            edges={styledEdges}
+                            onNodesChange={onNodesChange}
+                            onEdgesChange={onEdgesChange}
+                            onConnect={onConnect}
+                            nodeTypes={nodeTypes}
+                            edgeTypes={edgeTypes}
+                            fitView
+                            onInit={onInit}
+                            onNodeClick={onNodeClick}
+                            onEdgeClick={onEdgeClick}
+                            onPaneClick={onPaneClick}
+                            onNodesDelete={onNodesDelete}
+                            proOptions={proOptions}
+                            panOnDrag={mode === 'hand' && !nodes.filter(Boolean).some((n) => n.selected)}
+                            panOnScroll={true}
+                            zoomOnScroll={true}
+                            minZoom={0.1}
+                            maxZoom={2}
+                            selectionMode={mode === 'pointer' ? SelectionMode.Full : SelectionMode.Partial}
+                            selectNodesOnDrag={mode === 'pointer'}
+                            selectionOnDrag={mode === 'pointer'}
+                            selectionKeyCode={mode === 'pointer' ? null : 'Shift'}
+                            multiSelectionKeyCode={mode === 'pointer' ? null : 'Shift'}
+                            deleteKeyCode="Delete"
+                            nodesConnectable={true}
+                            connectionMode={ConnectionMode.Loose}
+                            onNodeMouseEnter={onNodeMouseEnter}
+                            onNodeMouseLeave={onNodeMouseLeave}
+                            onEdgeMouseEnter={onEdgeMouseEnter}
+                            onEdgeMouseLeave={onEdgeMouseLeave}
+                            snapToGrid={false}
+                            onNodeDrag={onNodeDrag}
+                            onNodeDragStop={onNodeDragStop}
+                        >
+                            <Background />
+                            {showHelperLines && (
+                                <HelperLinesRenderer horizontal={helperLines.horizontal} vertical={helperLines.vertical} />
+                            )}
+                            <Operator handleLayout={handleLayout} handleDownloadImage={handleDownloadImage} />
+
+                            {/* Extra Panel Buttons (from props) */}
+                            {extraPanelButtons && <Panel position="top-right">{extraPanelButtons}</Panel>}
+                        </ReactFlow>
+                    </div>
+                    {selectedNodeID && !renderNodeSidebarExternally && (
+                        <div
+                            className="absolute top-0 right-0 h-full bg-background dark:bg-background/80 border-l border-divider"
+                            style={{ zIndex: 30 }}
+                        >
+                            <NodeSidebar nodeID={selectedNodeID} key={selectedNodeID} readOnly={false} />
+                        </div>
+                    )}
+                    <div className="border-divider absolute top-4 left-4" style={{ zIndex: 15 }}>
+                        <CollapsibleNodePanel />
+                    </div>
                 </div>
             </div>
-        </div>
+        </AlertContext.Provider>
     )
 }
 

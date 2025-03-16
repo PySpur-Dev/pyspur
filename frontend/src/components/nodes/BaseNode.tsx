@@ -12,9 +12,10 @@ import { createSelector } from '@reduxjs/toolkit'
 import { Handle, Position, useConnection, useNodeConnections, useUpdateNodeInternals } from '@xyflow/react'
 import { debounce } from 'lodash'
 import isEqual from 'lodash/isEqual'
-import React, { useEffect, useMemo, useRef, useState } from 'react'
+import React, { useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { useDispatch, useSelector } from 'react-redux'
 import { updateNodeDataOnly, updateNodeParentAndCoordinates, updateNodeTitle } from '../../store/flowSlice'
+import { AlertContext } from '../canvas/EditorCanvas'
 import styles from './BaseNode.module.css'
 import NodeControls from './NodeControls'
 import NodeErrorDisplay from './NodeErrorDisplay'
@@ -112,7 +113,8 @@ const baseNodeComparator = (prev: BaseNodeProps, next: BaseNodeProps) => {
         prev.className === next.className &&
         prev.isResizable === next.isResizable &&
         prev.positionAbsoluteX === next.positionAbsoluteX &&
-        prev.positionAbsoluteY === next.positionAbsoluteY
+        prev.positionAbsoluteY === next.positionAbsoluteY &&
+        isEqual(prev.children, next.children)
     )
 }
 
@@ -158,12 +160,10 @@ const BaseNode: React.FC<BaseNodeProps> = ({
     const [editingTitle, setEditingTitle] = useState(false)
     const [isRunning, setIsRunning] = useState(false)
     const [titleInputValue, setTitleInputValue] = useState('')
-    const [alert, setAlert] = useState<AlertState>({
-        message: '',
-        color: 'default',
-        isVisible: false,
-    })
     const dispatch = useDispatch()
+
+    // Use the AlertContext
+    const { showAlert } = useContext(AlertContext)
 
     const connection = useConnection()
 
@@ -180,11 +180,6 @@ const BaseNode: React.FC<BaseNodeProps> = ({
     const availableOutputs = useSelector(selectAvailableOutputs, isEqual)
 
     const { executePartialRun, loading } = usePartialRun(dispatch)
-
-    const showAlert = (message: string, color: AlertState['color']) => {
-        setAlert({ message, color, isVisible: true })
-        setTimeout(() => setAlert((prev) => ({ ...prev, isVisible: false })), 3000)
-    }
 
     const handleDelete = () => {
         deleteNode(id, selectedNodeId, dispatch)
@@ -532,11 +527,6 @@ const BaseNode: React.FC<BaseNodeProps> = ({
 
     return (
         <>
-            {alert.isVisible && (
-                <div className="fixed bottom-4 right-4 z-50">
-                    <Alert color={alert.color}>{alert.message}</Alert>
-                </div>
-            )}
             <div
                 style={staticStyles.container}
                 draggable={false}

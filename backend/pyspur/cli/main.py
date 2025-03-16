@@ -66,6 +66,13 @@ def init(
                     f.write("\n# ================================")
                     f.write("\nPROJECT_ROOT=" + str(target_dir) + "\n")
 
+        # add __init__.py to the project directory
+        init_file_path = target_dir / "__init__.py"
+        if not init_file_path.exists():
+            with open(init_file_path, "w") as f:
+                f.write("# This is an empty __init__.py file")
+            print("[green]✓[/green] Created __init__.py")
+
         custom_dirs = {
             "data": target_dir / "data",
             "tools": target_dir / "tools",

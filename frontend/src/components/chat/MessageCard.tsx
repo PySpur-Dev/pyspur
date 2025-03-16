@@ -4,11 +4,12 @@ import { Avatar, Badge, Button, Chip, cn, Link, Tooltip } from '@heroui/react'
 import { useClipboard } from '@heroui/use-clipboard'
 import { Icon } from '@iconify/react'
 import React from 'react'
+import ReactMarkdown from 'react-markdown'
 
 export type MessageCardProps = React.HTMLAttributes<HTMLDivElement> & {
     avatar?: string
     showFeedback?: boolean
-    message?: React.ReactNode
+    message?: string | React.ReactNode
     currentAttempt?: number
     status?: 'success' | 'failed' | 'loading'
     attempts?: number
@@ -54,8 +55,8 @@ const MessageCard = React.forwardRef<HTMLDivElement, MessageCardProps>(
         const failedMessage = (
             <p>
                 Something went wrong, if the issue persists please contact us through our help center at&nbsp;
-                <Link href="mailto:support@acmeai.com" size="sm">
-                    support@acmeai.com
+                <Link href="mailto:support@pyspur.dev" size="sm">
+                    support@pyspur.dev
                 </Link>
             </p>
         )
@@ -135,7 +136,15 @@ const MessageCard = React.forwardRef<HTMLDivElement, MessageCardProps>(
                         )}
                     >
                         <div ref={messageRef} className={'pr-20 text-small'}>
-                            {hasFailed ? failedMessage : isLoading ? loadingMessage : message}
+                            {hasFailed ? (
+                                failedMessage
+                            ) : isLoading ? (
+                                loadingMessage
+                            ) : typeof message === 'string' ? (
+                                <ReactMarkdown>{message}</ReactMarkdown>
+                            ) : (
+                                message
+                            )}
                         </div>
                         {showFeedback && !hasFailed && !isLoading && (
                             <div className="absolute right-2 top-2 flex rounded-full bg-content2 shadow-small">
