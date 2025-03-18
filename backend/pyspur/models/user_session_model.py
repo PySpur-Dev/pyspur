@@ -16,13 +16,14 @@ class UserModel(BaseModel):
     external_id: Mapped[str] = mapped_column(String, nullable=True, unique=True)
     user_metadata: Mapped[Dict[str, Any]] = mapped_column(JSON, nullable=False, default=dict)
     created_at: Mapped[datetime] = mapped_column(
-        DateTime, nullable=False, default=datetime.now(timezone.utc)
+        DateTime, nullable=False, default=datetime.now(timezone.utc), index=True
     )
     updated_at: Mapped[datetime] = mapped_column(
         DateTime,
         nullable=False,
         default=datetime.now(timezone.utc),
         onupdate=datetime.now(timezone.utc),
+        index=True,
     )
 
     # Relationship to sessions, ordered by most recent first
@@ -45,13 +46,14 @@ class SessionModel(BaseModel):
         String, ForeignKey("workflows.id"), nullable=False, index=True
     )
     created_at: Mapped[datetime] = mapped_column(
-        DateTime, nullable=False, default=datetime.now(timezone.utc)
+        DateTime, nullable=False, default=datetime.now(timezone.utc), index=True
     )
     updated_at: Mapped[datetime] = mapped_column(
         DateTime,
         nullable=False,
         default=datetime.now(timezone.utc),
         onupdate=datetime.now(timezone.utc),
+        index=True,
     )
 
     # Relationship to user
@@ -82,13 +84,14 @@ class MessageModel(BaseModel):
     )
     content: Mapped[Dict[str, Any]] = mapped_column(JSON, nullable=False)
     created_at: Mapped[datetime] = mapped_column(
-        DateTime, nullable=False, default=datetime.now(timezone.utc)
+        DateTime, nullable=False, default=datetime.now(timezone.utc), index=True
     )
     updated_at: Mapped[datetime] = mapped_column(
         DateTime,
         nullable=False,
         default=datetime.now(timezone.utc),
         onupdate=datetime.now(timezone.utc),
+        index=True,
     )
 
     # Relationship to session

@@ -1,12 +1,11 @@
 import usePartialRun from '@/hooks/usePartialRun'
 import store, { RootState } from '@/store/store'
-import { AlertState } from '@/types/alert'
 import { FlowWorkflowNode } from '@/types/api_types/nodeTypeSchemas'
 import { TaskStatus } from '@/types/api_types/taskSchemas'
 import { isTargetAncestorOfSource } from '@/utils/cyclicEdgeUtils'
 import { deleteNode, duplicateNode, getNodeTitle } from '@/utils/flowUtils'
 import { convertToPythonVariableName } from '@/utils/variableNameUtils'
-import { Alert, Button, Card, CardBody, CardHeader, Divider, Input } from '@heroui/react'
+import { Button, Card, CardBody, CardHeader, Divider, Input } from '@heroui/react'
 import { Icon } from '@iconify/react'
 import { createSelector } from '@reduxjs/toolkit'
 import { Handle, Position, useConnection, useNodeConnections, useUpdateNodeInternals } from '@xyflow/react'
@@ -35,6 +34,7 @@ export interface BaseNodeProps {
     positionAbsoluteX?: number
     positionAbsoluteY?: number
     renderOutputHandles?: () => React.ReactNode
+    hideHandles?: boolean
 }
 
 const staticStyles = {
@@ -156,6 +156,7 @@ const BaseNode: React.FC<BaseNodeProps> = ({
     positionAbsoluteX,
     positionAbsoluteY,
     renderOutputHandles,
+    hideHandles = false,
 }) => {
     const [editingTitle, setEditingTitle] = useState(false)
     const [isRunning, setIsRunning] = useState(false)
@@ -174,6 +175,15 @@ const BaseNode: React.FC<BaseNodeProps> = ({
     const parentPosition = useSelector((state: RootState) =>
         parentId ? state.flow.nodes.find((n) => n.id === parentId)?.position : undefined
     )
+    const isTool = useSelector((state: RootState) => {
+        const node = state.flow.nodes.find((n) => n.id === id)
+        if (node?.data?.isTool) return true
+
+        // Check if parent is an AgentNode
+        const parentNode = node?.parentId ? state.flow.nodes.find((n) => n.id === node.parentId) : undefined
+
+        return parentNode?.type === 'Agent'
+    })
 
     const initialInputs = useSelector(selectInitialInputs, isEqual)
 
@@ -474,7 +484,7 @@ const BaseNode: React.FC<BaseNodeProps> = ({
     }, [finalPredecessors, predecessorNodes, id, updateNodeInternals])
 
     const renderHandles = () => {
-        if (!nodeData) {
+        if (!nodeData || hideHandles || isTool) {
             return null
         }
         const dedupedPredecessors = finalPredecessors.filter(

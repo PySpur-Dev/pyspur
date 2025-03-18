@@ -51,7 +51,7 @@ class RunModel(BaseModel):
         String, ForeignKey("datasets.id"), nullable=True, index=True
     )
     start_time: Mapped[Optional[datetime]] = mapped_column(
-        DateTime, default=datetime.now(timezone.utc)
+        DateTime, default=datetime.now(timezone.utc), index=True
     )
     end_time: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
     outputs: Mapped[Optional[Any]] = mapped_column(JSON, nullable=True)

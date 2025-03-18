@@ -211,18 +211,20 @@ def create_workflow(
     elif len(workflow_request.definition.nodes) == 0:
         # If the workflow type is not CHATBOT, create a new definition with default WORKFLOW type
         workflow_request.definition = create_a_new_workflow_definition(spur_type=SpurType.WORKFLOW)
+
     # Generate a unique name for the workflow
     workflow_name = generate_unique_workflow_name(db, workflow_request.name or "Untitled Workflow")
     new_workflow = WorkflowModel(
         name=workflow_name,
         description=workflow_request.description,
-        definition=(workflow_request.definition.model_dump()),
+        definition=workflow_request.definition.model_dump(),
         created_at=datetime.now(timezone.utc),
         updated_at=datetime.now(timezone.utc),
     )
     db.add(new_workflow)
     db.commit()
     db.refresh(new_workflow)
+
     return new_workflow
 
 
@@ -244,12 +246,14 @@ def update_workflow(
             status_code=400,
             detail="Workflow definition is required to update a workflow",
         )
+
     workflow.definition = workflow_request.definition.model_dump()
     workflow.name = workflow_request.name
     workflow.description = workflow_request.description
     workflow.updated_at = datetime.now(timezone.utc)
     db.commit()
     db.refresh(workflow)
+
     return workflow
 
 
@@ -290,6 +294,7 @@ def get_workflow(workflow_id: str, db: Session = Depends(get_db)) -> WorkflowRes
     workflow = db.query(WorkflowModel).filter(WorkflowModel.id == workflow_id).first()
     if not workflow:
         raise HTTPException(status_code=404, detail="Workflow not found")
+
     return workflow
 
 
@@ -364,10 +369,11 @@ def duplicate_workflow(workflow_id: str, db: Session = Depends(get_db)) -> Workf
 
     # Create a new WorkflowModel instance by copying fields
     new_workflow_name = generate_unique_workflow_name(db, f"{workflow.name} (Copy)")
+
     new_workflow = WorkflowModel(
         name=new_workflow_name,
         description=workflow.description,
-        definition=workflow.definition,
+        definition=workflow.definition.model_dump(),
         created_at=datetime.now(timezone.utc),
         updated_at=datetime.now(timezone.utc),
     )

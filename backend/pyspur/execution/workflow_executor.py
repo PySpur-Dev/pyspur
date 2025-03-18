@@ -547,7 +547,7 @@ class WorkflowExecutor:
                     # Get the specific route's output from the router
                     route_output = getattr(output, source_handle, None)
                     if route_output is not None:
-                        node_input[self.node_instances[dep_id].name] = route_output
+                        node_input[predecessor_node.title] = route_output
                     else:
                         self._outputs[node_id] = None
                         if self.task_recorder:
@@ -570,9 +570,9 @@ class WorkflowExecutor:
                         #
                         # Store the raw output data directly in the node_input
                         # using dep_id as the key
-                        node_input[self.node_instances[dep_id].name] = output_dict
+                        node_input[predecessor_node.title] = output_dict
                 else:
-                    node_input[self.node_instances[dep_id].name] = output
+                    node_input[predecessor_node.title] = output
 
             # Special handling for InputNode - use initial inputs
             if node.node_type == "InputNode":
@@ -732,7 +732,6 @@ class WorkflowExecutor:
         node_ids: List[str] = [],
         precomputed_outputs: Dict[str, Dict[str, Any] | List[Dict[str, Any]]] = {},
     ) -> Dict[str, BaseNodeOutput]:
-
         # Handle precomputed outputs first
         if precomputed_outputs:
             for node_id, output in precomputed_outputs.items():

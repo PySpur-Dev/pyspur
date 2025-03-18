@@ -22,11 +22,14 @@ class WorkflowModel(BaseModel):
     name: Mapped[str] = mapped_column(String, unique=True, nullable=False)
     description: Mapped[Optional[str]] = mapped_column(String)
     definition: Mapped[Any] = mapped_column(JSON, nullable=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now(timezone.utc))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, default=datetime.now(timezone.utc), index=True
+    )
     updated_at: Mapped[datetime] = mapped_column(
         DateTime,
         default=datetime.now(timezone.utc),
         onupdate=datetime.now(timezone.utc),
+        index=True,
     )
 
     versions = relationship(

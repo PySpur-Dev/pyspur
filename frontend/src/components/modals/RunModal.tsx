@@ -81,25 +81,30 @@ const RunModal: React.FC<RunModalProps> = ({ isOpen, onOpenChange, onRun, onSave
         }
     }, [isOpen, testData, selectedTestInputId, dispatch])
 
+    useEffect(() => {
+        if (!isOpen) return
+
+        const handleKeyDown = (event: KeyboardEvent) => {
+            if (event.key === 'Enter' && (event.ctrlKey || event.metaKey)) {
+                const canRun = selectedTestInputId || Object.values(editorContents).some((v) => v?.trim())
+                if (canRun) {
+                    const success = handleRun()
+                    if (success) {
+                        onOpenChange(false)
+                    }
+                }
+            } else if (event.key === 'Escape') {
+                onOpenChange(false)
+            }
+        }
+
+        window.addEventListener('keydown', handleKeyDown)
+        return () => window.removeEventListener('keydown', handleKeyDown)
+    }, [isOpen, selectedTestInputId, editorContents, onOpenChange])
+
     const getNextId = () => {
         const maxId = testData.reduce((max, row) => Math.max(max, row.id), 0)
         return maxId + 1
-    }
-
-    const handleAddRow = () => {
-        // Check if we have any content to add
-        const hasContent = Object.values(editorContents).some((v) => v?.trim())
-        if (!hasContent) return
-
-        const newId = getNextId()
-        const newTestInput: TestInput = {
-            id: newId,
-            ...editorContents,
-        }
-        setTestData([...testData, newTestInput])
-        setEditorContents({}) // Clear editor contents
-        dispatch(addTestInput(newTestInput))
-        saveWorkflow()
     }
 
     const handleDeleteRow = (id: number) => {
@@ -434,11 +439,17 @@ const RunModal: React.FC<RunModalProps> = ({ isOpen, onOpenChange, onRun, onSave
                                         >
                                             <TableHeader>
                                                 {[
-                                                    <TableColumn key="id" width={60}>ID</TableColumn>,
+                                                    <TableColumn key="id" width={60}>
+                                                        ID
+                                                    </TableColumn>,
                                                     ...workflowInputVariableNames.map((field) => (
-                                                        <TableColumn key={field} className="flex-1">{field}</TableColumn>
+                                                        <TableColumn key={field} className="flex-1">
+                                                            {field}
+                                                        </TableColumn>
                                                     )),
-                                                    <TableColumn key="actions" width={80}>Actions</TableColumn>,
+                                                    <TableColumn key="actions" width={80}>
+                                                        Actions
+                                                    </TableColumn>,
                                                 ]}
                                             </TableHeader>
                                             <TableBody>
@@ -579,13 +590,20 @@ const RunModal: React.FC<RunModalProps> = ({ isOpen, onOpenChange, onRun, onSave
                         </ModalBody>
                         <ModalFooter>
                             <div className="flex gap-2 justify-end w-full">
-                                <Button color="danger" variant="light" onPress={onClose}>
+                                <Button
+                                    size="lg"
+                                    color="danger"
+                                    variant="light"
+                                    onPress={onClose}
+                                    endContent={<span className="text-xs opacity-70">ESC</span>}
+                                >
                                     Cancel
                                 </Button>
-                                <Button color="primary" variant="bordered" onPress={handleSave}>
+                                <Button size="lg" color="primary" variant="bordered" onPress={handleSave}>
                                     Save & Close
                                 </Button>
                                 <Button
+                                    size="lg"
                                     color="primary"
                                     onPress={() => {
                                         const success = handleRun()
@@ -597,6 +615,7 @@ const RunModal: React.FC<RunModalProps> = ({ isOpen, onOpenChange, onRun, onSave
                                         !selectedTestInputId && !Object.values(editorContents).some((v) => v?.trim())
                                     }
                                     startContent={<Icon icon="material-symbols:play-arrow" />}
+                                    endContent={<span className="text-xs opacity-70">⌘+↵</span>}
                                 >
                                     Run
                                 </Button>

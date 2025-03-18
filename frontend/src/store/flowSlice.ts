@@ -230,7 +230,7 @@ const flowSlice = createSlice({
                 const incomingEdges = state.edges.filter((edge) => edge.target === targetNode.id)
                 // Instead of just storing node IDs, create a dictionary of node_id -> config
                 const nodeConfigsDict: Record<string, any> = {}
-                
+
                 incomingEdges.forEach((edge) => {
                     const sourceNode = state.nodes.find((n) => n.id === edge.source)
                     if (sourceNode && sourceNode.id) {
@@ -251,7 +251,7 @@ const flowSlice = createSlice({
                     ...state.nodeConfigs[targetNode.id],
                     // Keep tool_names for backward compatibility but commented out
                     // tool_names: toolNames,
-                    node_configs: nodeConfigsDict
+                    node_configs: nodeConfigsDict,
                 }
             }
         },
@@ -319,6 +319,38 @@ const flowSlice = createSlice({
                 connectedCoalesceNodes.forEach((coalesceNode) => {
                     rebuildCoalesceNodeSchema(state, coalesceNode)
                 })
+            }
+        },
+
+        addToolToAgent: (state, action: PayloadAction<{ nodeId: string; nodeTypeName: string }>) => {
+            const { nodeId, nodeTypeName } = action.payload
+            const node = state.nodes.find((n) => n.id === nodeId)
+            if (node) {
+                // Generate a new ID following the same pattern as other nodes
+                const existingIds = state.nodes.map((node) => node.id)
+                const sanitizedType = nodeTypeName.replace(/\s+/g, '_').replace(/Node/g, 'Tool')
+                let counter = 1
+                let newId = `${sanitizedType}_${counter}`
+                while (existingIds.includes(newId)) {
+                    counter++
+                    newId = `${sanitizedType}_${counter}`
+                }
+
+                // Create the new node using createNode
+                const result = createNode(
+                    // @ts-ignore - nodeTypes will be properly typed at runtime
+                    state.nodeTypes,
+                    nodeTypeName,
+                    newId,
+                    { x: 0, y: 0 },
+                    nodeId // Set parentId to the agent node's ID
+                )
+
+                if (result) {
+                    // Add the node and its config to the flow state
+                    state.nodes.push(result.node)
+                    state.nodeConfigs[result.node.id] = result.config
+                }
             }
         },
 
@@ -409,10 +441,10 @@ const flowSlice = createSlice({
                 if (targetNode?.type === 'ToolCallNode') {
                     // Get remaining incoming edges after deletion
                     const remainingEdges = state.edges.filter((e) => e.target === targetNode.id && e.id !== edgeId)
-                    
+
                     // Instead of just storing node IDs, create a dictionary of node_id -> config
                     const nodeConfigsDict: Record<string, any> = {}
-                    
+
                     remainingEdges.forEach((e) => {
                         const sourceNode = state.nodes.find((n) => n.id === e.source)
                         if (sourceNode && sourceNode.id) {
@@ -429,16 +461,18 @@ const flowSlice = createSlice({
                     })
 
                     // For backward compatibility, also update tool_names
-                    const toolNames = remainingEdges.map((e) => {
-                        const sourceNode = state.nodes.find((n) => n.id === e.source)
-                        return sourceNode?.id || ''
-                    }).filter(id => id !== '')
+                    const toolNames = remainingEdges
+                        .map((e) => {
+                            const sourceNode = state.nodes.find((n) => n.id === e.source)
+                            return sourceNode?.id || ''
+                        })
+                        .filter((id) => id !== '')
 
                     // Update the node's config with the remaining node_configs
                     state.nodeConfigs[targetNode.id] = {
                         ...targetNodeConfig,
                         tool_names: toolNames,
-                        node_configs: nodeConfigsDict
+                        node_configs: nodeConfigsDict,
                     }
                 }
 
@@ -844,6 +878,7 @@ export const {
     setEdges,
     updateNodeDataOnly,
     updateNodeConfigOnly,
+    addToolToAgent,
     setSelectedNode,
     setSelectedEdgeId,
     deleteNode,

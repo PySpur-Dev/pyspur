@@ -13,15 +13,6 @@ import {
     Switch,
     Textarea,
     Tooltip,
-    Dropdown,
-    DropdownTrigger,
-    DropdownMenu,
-    DropdownItem,
-    Modal,
-    ModalContent,
-    ModalHeader,
-    ModalBody,
-    ModalFooter,
 } from '@heroui/react'
 import { Icon } from '@iconify/react'
 import { cloneDeep, debounce, set } from 'lodash'
@@ -42,7 +33,14 @@ import {
 } from '../../../store/nodeTypesSlice'
 import { RootState } from '../../../store/store'
 import { FieldMetadata, ModelConstraints } from '../../../types/api_types/modelMetadataSchemas'
-import { listVectorIndices, listTools, createToolFile, updateToolFile, getToolFile, listToolFiles } from '../../../utils/api'
+import {
+    createToolFile,
+    getToolFile,
+    listToolFiles,
+    listTools,
+    listVectorIndices,
+    updateToolFile,
+} from '../../../utils/api'
 import CodeEditor from '../../CodeEditor'
 import NumberInput from '../../NumberInput'
 import FewShotExamplesEditor from '../../textEditor/FewShotExamplesEditor'
@@ -769,7 +767,7 @@ const NodeSidebar: React.FC<NodeSidebarProps> = ({ nodeID, readOnly }) => {
         //             </div>
         //             <Dropdown isDisabled={readOnly || isLoadingTools}>
         //                 <DropdownTrigger>
-        //                     <Button 
+        //                     <Button
         //                         className="w-full justify-start text-left"
         //                         variant="bordered"
         //                         isDisabled={readOnly || isLoadingTools}
@@ -788,7 +786,7 @@ const NodeSidebar: React.FC<NodeSidebarProps> = ({ nodeID, readOnly }) => {
         //                     }}
         //                 >
         //                     {availableTools.map((tool) => (
-        //                         <DropdownItem 
+        //                         <DropdownItem
         //                             key={tool}
         //                             endContent={
         //                                 <Button
@@ -827,7 +825,7 @@ const NodeSidebar: React.FC<NodeSidebarProps> = ({ nodeID, readOnly }) => {
         //             /> */}
         //         </div>
         //     )
-        
+
         // }
 
         // Skip api_base field if the selected model is not an Ollama model
@@ -1255,7 +1253,7 @@ const NodeSidebar: React.FC<NodeSidebarProps> = ({ nodeID, readOnly }) => {
     // Add this function after renderUrlVariableConfig but before renderConfigFields
     const renderMessageHistoryConfig = () => {
         // Only show for SingleLLMCallNode
-        if (nodeType !== 'SingleLLMCallNode') {
+        if (nodeType !== 'SingleLLMCallNode' && nodeType !== 'Agent') {
             return null
         }
 
@@ -1317,7 +1315,12 @@ const NodeSidebar: React.FC<NodeSidebarProps> = ({ nodeID, readOnly }) => {
         // Prioritize system_message, user_message, and template fields to appear first
         const priorityFields = ['system_message', 'user_message']
         const templateFields = keys
-            .filter((key) => (key.includes('template') || key.includes('message') || key.includes('prompt')) && key !== 'enable_message_history' && key !== 'message_history_variable')
+            .filter(
+                (key) =>
+                    (key.includes('template') || key.includes('message') || key.includes('prompt')) &&
+                    key !== 'enable_message_history' &&
+                    key !== 'message_history_variable'
+            )
             .filter((key) => !priorityFields.includes(key))
 
         // Filter out thinking-related fields if not using Claude 3.7 Sonnet

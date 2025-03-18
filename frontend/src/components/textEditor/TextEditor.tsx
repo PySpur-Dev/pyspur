@@ -1,6 +1,23 @@
 'use client'
 
-import { Button, Modal, ModalBody, ModalContent, ModalFooter, ModalHeader, useDisclosure } from '@heroui/react'
+import {
+    Alert,
+    Button,
+    Card,
+    CardBody,
+    Checkbox,
+    CheckboxGroup,
+    Modal,
+    ModalBody,
+    ModalContent,
+    ModalFooter,
+    ModalHeader,
+    Radio,
+    RadioGroup,
+    Textarea,
+    Tooltip,
+    useDisclosure,
+} from '@heroui/react'
 import { Icon } from '@iconify/react'
 import { Color } from '@tiptap/extension-color'
 import ListItem from '@tiptap/extension-list-item'
@@ -8,13 +25,12 @@ import TextStyle from '@tiptap/extension-text-style'
 import Underline from '@tiptap/extension-underline'
 import { Editor, EditorContent, useEditor } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
+import axios from 'axios'
 import { List, ListOrdered } from 'lucide-react'
 import React, { forwardRef, useEffect, useImperativeHandle } from 'react'
 import { Markdown } from 'tiptap-markdown'
-import styles from './TextEditor.module.css'
-import { Alert, Card, CardBody, Checkbox, CheckboxGroup, Radio, RadioGroup, Textarea, Tooltip } from '@heroui/react'
-import axios from 'axios'
 import { generateMessage } from '../../utils/api'
+import styles from './TextEditor.module.css'
 
 interface TextEditorProps {
     nodeID: string
@@ -38,7 +54,21 @@ interface TextEditorRef {
 
 const TextEditor = forwardRef<TextEditorRef, TextEditorProps>(
     (
-        { content: initialContent, setContent, isEditable = true, fullScreen = false, inputSchema = [], fieldTitle, disableFormatting = false, isTemplateEditor = false, readOnly = false, enableAIGeneration = false, messageType = 'user', nodeID, fieldName },
+        {
+            content: initialContent,
+            setContent,
+            isEditable = true,
+            fullScreen = false,
+            inputSchema = [],
+            fieldTitle,
+            disableFormatting = false,
+            isTemplateEditor = false,
+            readOnly = false,
+            enableAIGeneration = false,
+            messageType = 'user',
+            nodeID,
+            fieldName,
+        },
         ref
     ) => {
         const [localContent, setLocalContent] = React.useState(initialContent)
@@ -229,7 +259,7 @@ const TextEditor = forwardRef<TextEditorRef, TextEditorProps>(
 
         const renderVariableButtons = (editorInstance: Editor | null) => {
             // Only show variable buttons if this is a template editor
-            if (!isTemplateEditor) return null;
+            if (!isTemplateEditor) return null
 
             // Show message when no input schema is available (undefined or empty array)
             if (!inputSchema || !Array.isArray(inputSchema) || inputSchema.length === 0) {
@@ -418,12 +448,12 @@ const TextEditor = forwardRef<TextEditorRef, TextEditorProps>(
         const getPlaceholderText = () => {
             if (messageType === 'system') {
                 return generationType === 'new'
-                    ? "Example: Create a system message for a coding assistant that specializes in debugging JavaScript code"
-                    : "Example: Make the assistant more detailed in its explanations and add instructional guidance"
+                    ? 'Example: Create a system message for a coding assistant that specializes in debugging JavaScript code'
+                    : 'Example: Make the assistant more detailed in its explanations and add instructional guidance'
             } else {
                 return generationType === 'new'
-                    ? "Example: Create a prompt that asks for a detailed analysis of quarterly financial data with trend identification"
-                    : "Example: Add a request for the response to include actionable recommendations"
+                    ? 'Example: Create a prompt that asks for a detailed analysis of quarterly financial data with trend identification'
+                    : 'Example: Add a request for the response to include actionable recommendations'
             }
         }
 
@@ -458,10 +488,15 @@ const TextEditor = forwardRef<TextEditorRef, TextEditorProps>(
                                     </div>
                                 </ModalBody>
                                 <ModalFooter>
-                                    <Button color="danger" variant="light" onPress={() => handleCancel(onClose)} size={buttonSize}>
+                                    <Button
+                                        color="danger"
+                                        variant="light"
+                                        onPress={() => handleCancel(onClose)}
+                                        size="lg"
+                                    >
                                         Cancel
                                     </Button>
-                                    <Button color="primary" onPress={() => handleSave(onClose)} size={buttonSize}>
+                                    <Button color="primary" onPress={() => handleSave(onClose)} size="lg">
                                         Save
                                     </Button>
                                 </ModalFooter>
@@ -501,7 +536,9 @@ const TextEditor = forwardRef<TextEditorRef, TextEditorProps>(
                                         <Radio
                                             value="enhance"
                                             isDisabled={!localContent.trim() || isGenerating}
-                                            description={!localContent.trim() ? "No existing message to enhance" : undefined}
+                                            description={
+                                                !localContent.trim() ? 'No existing message to enhance' : undefined
+                                            }
                                         >
                                             Enhance Existing Message
                                         </Radio>
@@ -521,14 +558,17 @@ const TextEditor = forwardRef<TextEditorRef, TextEditorProps>(
                                     {inputSchema && inputSchema.length > 0 && (
                                         <Card className="mb-4">
                                             <CardBody>
-                                                <div className="text-sm font-semibold mb-2">Available Template Variables:</div>
+                                                <div className="text-sm font-semibold mb-2">
+                                                    Available Template Variables:
+                                                </div>
                                                 <div className="mb-2 text-xs text-default-500">
                                                     Select which variables should be included in your generated message:
                                                 </div>
 
                                                 <div className="flex justify-between items-center gap-2 mb-2">
                                                     <div className="text-xs text-default-500">
-                                                        {selectedVariables.length} of {inputSchema.length} variables selected
+                                                        {selectedVariables.length} of {inputSchema.length} variables
+                                                        selected
                                                     </div>
                                                     <div className="flex gap-2">
                                                         <Button
@@ -567,16 +607,18 @@ const TextEditor = forwardRef<TextEditorRef, TextEditorProps>(
                                                 </CheckboxGroup>
 
                                                 <div className="mt-2 text-xs text-default-500">
-                                                    These variables will be used in your message template and will be replaced with actual values at runtime.
+                                                    These variables will be used in your message template and will be
+                                                    replaced with actual values at runtime.
                                                 </div>
                                             </CardBody>
                                         </Card>
                                     )}
 
                                     <Textarea
-                                        label={generationType === 'new'
-                                            ? `Describe the ${messageType === 'system' ? 'system message' : 'user prompt'} you want to generate`
-                                            : `Describe how you want to enhance the ${messageType === 'system' ? 'system message' : 'user prompt'}`
+                                        label={
+                                            generationType === 'new'
+                                                ? `Describe the ${messageType === 'system' ? 'system message' : 'user prompt'} you want to generate`
+                                                : `Describe how you want to enhance the ${messageType === 'system' ? 'system message' : 'user prompt'}`
                                         }
                                         placeholder={getPlaceholderText()}
                                         value={description}
@@ -588,7 +630,7 @@ const TextEditor = forwardRef<TextEditorRef, TextEditorProps>(
                                 </ModalBody>
                                 <ModalFooter>
                                     <Button
-                                        size={buttonSize}
+                                        size="lg"
                                         variant="light"
                                         onClick={resetModalState}
                                         isDisabled={isGenerating}
@@ -596,7 +638,7 @@ const TextEditor = forwardRef<TextEditorRef, TextEditorProps>(
                                         Cancel
                                     </Button>
                                     <Button
-                                        size={buttonSize}
+                                        size="lg"
                                         color="primary"
                                         onClick={handleGenerateMessage}
                                         isLoading={isGenerating}

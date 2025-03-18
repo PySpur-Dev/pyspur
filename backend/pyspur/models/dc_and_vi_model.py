@@ -36,7 +36,10 @@ class DocumentCollectionModel(BaseModel):
     text_processing_config: Mapped[Dict[str, Any]] = mapped_column(
         JSON,
         nullable=False,
-        comment="Configuration for text processing including: chunk_token_size, min_chunk_size_chars, etc.",
+        comment=(
+            "Configuration for text processing including:"
+            " chunk_token_size, min_chunk_size_chars, etc."
+        ),
     )
 
     # Relationships
@@ -46,11 +49,14 @@ class DocumentCollectionModel(BaseModel):
         cascade="all, delete-orphan",
     )
 
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now(timezone.utc))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, default=datetime.now(timezone.utc), index=True
+    )
     updated_at: Mapped[datetime] = mapped_column(
         DateTime,
         default=datetime.now(timezone.utc),
         onupdate=datetime.now(timezone.utc),
+        index=True,
     )
 
 
@@ -83,16 +89,19 @@ class VectorIndexModel(BaseModel):
         "DocumentCollectionModel", back_populates="vector_indices"
     )
 
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now(timezone.utc))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, default=datetime.now(timezone.utc), index=True
+    )
     updated_at: Mapped[datetime] = mapped_column(
         DateTime,
         default=datetime.now(timezone.utc),
         onupdate=datetime.now(timezone.utc),
+        index=True,
     )
 
 
 class DocumentProcessingProgressModel(BaseModel):
-    """Model for tracking processing progress"""
+    """Model for tracking processing progress."""
 
     __tablename__ = "document_processing_progress"
 
@@ -105,9 +114,12 @@ class DocumentProcessingProgressModel(BaseModel):
     total_chunks: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     processed_chunks: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     error_message: Mapped[Optional[str]] = mapped_column(String, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now(timezone.utc))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, default=datetime.now(timezone.utc), index=True
+    )
     updated_at: Mapped[datetime] = mapped_column(
         DateTime,
         default=datetime.now(timezone.utc),
         onupdate=datetime.now(timezone.utc),
+        index=True,
     )

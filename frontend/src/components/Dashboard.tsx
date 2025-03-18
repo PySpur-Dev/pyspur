@@ -711,6 +711,27 @@ const Dashboard: React.FC = () => {
                                                                         {run.id}
                                                                     </Chip>
                                                                 ))}
+                                                                {workflowRuns[workflow.id]?.length >= 5 && (
+                                                                    <Chip
+                                                                        size="sm"
+                                                                        variant="flat"
+                                                                        className="cursor-pointer"
+                                                                        onClick={() =>
+                                                                            window.open(
+                                                                                `/runs/${workflow.id}`,
+                                                                                '_blank'
+                                                                            )
+                                                                        }
+                                                                        startContent={
+                                                                            <Icon
+                                                                                icon="solar:playlist-linear"
+                                                                                width={14}
+                                                                            />
+                                                                        }
+                                                                    >
+                                                                        See All
+                                                                    </Chip>
+                                                                )}
                                                             </div>
                                                         ) : columnKey === 'name' ? (
                                                             <Chip

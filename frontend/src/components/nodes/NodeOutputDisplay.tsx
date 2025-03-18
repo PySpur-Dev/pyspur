@@ -1,8 +1,7 @@
+import { Icon } from '@iconify/react'
 import React, { useState } from 'react'
 import Markdown from 'react-markdown'
-import SyntaxHighlighter from 'react-syntax-highlighter'
-import { oneDark } from 'react-syntax-highlighter'
-import { Icon } from '@iconify/react'
+import SyntaxHighlighter, { oneDark } from 'react-syntax-highlighter'
 
 import JsonView from 'react18-json-view'
 import 'react18-json-view/src/style.css'
@@ -14,14 +13,14 @@ interface NodeOutputDisplayProps {
 
 // Add a helper function to generate a simple hash for content
 const generateContentHash = (content: string): string => {
-    let hash = 0;
+    let hash = 0
     for (let i = 0; i < content.length; i++) {
-        const char = content.charCodeAt(i);
-        hash = ((hash << 5) - hash) + char;
-        hash = hash & hash; // Convert to 32-bit integer
+        const char = content.charCodeAt(i)
+        hash = (hash << 5) - hash + char
+        hash = hash & hash // Convert to 32-bit integer
     }
-    return Math.abs(hash).toString(36);
-};
+    return Math.abs(hash).toString(36)
+}
 
 const NodeOutputDisplay: React.FC<NodeOutputDisplayProps> = ({ output, maxHeight = '500px' }) => {
     const [copiedKey, setCopiedKey] = useState<string | null>(null)
@@ -185,7 +184,8 @@ const NodeOutputDisplay: React.FC<NodeOutputDisplayProps> = ({ output, maxHeight
                         },
                     }
 
-                    const config = errorConfig[parsedValue.error_type as keyof typeof errorConfig] || errorConfig.unknown
+                    const config =
+                        errorConfig[parsedValue.error_type as keyof typeof errorConfig] || errorConfig.unknown
                     const colorClass = config.color === 'warning' ? 'warning' : 'danger'
 
                     return (
@@ -238,15 +238,19 @@ const NodeOutputDisplay: React.FC<NodeOutputDisplayProps> = ({ output, maxHeight
                     <div className="flex justify-end mt-3">
                         <button
                             onClick={(e) => {
-                                e.stopPropagation();
-                                copyToClipboard(value, codeKey);
+                                e.stopPropagation()
+                                copyToClipboard(value, codeKey)
                             }}
                             className="px-3 py-1.5 rounded-md bg-white/10 dark:bg-gray-800/50 hover:bg-gray-100 dark:hover:bg-gray-700/50 transition-all flex items-center gap-2 border border-gray-200 dark:border-gray-700/50 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200"
                             title="Copy to clipboard"
                         >
                             <Icon
                                 icon={copiedKey === codeKey ? 'solar:check-circle-bold' : 'solar:copy-linear'}
-                                className={copiedKey === codeKey ? 'text-green-500 dark:text-green-400' : 'text-gray-500 dark:text-gray-400'}
+                                className={
+                                    copiedKey === codeKey
+                                        ? 'text-green-500 dark:text-green-400'
+                                        : 'text-gray-500 dark:text-gray-400'
+                                }
                                 width={16}
                             />
                         </button>
@@ -272,13 +276,13 @@ const NodeOutputDisplay: React.FC<NodeOutputDisplayProps> = ({ output, maxHeight
 
             // Handle images
             if (mimeType.startsWith('image/')) {
-                return <img src={value} alt="Image Preview" style={{ maxWidth: '100%', maxHeight: '500px' }} />
+                return <img src={value} alt="Image Preview" style={{ maxWidth: '100%', maxHeight: maxHeight }} />
             }
 
             // Handle video
             if (mimeType.startsWith('video/')) {
                 return (
-                    <video controls style={{ maxWidth: '100%', maxHeight: '500px' }}>
+                    <video controls style={{ maxWidth: '100%', maxHeight: maxHeight }}>
                         <source src={value} type={mimeType} />
                         Your browser does not support the video tag.
                     </video>
@@ -353,13 +357,13 @@ const NodeOutputDisplay: React.FC<NodeOutputDisplayProps> = ({ output, maxHeight
 
             // For images (png, jpg, jpeg, gif, etc.)
             if (['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg'].includes(extension)) {
-                return <img src={value} alt="Image Preview" style={{ maxWidth: '100%', maxHeight: '500px' }} />
+                return <img src={value} alt="Image Preview" style={{ maxWidth: '100%', maxHeight: maxHeight }} />
             }
 
             // For videos (mp4, webm, ogv, etc.)
             if (['mp4', 'webm', 'ogg', 'ogv'].includes(extension)) {
                 return (
-                    <video controls style={{ maxWidth: '100%', maxHeight: '500px' }}>
+                    <video controls style={{ maxWidth: '100%', maxHeight: maxHeight }}>
                         <source src={value} />
                         Your browser does not support the video tag.
                     </video>
@@ -403,51 +407,55 @@ const NodeOutputDisplay: React.FC<NodeOutputDisplayProps> = ({ output, maxHeight
             if (typeof val === 'string') {
                 // Preserve existing heading markers (#, ##, ###)
                 if (val.match(/^#+\s/m)) {
-                    return val;
+                    return val
                 }
                 // For object keys that should be headings, use appropriate heading level
                 if (val.match(/^[A-Z][^a-z:]+(?:\s[A-Z][^a-z:]+)*:?$/)) {
-                    return `### ${val}`;
+                    return `### ${val}`
                 }
-                return val;
+                return val
             }
             if (typeof val === 'object' && val !== null) {
                 return Object.entries(val)
                     .map(([k, v]) => {
                         // Make top-level keys larger headings
                         if (k.match(/^[A-Z][^a-z:]+(?:\s[A-Z][^a-z:]+)*:?$/)) {
-                            return `## ${k}\n\n${processValue(v)}`;
+                            return `## ${k}\n\n${processValue(v)}`
                         }
-                        return `**${k}**: ${processValue(v)}`;
+                        return `**${k}**: ${processValue(v)}`
                     })
-                    .join('\n\n');
+                    .join('\n\n')
             }
-            return String(val);
-        };
+            return String(val)
+        }
 
-        const content = processValue(value);
-        const textKey = `text-${generateContentHash(content)}`;
+        const content = processValue(value)
+        const textKey = `text-${generateContentHash(content)}`
         return (
             <div className="group">
                 <Markdown>{content}</Markdown>
                 <div className="flex justify-end mt-3">
                     <button
                         onClick={(e) => {
-                            e.stopPropagation();
-                            copyToClipboard(content, textKey);
+                            e.stopPropagation()
+                            copyToClipboard(content, textKey)
                         }}
                         className="px-3 py-1.5 rounded-md bg-white/10 dark:bg-gray-800/50 hover:bg-gray-100 dark:hover:bg-gray-700/50 transition-all flex items-center gap-2 border border-gray-200 dark:border-gray-700/50 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200"
                         title="Copy to clipboard"
                     >
                         <Icon
                             icon={copiedKey === textKey ? 'solar:check-circle-bold' : 'solar:copy-linear'}
-                            className={copiedKey === textKey ? 'text-green-500 dark:text-green-400' : 'text-gray-500 dark:text-gray-400'}
+                            className={
+                                copiedKey === textKey
+                                    ? 'text-green-500 dark:text-green-400'
+                                    : 'text-gray-500 dark:text-gray-400'
+                            }
                             width={16}
                         />
                     </button>
                 </div>
             </div>
-        );
+        )
     }
 
     return (
@@ -458,7 +466,7 @@ const NodeOutputDisplay: React.FC<NodeOutputDisplayProps> = ({ output, maxHeight
                     style={{
                         overflowY: 'auto',
                         touchAction: 'none',
-                        maxHeight: maxHeight
+                        maxHeight: maxHeight,
                     }}
                     onWheelCapture={(e) => {
                         e.stopPropagation()

@@ -1,5 +1,6 @@
 import { Button, Card, CardBody, Modal, ModalBody, ModalContent, ModalFooter, ModalHeader } from '@heroui/react'
 import { Icon } from '@iconify/react'
+import { useEffect } from 'react'
 
 interface HelpModalProps {
     isOpen: boolean
@@ -7,6 +8,19 @@ interface HelpModalProps {
 }
 
 export default function HelpModal({ isOpen, onClose }: HelpModalProps) {
+    useEffect(() => {
+        if (!isOpen) return
+
+        const handleKeyDown = (event: KeyboardEvent) => {
+            if (event.key === 'Escape') {
+                onClose()
+            }
+        }
+
+        window.addEventListener('keydown', handleKeyDown)
+        return () => window.removeEventListener('keydown', handleKeyDown)
+    }, [isOpen, onClose])
+
     return (
         <Modal isOpen={isOpen} onClose={onClose} size="2xl">
             <ModalContent>
@@ -89,7 +103,13 @@ export default function HelpModal({ isOpen, onClose }: HelpModalProps) {
                     </div>
                 </ModalBody>
                 <ModalFooter>
-                    <Button color="danger" variant="light" onPress={onClose}>
+                    <Button
+                        size="lg"
+                        color="danger"
+                        variant="light"
+                        onPress={onClose}
+                        endContent={<span className="text-xs opacity-70">ESC</span>}
+                    >
                         Close
                     </Button>
                 </ModalFooter>

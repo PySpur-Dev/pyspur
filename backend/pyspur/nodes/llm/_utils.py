@@ -4,23 +4,23 @@ import json
 import logging
 import os
 import re
-from typing import Any, Callable, Dict, List, Optional, cast
+from typing import Any, Callable, Dict, List, Optional
 
 import litellm
 from docx2python import docx2python
 from dotenv import load_dotenv
 from litellm import acompletion
+from litellm.types.utils import Message
 from ollama import AsyncClient
 from pydantic import BaseModel, Field
 from tenacity import AsyncRetrying, stop_after_attempt, wait_random_exponential
 
+from ...nodes.factory import NodeFactory
 from ...utils.file_utils import encode_file_to_base64_data_url
 from ...utils.mime_types_utils import get_mime_type_for_url
 from ...utils.path_utils import is_external_url, resolve_file_path
 from ._model_info import LLMModels
 from ._providers import OllamaOptions, setup_azure_configuration
-from ...api.mcp_management import get_mcp_client
-from ...nodes.factory import NodeFactory
 
 # uncomment for debugging litellm issues
 # litellm.set_verbose=True
@@ -161,8 +161,9 @@ def async_retry(*dargs, **dkwargs):
         ),
     ),
 )
-async def completion_with_backoff(**kwargs) -> str:
-    """Calls the LLM completion endpoint with backoff.
+async def completion_with_backoff(**kwargs) -> Message:
+    """Call the LLM completion endpoint with backoff.
+
     Supports Azure OpenAI, standard OpenAI, or Ollama based on the model name.
     """
     try:
@@ -170,7 +171,8 @@ async def completion_with_backoff(**kwargs) -> str:
         logging.info("=== LLM Request Configuration ===")
         logging.info(f"Requested Model: {model}")
 
-        # Use Azure if either 'azure/' is prefixed or if an Azure API key is provided and not using Ollama
+        # Use Azure if either 'azure/' is prefixed or if an Azure API key
+        # is provided and not using Ollama
         if model.startswith("azure/") or (
             os.getenv("AZURE_OPENAI_API_KEY") and not model.startswith("ollama/")
         ):
@@ -186,12 +188,11 @@ async def completion_with_backoff(**kwargs) -> str:
         elif model.startswith("ollama/"):
             logging.info("=== Ollama Configuration ===")
             response = await acompletion(**kwargs, drop_params=True)
-            return response.choices[0].message.content
+            return response.choices[0].message
         else:
             logging.info("=== Standard Configuration ===")
             response = await acompletion(**kwargs, drop_params=True)
-            # print(response)
-            return response.choices[0].message.content
+            return response.choices[0].message
 
     except Exception as e:
         logging.error("=== LLM Request Error ===")
@@ -208,7 +209,8 @@ async def completion_with_backoff(**kwargs) -> str:
 
 
 def sanitize_json_schema(schema: Dict[str, Any]) -> Dict[str, Any]:
-    """Makes a JSON schema compatible with the LLM providers.
+    """Make a JSON schema compatible with the LLM providers.
+
     * sets "additionalProperties" to False
     * adds all properties to the "required" list recursively
     """
@@ -233,11 +235,32 @@ async def generate_text(
     api_base: Optional[str] = None,
     url_variables: Optional[Dict[str, str]] = None,
     output_json_schema: Optional[str] = None,
-    functions: Optional[List[Dict[str, Any]]] = None,
-    function_call: Optional[str] = None,
+    tools: Optional[List[Dict[str, Any]]] = None,
+    tool_choice: Optional[str] = "auto",
     thinking: Optional[Dict[str, Any]] = None,
-) -> str:
-    # print(functions)
+) -> Message:
+    """Generate text using the specified LLM model.
+
+    Args:
+        messages: List of message dictionaries with 'role' and 'content'
+        model_name: Name of the LLM model to use
+        temperature: Temperature for randomness, between 0.0 and 1.0
+        json_mode: Flag to indicate if JSON output is required
+        max_tokens: Maximum number of tokens the model can generate
+        api_base: Base URL for the API
+        url_variables: Dictionary of URL variables for file inputs
+        output_json_schema: JSON schema for the output format
+        tools: List of function schemas for function calling
+        tool_choice: By default the model will determine when and how many tools to use. You can
+            force specific behavior with the tool_choice parameter.
+            auto: (Default) Call zero, one, or multiple functions. tool_choice: "auto"
+            required: Call one or more functions. tool_choice: "required"
+            Forced Function: Call exactly one specific function.
+                tool_choice: {"type": "function", "function": {"name": "get_weather"}}
+
+        thinking: Thinking parameters for the model
+
+    """
     kwargs = {
         "model": model_name,
         "max_tokens": max_tokens,
@@ -246,12 +269,10 @@ async def generate_text(
     }
 
     # Add function calling parameters if provided
-    if functions:
-        kwargs["tools"] = functions
-        if function_call:
-            kwargs["tool_choice"] = function_call
-
-    # print("kwargs", kwargs)
+    if tools:
+        kwargs["tools"] = tools
+        if tool_choice:
+            kwargs["tool_choice"] = tool_choice
 
     # Get model info to check capabilities
     model_info = LLMModels.get_model_info(model_name)
@@ -309,7 +330,9 @@ async def generate_text(
                     message for message in messages if message["role"] == "system"
                 )
                 system_message["content"] += (
-                    "\nYou must respond with valid JSON only. No other text before or after the JSON Object. The JSON Object must adhere to this schema: "
+                    "\nYou must respond with valid JSON only."
+                    + " No other text before or after the JSON Object."
+                    + "The JSON Object must adhere to this schema: "
                     + schema_for_prompt
                 )
 
@@ -326,13 +349,20 @@ async def generate_text(
                 api_base=api_base,
             )
             response = raw_response
+            message_response = Message(
+                content=json.dumps(raw_response),
+                tool_calls=[],
+            )
         # Handle inputs with URL variables
         elif url_variables:
             # check if the mime type is supported
             mime_type = get_mime_type_for_url(url_variables["image"])
             if not model_info.constraints.is_mime_type_supported(mime_type):
                 raise ValueError(
-                    f"""Unsupported file type: "{mime_type.value}" for model {model_name}. Supported types: {[mime.value for mime in model_info.constraints.supported_mime_types]}"""
+                    f"""Unsupported file type: "{mime_type.value}" for model {model_name}."""
+                    f""" Supported types: {
+                        [mime.value for mime in model_info.constraints.supported_mime_types]
+                    }"""
                 )
 
             # Transform messages to include URL content
@@ -363,7 +393,9 @@ async def generate_text(
                                         # Convert DOCX to XML
                                         xml_content = convert_docx_to_xml(str(file_path))
                                         # Encode the XML content directly
-                                        data_url = f"data:text/xml;base64,{base64.b64encode(xml_content.encode()).decode()}"
+                                        data_url = f"data:text/xml;base64,{
+                                            base64.b64encode(xml_content.encode()).decode()
+                                        }"
                                     else:
                                         data_url = encode_file_to_base64_data_url(str(file_path))
 
@@ -379,18 +411,20 @@ async def generate_text(
                     msg["content"] = content
                 transformed_messages.append(msg)
             kwargs["messages"] = transformed_messages
-            raw_response = await completion_with_backoff(**kwargs)
-            response = raw_response
+            message_response: Message = await completion_with_backoff(**kwargs)
+            response = message_response.content
+            raw_response = response
         else:
-            raw_response = await completion_with_backoff(**kwargs)
-            response = raw_response
+            message_response: Message = await completion_with_backoff(**kwargs)
+            response = message_response.content
+            raw_response = response
     else:
         if model_name.startswith("ollama"):
             if api_base is None:
                 api_base = os.getenv("OLLAMA_BASE_URL")
             kwargs["api_base"] = api_base
-        raw_response = await completion_with_backoff(**kwargs)
-        response = raw_response
+        message_response: Message = await completion_with_backoff(**kwargs)
+        response = message_response.content
 
     # For models that don't support JSON output, wrap the response in a JSON structure
     if not supports_json:
@@ -403,19 +437,26 @@ async def generate_text(
         if hasattr(raw_response, "choices") and len(raw_response.choices) > 0:
             if hasattr(raw_response.choices[0].message, "provider_specific_fields"):
                 provider_fields = raw_response.choices[0].message.provider_specific_fields
-                return json.dumps(
+                message_response.content = json.dumps(
                     {
                         "output": sanitized_response,
                         "provider_specific_fields": provider_fields,
                     }
                 )
-        return f'{{"output": "{sanitized_response}"}}'
+                return message_response
+        message_response.content = f'{{"output": "{sanitized_response}"}}'
+        return message_response
 
     # Ensure response is valid JSON for models that support it
     if supports_json:
         try:
-            json.loads(response)
-            return response
+            if message_response.tool_calls and len(message_response.tool_calls) > 0:
+                # If the model made tool calls, return the raw response
+                return message_response
+            else:
+                # Attempt to parse the response as JSON to validate it
+                _ = json.loads(response)
+                return message_response
         except json.JSONDecodeError:
             logging.error(f"Response is not valid JSON: {response}")
             # Try to fix common json issues
@@ -426,7 +467,8 @@ async def generate_text(
                     response = json_match.group(0)
                     try:
                         json.loads(response)
-                        return response
+                        message_response.content = response
+                        return message_response
                     except json.JSONDecodeError:
                         pass
 
@@ -436,19 +478,22 @@ async def generate_text(
             if hasattr(raw_response, "choices") and len(raw_response.choices) > 0:
                 if hasattr(raw_response.choices[0].message, "provider_specific_fields"):
                     provider_fields = raw_response.choices[0].message.provider_specific_fields
-                    return json.dumps(
+                    message_response.content = json.dumps(
                         {
                             "output": sanitized_response,
                             "provider_specific_fields": provider_fields,
                         }
                     )
-            return f'{{"output": "{sanitized_response}"}}'
+                    return message_response
+            message_response.content = f'{{"output": "{sanitized_response}"}}'
+            return message_response
 
-    return response
+    return message_response
 
 
 async def completion_with_backoff_with_tools(**kwargs) -> str:
-    """Calls the LLM completion endpoint with backoff.
+    """Call the LLM completion endpoint with backoff.
+
     Supports Azure OpenAI, standard OpenAI, or Ollama based on the model name.
     """
     try:
@@ -471,7 +516,8 @@ async def completion_with_backoff_with_tools(**kwargs) -> str:
         # remove node_configs from kwargs
         kwargs.pop("node_configs", None)
 
-        # Use Azure if either 'azure/' is prefixed or if an Azure API key is provided and not using Ollama
+        # Use Azure if either 'azure/' is prefixed or if an
+        # Azure API key is provided and not using Ollama
         if model.startswith("azure/") or (
             os.getenv("AZURE_OPENAI_API_KEY") and not model.startswith("ollama/")
         ):
@@ -532,7 +578,8 @@ async def completion_with_backoff_with_tools(**kwargs) -> str:
                             function_result = str(result)
                     else:
                         # Fallback for backward compatibility or if node_configs is not provided
-                        # tool_result = await client.tool_call(tool_name, cast(Dict[str, Any], tool_args))
+                        # tool_result = await client.tool_call(tool_name,
+                        #                           cast(Dict[str, Any], tool_args))
                         # tool_result_type = tool_result.content[0].type
                         # if tool_result.content[0].type == "text":
                         #     function_result = str(tool_result.content[0].text)
@@ -597,7 +644,8 @@ async def completion_with_backoff_with_tools(**kwargs) -> str:
                 if msg.get("tool_call_id"):
                     logging.info(f"  Tool call ID: {msg['tool_call_id']}")
 
-            # Use Azure if either 'azure/' is prefixed or if an Azure API key is provided and not using Ollama
+            # Use Azure if either 'azure/' is prefixed or if
+            # an Azure API key is provided and not using Ollama
             if model.startswith("azure/") or (
                 os.getenv("AZURE_OPENAI_API_KEY") and not model.startswith("ollama/")
             ):
@@ -727,9 +775,10 @@ async def generate_text_with_tools(
                     message for message in messages if message["role"] == "system"
                 )
                 system_message["content"] += (
-                    "\nYou must respond with valid JSON only. No other text before or after the JSON Object. The JSON Object must adhere to this schema: "
-                    + schema_for_prompt
-                )
+                    "\nYou must respond with valid JSON only."
+                    " No other text before or after the JSON Object."
+                    " The JSON Object must adhere to this schema: "
+                ) + schema_for_prompt
 
     if json_mode and supports_json:
         if model_name.startswith("ollama"):
@@ -750,7 +799,8 @@ async def generate_text_with_tools(
             mime_type = get_mime_type_for_url(url_variables["image"])
             if not model_info.constraints.is_mime_type_supported(mime_type):
                 raise ValueError(
-                    f"""Unsupported file type: "{mime_type.value}" for model {model_name}. Supported types: {[mime.value for mime in model_info.constraints.supported_mime_types]}"""
+                    f"""Unsupported file type: "{mime_type.value}" for model {model_name}.
+ Supported types: {[mime.value for mime in model_info.constraints.supported_mime_types]}"""
                 )
 
             # Transform messages to include URL content
@@ -781,7 +831,9 @@ async def generate_text_with_tools(
                                         # Convert DOCX to XML
                                         xml_content = convert_docx_to_xml(str(file_path))
                                         # Encode the XML content directly
-                                        data_url = f"data:text/xml;base64,{base64.b64encode(xml_content.encode()).decode()}"
+                                        data_url = f"data:text/xml;base64,{
+                                            base64.b64encode(xml_content.encode()).decode()
+                                        }"
                                     else:
                                         data_url = encode_file_to_base64_data_url(str(file_path))
 
@@ -869,6 +921,7 @@ def convert_output_schema_to_json_schema(
     output_schema: Dict[str, Any],
 ) -> Dict[str, Any]:
     """Convert a simple output schema to a JSON schema.
+
     Simple output schema is a dictionary with field names and types.
     Types can be one of 'str', 'int', 'float' or 'bool'.
     """
@@ -909,10 +962,9 @@ async def ollama_with_backoff(
     Args:
         model: The name of the Ollama model to use
         messages: List of message dictionaries with 'role' and 'content'
+        format: Format for the response, either 'json' or a dictionary
         options: OllamaOptions instance with model parameters
-        max_retries: Maximum number of retries
-        initial_wait: Initial wait time between retries in seconds
-        max_wait: Maximum wait time between retries in seconds
+        api_base: Base URL for the Ollama API
 
     Returns:
         Either a string response or a validated Pydantic model instance

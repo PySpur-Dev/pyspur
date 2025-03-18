@@ -1,6 +1,6 @@
 import json
 import re
-from typing import Any, Dict, List, Literal, Optional
+from typing import Any, Dict, List, Literal, Optional, cast
 
 from fastapi import APIRouter, HTTPException
 from loguru import logger
@@ -29,7 +29,8 @@ async def generate_schema(request: SchemaGenerationRequest) -> Dict[str, Any]:
     response: str = ""
     try:
         # Prepare the system message
-        system_message = """You are a JSON Schema expert. Your task is to generate a JSON Schema based on a text description.
+        system_message = """You are a JSON Schema expert. Your task is to generate a JSON Schema
+        based on a text description.
         The schema should:
         1. Follow JSON Schema standards
         2. Include appropriate types, required fields, and descriptions
@@ -126,9 +127,11 @@ async def generate_schema(request: SchemaGenerationRequest) -> Dict[str, Any]:
             {"role": "user", "content": user_message},
         ]
 
-        response = await generate_text(
+        message_response = await generate_text(
             messages=messages, model_name="openai/o3-mini", json_mode=True
         )
+        assert message_response.content, "No response from LLM"
+        response = message_response.content
 
         # Try to parse the response in different ways
         try:
@@ -136,34 +139,32 @@ async def generate_schema(request: SchemaGenerationRequest) -> Dict[str, Any]:
             schema = json.loads(response)
             if isinstance(schema, dict) and "output" in schema:
                 # If we got a wrapper object with an "output" key, extract the schema from it
-                schema_str = schema["output"]
+                schema_str = cast(str, schema["output"])
                 # Extract JSON from potential markdown code blocks
                 json_match = re.search(r"```json\s*(.*?)\s*```", schema_str, re.DOTALL)
                 if json_match:
                     schema_str = json_match.group(1)
                 schema = json.loads(schema_str)
-        except json.JSONDecodeError:
+        except json.JSONDecodeError as e:
             # Second try: Look for JSON in markdown code blocks
             json_match = re.search(r"```(?:json)?\s*(.*?)\s*```", response, re.DOTALL)
             if json_match:
                 schema = json.loads(json_match.group(1))
             else:
-                raise ValueError("Could not extract valid JSON schema from response")
+                raise ValueError("Could not extract valid JSON schema from response") from e
 
         # Validate the schema structure
         if not isinstance(schema, dict) or "type" not in schema or "properties" not in schema:
             raise ValueError("Generated schema is not valid - missing required fields")
 
-        return schema
+        return cast(Dict[str, Any], schema)
 
     except Exception as e:
         # Log the raw response if it exists and is not empty
         if response:
             truncated_response = response[:1000] + "..." if len(response) > 1000 else response
-            logger.error(
-                f"Schema generation failed. Raw response (truncated): {truncated_response}. Error: {str(e)}"
-            )
-        raise HTTPException(status_code=400, detail=str(e))
+            logger.error(f"Schema generation failed. response (truncated): {truncated_response}.")
+        raise HTTPException(status_code=400, detail=str(e)) from e
 
 
 @router.post("/generate_message/")
@@ -172,8 +173,10 @@ async def generate_message(request: MessageGenerationRequest) -> Dict[str, str]:
     try:
         # Prepare the system message based on the message type
         if request.message_type == "system":
-            system_message = """You are an expert at crafting effective system messages for AI assistants.
-            Your task is to generate a clear, concise, and effective system message based on the provided description.
+            system_message = """You are an expert at crafting effective \
+system messages for AI assistants.
+            Your task is to generate a clear, concise, and effective system message based\
+on the provided description.
 
             # INSTRUCTIONS
             A good system message should:
@@ -182,7 +185,8 @@ async def generate_message(request: MessageGenerationRequest) -> Dict[str, str]:
             3. Provide necessary context and background information
             4. Be concise but comprehensive
             5. Use clear, unambiguous language
-            6. Use XML tags when appropriate to structure information (e.g., <role>...</role>, <constraints>...</constraints>)
+            6. Use XML tags when appropriate to structure information:
+                e.g., <role>...</role>, <constraints>...</constraints>
 
             # FORMAT REQUIREMENTS
             Your generated system message MUST include:
@@ -211,14 +215,17 @@ async def generate_message(request: MessageGenerationRequest) -> Dict[str, str]:
             4. Suggest actionable insights when appropriate
 
             <constraints>Do not make assumptions about data you cannot see.</constraints>
-            <format>Present your analysis with clear sections for Summary, Details, and Recommendations.</format>
+            <format>Present your analysis with clear sections for Summary, Details, \
+and Recommendations.</format>
             ```
 
             Return ONLY the system message text without any additional explanation or formatting.
             """
         elif request.message_type == "user":
-            system_message = """You are an expert at crafting effective user prompts for AI assistants.
-            Your task is to generate a clear, specific, and effective user prompt based on the provided description.
+            system_message = """You are an expert at crafting effective user prompts for AI \
+assistants.
+            Your task is to generate a clear, specific, and effective user prompt based on the \
+provided description.
 
             # INSTRUCTIONS
             A good user prompt should:
@@ -227,7 +234,8 @@ async def generate_message(request: MessageGenerationRequest) -> Dict[str, str]:
             3. Be structured in a way that guides the AI to produce the desired output
             4. Use clear, unambiguous language
             5. Include any relevant constraints or requirements
-            6. Use XML tags when appropriate to structure information (e.g., <context>...</context>, <request>...</request>)
+            6. Use XML tags when appropriate to structure information \
+(e.g., <context>...</context>, <request>...</request>)
 
             # FORMAT REQUIREMENTS
             Your generated user prompt MUST include:
@@ -247,9 +255,11 @@ async def generate_message(request: MessageGenerationRequest) -> Dict[str, str]:
 
             Example 2 (With XML tags):
             ```
-            <context>I'm building a React application with a complex state management system.</context>
+            <context>I'm building a React application with a complex state management system.\
+</context>
 
-            <request>Review the following code snippet and suggest improvements for performance and readability:</request>
+            <request>Review the following code snippet and suggest improvements for performance \
+and readability:</request>
 
             <code>
             // Code would go here
@@ -268,10 +278,12 @@ async def generate_message(request: MessageGenerationRequest) -> Dict[str, str]:
             raise ValueError(f"Unsupported message type: {request.message_type}")
 
         # Prepare the user message
-        user_message = f"Generate a {request.message_type} message based on the following description:\n{request.description}"
+        user_message = f"Generate a {request.message_type} message based on the following \
+description:\n{request.description}"
 
         if request.existing_message:
-            user_message += f"\n\nPlease consider this existing message as a starting point:\n{request.existing_message}"
+            user_message += f"\n\nPlease consider this existing message as a starting \
+point:\n{request.existing_message}"
 
         # Add context if provided
         if request.context:
@@ -282,12 +294,19 @@ async def generate_message(request: MessageGenerationRequest) -> Dict[str, str]:
             variables_str = "\n".join([f"- {var}" for var in request.available_variables])
 
             if request.message_type == "system":
-                user_message += f"\n\nThe message should appropriately incorporate the following template variables that the user has specifically selected for this message:\n{variables_str}\n\nThese variables will be replaced with actual values at runtime. Use them in the appropriate places to make the message dynamic and context-aware."
+                user_message += f"\n\nThe message should appropriately incorporate the following \
+template variables that the user has specifically selected for this message:\n{variables_str}\n\n\
+These variables will be replaced with actual values at runtime. Use them in the appropriate places \
+to make the message dynamic and context-aware."
             else:  # user message
-                user_message += f"\n\nThe prompt should appropriately incorporate the following template variables that the user has specifically selected for this message:\n{variables_str}\n\nThese variables will be replaced with actual values at runtime. Use them in the appropriate places to make the prompt dynamic and personalized."
+                user_message += f"\n\nThe prompt should appropriately incorporate the following \
+template variables that the user has specifically selected for this message:\n{variables_str}\n\n\
+These variables will be replaced with actual values at runtime. Use them in the appropriate places \
+to make the prompt dynamic and personalized."
 
             # Additional guidance on template variable usage
-            user_message += "\n\nUse the variables in the format {{ variable_name }}. Only use the variables listed above - do not invent new variables."
+            user_message += "\n\nUse the variables in the format {{ variable_name }}. Only use the \
+variables listed above - do not invent new variables."
 
         # Prepare messages for the LLM
         messages = [
@@ -296,31 +315,31 @@ async def generate_message(request: MessageGenerationRequest) -> Dict[str, str]:
         ]
 
         # Generate the message using OpenAI
-        response = await generate_text(
+        message_response = await generate_text(
             messages=messages,
             model_name="openai/o3-mini",
             temperature=0.7,
             max_tokens=1000,
         )
+        response = cast(str, message_response.content)
 
         # Process the response to extract the message
         message: str = ""
-        if isinstance(response, str):
-            if response.strip().startswith("{") and response.strip().endswith("}"):
-                try:
-                    parsed_response = json.loads(response)
-                    if isinstance(parsed_response, dict) and "output" in parsed_response:
-                        message = parsed_response["output"]
-                    else:
-                        message = response
-                except json.JSONDecodeError:
+        if response.strip().startswith("{") and response.strip().endswith("}"):
+            try:
+                parsed_response = json.loads(response)
+                if isinstance(parsed_response, dict) and "output" in parsed_response:
+                    message = cast(str, parsed_response["output"])
+                else:
                     message = response
-            else:
+            except json.JSONDecodeError:
                 message = response
+        else:
+            message = response
 
-            # Remove any markdown code blocks if present
-            if "```" in message:
-                message = re.sub(r"```.*?```", "", message, flags=re.DOTALL).strip()
+        # Remove any markdown code blocks if present
+        if "```" in message:
+            message = re.sub(r"```.*?```", "", message, flags=re.DOTALL).strip()
         else:
             # Fallback if response is not a string (shouldn't happen)
             message = str(response)
@@ -330,4 +349,4 @@ async def generate_message(request: MessageGenerationRequest) -> Dict[str, str]:
         logger.error(f"Error generating message: {str(e)}")
         if response:
             logger.error(f"Raw response: {response}")
-        raise HTTPException(status_code=500, detail=f"Failed to generate message: {str(e)}")
+        raise HTTPException(status_code=500) from e

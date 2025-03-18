@@ -22,7 +22,7 @@ import {
     VectorIndexCreateRequestSchema,
     VectorIndexResponseSchema,
 } from '@/types/api_types/ragSchemas'
-import { RunResponse } from '@/types/api_types/runSchemas'
+import { RunResponse, RunStatus } from '@/types/api_types/runSchemas'
 import { SessionCreate, SessionListResponse, SessionResponse } from '@/types/api_types/sessionSchemas'
 import { UserCreate, UserListResponse, UserResponse, UserUpdate } from '@/types/api_types/userSchemas'
 import {
@@ -206,18 +206,30 @@ export const getWorkflow = async (workflowID: string): Promise<WorkflowResponse>
     }
 }
 
-export const getWorkflowRuns = async (
-    workflowID: string,
+export async function getWorkflowRuns(
+    workflowId: string,
     page: number = 1,
-    pageSize: number = 10
-): Promise<RunResponse[]> => {
+    pageSize: number = 10,
+    startDate?: Date,
+    endDate?: Date,
+    status?: RunStatus
+): Promise<RunResponse[]> {
+    let url = `${API_BASE_URL}/wf/${workflowId}/runs/?page=${page}&page_size=${pageSize}`
+
+    // Add date filters if provided
+    if (startDate) {
+        url += `&start_date=${startDate.toISOString()}`
+    }
+    if (endDate) {
+        url += `&end_date=${endDate.toISOString()}`
+    }
+    // Add status filter if provided
+    if (status) {
+        url += `&status=${status}`
+    }
+
     try {
-        const response = await axios.get(`${API_BASE_URL}/wf/${workflowID}/runs/`, {
-            params: {
-                page,
-                page_size: pageSize,
-            },
-        })
+        const response = await axios.get(url)
         return response.data
     } catch (error) {
         console.error('Error fetching workflow runs:', error)
@@ -929,17 +941,17 @@ export const listVectorIndices = async (): Promise<VectorIndexResponseSchema[]> 
 }
 
 export interface ToolListResponse {
-    available_tools: string[];
-    enabled_tools: string[];
+    available_tools: string[]
+    enabled_tools: string[]
 }
 
 export interface ToolFileResponse {
-    success: boolean;
-    message: string;
+    success: boolean
+    message: string
     data?: {
-        filename: string;
-        content: string;
-    };
+        filename: string
+        content: string
+    }
 }
 
 export const listTools = async (): Promise<ToolListResponse> => {
@@ -947,7 +959,7 @@ export const listTools = async (): Promise<ToolListResponse> => {
         const response = await axios.get(`${API_BASE_URL}/mcp/tools`)
         return {
             available_tools: response.data.available_tools || [],
-            enabled_tools: response.data.enabled_tools || []
+            enabled_tools: response.data.enabled_tools || [],
         }
     } catch (error) {
         console.error('Error listing tools:', error)
@@ -979,7 +991,7 @@ export const createToolFile = async (filename: string, content: string): Promise
     try {
         const response = await axios.post(`${API_BASE_URL}/mcp/tools/files`, {
             filename,
-            content
+            content,
         })
         return response.data
     } catch (error) {
@@ -992,7 +1004,7 @@ export const updateToolFile = async (filename: string, content: string): Promise
     try {
         const response = await axios.put(`${API_BASE_URL}/mcp/tools/files/${filename}`, {
             filename,
-            content
+            content,
         })
         return response.data
     } catch (error) {
@@ -1014,7 +1026,7 @@ export const deleteToolFile = async (filename: string): Promise<ToolFileResponse
 export const registerNodesAsTools = async (workflowId: string): Promise<ToolFileResponse> => {
     try {
         const response = await axios.post(`${API_BASE_URL}/mcp/tools/register`, {
-            workflow_id: workflowId
+            workflow_id: workflowId,
         })
         return response.data
     } catch (error) {

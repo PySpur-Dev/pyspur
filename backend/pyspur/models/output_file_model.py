@@ -13,11 +13,14 @@ class OutputFileModel(BaseModel):
     id: Mapped[str] = mapped_column(String, Computed("'OF' || _intid"), nullable=False, unique=True)
     file_name: Mapped[str] = mapped_column(String, nullable=False)
     file_path: Mapped[str] = mapped_column(String, nullable=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now(timezone.utc))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, default=datetime.now(timezone.utc), index=True
+    )
     updated_at: Mapped[datetime] = mapped_column(
         DateTime,
         default=datetime.now(timezone.utc),
         onupdate=datetime.now(timezone.utc),
+        index=True,
     )
 
     run = relationship(

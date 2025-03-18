@@ -35,7 +35,7 @@ class EvalRunModel(BaseModel):
     output_variable: Mapped[str] = mapped_column(String, nullable=False)
     num_samples: Mapped[int] = mapped_column(Integer, default=10)
     start_time: Mapped[Optional[datetime]] = mapped_column(
-        DateTime, default=datetime.now(timezone.utc)
+        DateTime, default=datetime.now(timezone.utc), index=True
     )
-    end_time: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    end_time: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True, index=True)
     results: Mapped[Optional[Any]] = mapped_column(JSON, nullable=True)
