@@ -35,7 +35,7 @@ from ..schemas.run_schemas import (
     RunResponseSchema,
     StartRunRequestSchema,
 )
-from ..schemas.workflow_schemas import WorkflowDefinitionSchema
+from ..schemas.workflow_schemas import WorkflowDefinitionSchema, WorkflowNodeSchema
 from ..utils.workflow_version_utils import fetch_workflow_version
 
 router = APIRouter()
@@ -87,6 +87,159 @@ def process_embedded_files(
 
     processed_inputs = find_and_replace_data_uris(processed_inputs)
     return processed_inputs
+
+
+@router.post(
+    "/{workflow_id}/runv2/",
+    response_model=RunResponseSchema,
+    description="Run a workflow and return the run details with outputs",
+)
+async def run_workflow_blocking_v2(  # noqa: C901
+    workflow_id: str,
+    request: StartRunRequestSchema,
+    db: Session = Depends(get_db),
+    run_type: str = "interactive",
+) -> RunResponseSchema:
+    workflow = db.query(WorkflowModel).filter(WorkflowModel.id == workflow_id).first()
+    if not workflow:
+        raise HTTPException(status_code=404, detail="Workflow not found")
+
+    workflow_version = fetch_workflow_version(workflow_id, workflow, db)
+    workflow_definition = WorkflowDefinitionSchema.model_validate(workflow_version.definition)
+
+    initial_inputs = request.initial_inputs or {}
+
+    # Process any embedded files in the inputs
+    initial_inputs = process_embedded_files(workflow_id, initial_inputs)
+
+    # Handle file paths if present
+    if request.files:
+        for node_id, file_paths in request.files.items():
+            if node_id in initial_inputs:
+                initial_inputs[node_id]["files"] = file_paths
+
+    new_run = await create_run_model(
+        workflow_id,
+        workflow_version.id,
+        initial_inputs,
+        request.parent_run_id,
+        run_type,
+        db,
+    )
+    task_recorder = TaskRecorder(db, new_run.id)
+    context = WorkflowExecutionContext(
+        workflow_id=workflow.id,
+        run_id=new_run.id,
+        parent_run_id=request.parent_run_id,
+        run_type=run_type,
+        db_session=db,
+        workflow_definition=workflow_version.definition,
+    )
+    executor = WorkflowExecutor(
+        workflow=workflow_definition,
+        task_recorder=task_recorder,
+        context=context,
+    )
+    input_node = next(node for node in workflow_definition.nodes if node.node_type == "InputNode")
+
+    try:
+        outputs = await executor(initial_inputs[input_node.id])
+
+        # Check if any tasks were paused
+        has_paused_tasks = False
+        paused_node_ids: List[str] = []
+        for task in new_run.tasks:
+            if task.status == TaskStatus.PAUSED:
+                has_paused_tasks = True
+                paused_node_ids.append(task.node_id)
+
+        if has_paused_tasks:
+            # If we have paused tasks, ensure the run is in a PAUSED state
+            new_run.status = RunStatus.PAUSED
+
+            # Get all blocked nodes from paused nodes
+            all_blocked_nodes: Set[str] = set()
+            for paused_node_id in paused_node_ids:
+                blocked_nodes = executor.get_blocked_nodes(paused_node_id)
+                all_blocked_nodes.update(blocked_nodes)
+
+            # Make sure all downstream nodes are in PENDING status
+            for task in new_run.tasks:
+                if task.status == TaskStatus.CANCELED and task.node_id in all_blocked_nodes:
+                    # Update any CANCELED tasks that should be PENDING
+                    task_recorder.update_task(
+                        node_id=task.node_id,
+                        status=TaskStatus.PENDING,
+                        end_time=datetime.now(),
+                        is_downstream_of_pause=True,
+                    )
+        else:
+            new_run.status = RunStatus.COMPLETED
+
+        new_run.end_time = datetime.now(timezone.utc)
+        nodes = workflow_version.definition["nodes"]
+        nodes = [WorkflowNodeSchema.model_validate(node) for node in nodes]
+        # Create outputs dictionary using node titles as keys instead of node IDs
+        title_output_dict = {}
+        for node_id, node_output in outputs.items():
+            # Find the node with this ID to get its title
+            node = next((n for n in nodes if n.id == node_id), None)
+            if node and hasattr(node, "title") and node.title:
+                # Use the node's title as the key
+                title_output_dict[node.title] = node_output.model_dump()
+        new_run.outputs = title_output_dict
+        db.commit()
+
+        # Refresh the run to get the updated tasks
+        db.refresh(new_run)
+        response = RunResponseSchema.model_validate(new_run)
+        response.message = "Workflow execution completed successfully."
+        return response
+
+    except PauseException as e:
+        # Make sure the run status is set to PAUSED
+        new_run.status = RunStatus.PAUSED
+        new_run.outputs = {k: v.model_dump() for k, v in executor.outputs.items() if v is not None}
+
+        # Get all blocked nodes from paused nodes
+        paused_node_ids = [
+            task.node_id for task in new_run.tasks if task.status == TaskStatus.PAUSED
+        ]
+        all_blocked_nodes: Set[str] = set()
+        for paused_node_id in paused_node_ids:
+            blocked_nodes = executor.get_blocked_nodes(paused_node_id)
+            all_blocked_nodes.update(blocked_nodes)
+
+        # Make sure all downstream nodes are in PENDING status
+        for task in new_run.tasks:
+            if task.status == TaskStatus.CANCELED and task.node_id in all_blocked_nodes:
+                # Update any CANCELED tasks that should be PENDING
+                task_recorder.update_task(
+                    node_id=task.node_id,
+                    status=TaskStatus.PENDING,
+                    end_time=datetime.now(),
+                    is_downstream_of_pause=True,
+                )
+
+        db.commit()
+        # Refresh the run to get the updated tasks
+        db.refresh(new_run)
+        response = RunResponseSchema.model_validate(new_run)
+        response.message = "Workflow execution paused for human intervention."
+        raise HTTPException(
+            status_code=202,
+            detail=response.model_dump(),
+        ) from e
+    except Exception as e:
+        new_run.status = RunStatus.FAILED
+        new_run.end_time = datetime.now(timezone.utc)
+        db.commit()
+        response = RunResponseSchema.model_validate(new_run)
+        response.message = f"Workflow execution failed: {str(e)}"
+        raise HTTPException(
+            status_code=500,
+            detail=response.model_dump(),
+        ) from e
 
 
 @router.post(

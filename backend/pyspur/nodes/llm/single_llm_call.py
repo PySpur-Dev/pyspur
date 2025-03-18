@@ -28,6 +28,17 @@ def repair_json(broken_json_str: str) -> str:
 
     repaired = broken_json_str
 
+    # Remove common LLM artifacts like XML/markdown tags that might be mixed in with JSON
+    repaired = re.sub(r"</?(invoke|function_call|thinking).*?>", "", repaired)
+
+    # Remove markdown code block markers if present
+    repaired = re.sub(r"^```(json)?|```$", "", repaired, flags=re.MULTILINE)
+
+    # Try to extract just the JSON part if it's mixed with other text
+    json_match = re.search(r"(\{[\s\S]*\})", repaired)
+    if json_match:
+        repaired = json_match.group(1)
+
     # Convert single quotes to double quotes, but not within already double-quoted strings
     # First, temporarily replace valid double-quoted strings
     placeholder = "PLACEHOLDER"
@@ -168,7 +179,7 @@ class SingleLLMCallNode(BaseNode):
             raise e
 
         # Extract message history from input if enabled
-        history = None
+        history: Optional[List[Dict[str, str]]] = None
         if self.config.enable_message_history and self.config.message_history_variable:
             try:
                 # Try to get history from the specified variable
@@ -180,7 +191,7 @@ class SingleLLMCallNode(BaseNode):
                     # Direct field access
                     history = raw_input_dict.get(history_var)
 
-                if history is not None and not isinstance(history, list):
+                if history is not None:
                     print(
                         f"[WARNING] Message history must be a list, but got {type(history).__name__}"
                     )
@@ -281,6 +292,13 @@ class SingleLLMCallNode(BaseNode):
 
         try:
             assistant_message_dict = json.loads(assistant_message_str)
+
+            # Add a type check to ensure we have a dictionary
+            if not isinstance(assistant_message_dict, dict):
+                # If we parsed JSON successfully but got a non-dict result (like a string with XML tags),
+                # try to repair it
+                repaired_str = repair_json(str(assistant_message_dict))
+                assistant_message_dict = json.loads(repaired_str)
         except Exception:
             try:
                 repaired_str = repair_json(assistant_message_str)
@@ -304,8 +322,34 @@ class SingleLLMCallNode(BaseNode):
                 )
 
         # Validate and return
-        assistant_message = self.output_model.model_validate(assistant_message_dict)
-        return assistant_message
+        try:
+            assistant_message = self.output_model.model_validate(assistant_message_dict)
+            return assistant_message
+        except Exception as e:
+            # For better debugging, include the raw response
+            raw_response = assistant_message_str
+
+            # Also include what we attempted to validate
+            validation_input = json.dumps(assistant_message_dict, default=str)
+
+            error_message = (
+                f"The LLM did not return valid JSON that matches the expected schema.\n\n"
+                f"Raw LLM response:\n{raw_response}\n\n"
+                f"Attempted to validate:\n{validation_input}\n\n"
+                f"Validation error: {str(e)}"
+            )
+
+            raise Exception(
+                json.dumps(
+                    {
+                        "type": "invalid_json_format",
+                        "message": error_message,
+                        "original_response": raw_response,
+                        "validation_input": validation_input,
+                        "validation_error": str(e),
+                    }
+                )
+            )
 
 
 if __name__ == "__main__":
