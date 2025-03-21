@@ -304,14 +304,16 @@ export const insertNodeBetweenNodes = (
         return
     }
 
-    const id = generateNewNodeId(nodes, nodeType)
+    const id = uuidv4()
+    const nodeTitle = generateNewNodeTitle(nodes, nodeType)
+
     const newPosition = {
         x: (sourceNode.position.x + targetNode.position.x) / 2,
         y: (sourceNode.position.y + targetNode.position.y) / 2,
     }
 
     // Create the new node
-    const result = createNode(nodeTypes, nodeType, id, newPosition)
+    const result = createNode(nodeTypes, nodeType, id, newPosition, null, null, nodeTitle)
     if (!result) {
         console.error('Failed to create node')
         return
