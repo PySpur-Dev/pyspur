@@ -113,10 +113,10 @@ export const createNodeAtCenter = (
 ): void => {
     // Generate UUID for the node ID
     const id = uuidv4()
-    
+
     // Create a human-readable title (similar to previous ID format)
     const nodeTitle = generateNewNodeTitle(nodes, nodeType)
-    
+
     const center = reactFlowInstance.screenToFlowPosition({
         x: window.innerWidth / 2,
         y: window.innerHeight / 2,
@@ -165,8 +165,8 @@ export const duplicateNode = (nodeId: string, dispatch: AppDispatch, getState: (
 
     // Generate a new unique ID for the duplicated node using UUID
     const newNodeId = uuidv4()
-    
-    // Create a title based on the original node's title 
+
+    // Create a title based on the original node's title
     const newNodeTitle = generateNewNodeTitle(nodes, sourceNode.type || 'default')
 
     // Create the new node with an offset position
@@ -221,7 +221,7 @@ export const duplicateNode = (nodeId: string, dispatch: AppDispatch, getState: (
         childNodes.forEach((childNode) => {
             const newChildId = uuidv4()
             idMapping[childNode.id] = newChildId
-            
+
             // Create readable title for the child node
             const newChildTitle = generateNewNodeTitle(nodes, childNode.type || 'default')
             const newChildNode = {
@@ -304,9 +304,11 @@ export const insertNodeBetweenNodes = (
         return
     }
 
+    // Generate UUID for the node ID
     const id = uuidv4()
-    const nodeTitle = generateNewNodeTitle(nodes, nodeType)
 
+    // Create a human-readable title (similar to previous ID format)
+    const nodeTitle = generateNewNodeTitle(nodes, nodeType)
     const newPosition = {
         x: (sourceNode.position.x + targetNode.position.x) / 2,
         y: (sourceNode.position.y + targetNode.position.y) / 2,

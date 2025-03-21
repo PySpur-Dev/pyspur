@@ -392,9 +392,10 @@ async def generate_text(
                                         # Convert DOCX to XML
                                         xml_content = convert_docx_to_xml(str(file_path))
                                         # Encode the XML content directly
-                                        data_url = f"data:text/xml;base64,{
-                                            base64.b64encode(xml_content.encode()).decode()
-                                        }"
+                                        data_url = (
+                                            f"data:text/xml;base64,"
+                                            f"{base64.b64encode(xml_content.encode()).decode()}"
+                                        )
                                     else:
                                         data_url = encode_file_to_base64_data_url(str(file_path))
 

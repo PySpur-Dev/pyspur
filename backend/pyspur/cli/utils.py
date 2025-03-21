@@ -31,7 +31,8 @@ def load_environment() -> None:
         with resources.files("pyspur.templates").joinpath(".env.example").open() as f:
             load_dotenv(stream=f)
             print(
-                "[yellow]![/yellow] No .env file found, using default configuration from .env.example"
+                "[yellow]![/yellow] No .env file found,"
+                " using default configuration from .env.example"
             )
             print("[yellow]![/yellow] Run 'pyspur init' to create a customizable .env file")
 
@@ -53,6 +54,11 @@ def run_migrations() -> None:
         from ..models.output_file_model import OutputFileModel  # type: ignore
         from ..models.run_model import RunModel  # type: ignore
         from ..models.task_model import TaskModel  # type: ignore
+        from ..models.user_session_model import (
+            MessageModel,  # type: ignore
+            SessionModel,  # type: ignore
+            UserModel,  # type: ignore
+        )
         from ..models.workflow_model import WorkflowModel  # type: ignore
         from ..models.workflow_version_model import WorkflowVersionModel  # type: ignore
         # Import all models to ensure they're registered with SQLAlchemy
@@ -87,7 +93,8 @@ def run_migrations() -> None:
                     if confirm.lower() != "y":
                         print("[yellow]![/yellow] Database recreation cancelled")
                         print(
-                            "[yellow]![/yellow] Please revert pyspur to the original version that was used to create the database"
+                            "[yellow]![/yellow] Please revert pyspur to the original"
+                            " version that was used to create the database"
                         )
                         print("[yellow]![/yellow] OR use a postgres instance to support migrations")
                         return
