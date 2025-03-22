@@ -354,11 +354,19 @@ const APIKeys = (props: CardProps): React.ReactElement => {
 interface SettingsModalProps {
     isOpen: boolean
     onOpenChange: (isOpen: boolean) => void
+    initialTab?: 'appearance' | 'api-keys'
 }
 
-const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onOpenChange }) => {
-    const [activeTab, setActiveTab] = React.useState<'appearance' | 'api-keys'>('appearance')
+const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onOpenChange, initialTab = 'appearance' }) => {
+    const [activeTab, setActiveTab] = React.useState<'appearance' | 'api-keys'>(initialTab)
     const { theme, setTheme } = useTheme()
+
+    // Update activeTab when initialTab prop changes
+    React.useEffect(() => {
+        if (isOpen && initialTab) {
+            setActiveTab(initialTab);
+        }
+    }, [isOpen, initialTab]);
 
     useEffect(() => {
         if (!isOpen) return

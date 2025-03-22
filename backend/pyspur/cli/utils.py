@@ -53,6 +53,7 @@ def run_migrations() -> None:
         from ..models.eval_run_model import EvalRunModel  # type: ignore
         from ..models.output_file_model import OutputFileModel  # type: ignore
         from ..models.run_model import RunModel  # type: ignore
+        from ..models.slack_agent_model import SlackAgentModel  # type: ignore
         from ..models.task_model import TaskModel  # type: ignore
         from ..models.user_session_model import (
             MessageModel,  # type: ignore

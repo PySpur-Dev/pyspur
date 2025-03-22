@@ -20,7 +20,7 @@ command_exists() {
 download_file() {
     local file=$1
     local url="https://raw.githubusercontent.com/pyspur-dev/pyspur/main/${file}"
-    
+
     if curl -fsSL "$url" -o "$file"; then
         print_message "Downloaded ${file} successfully" "$GREEN"
         return 0
@@ -63,7 +63,10 @@ if ! download_file "docker-compose.yml"; then
     exit 1
 fi
 
-# Download and copy .env.example to .env 
+# Download Dockerfile.socket if available
+download_file "Dockerfile.socket" || print_message "Optional Dockerfile.socket not found, will use image from registry" "$YELLOW"
+
+# Download and copy .env.example to .env
 if ! download_file ".env.example"; then
     exit 1
 fi
@@ -78,9 +81,10 @@ if docker compose up -d; then
     print_message "\nTo customize your deployment:" "$YELLOW"
     print_message "1. Configure API keys through the portal's API Keys tab, or" "$YELLOW"
     print_message "2. Manually edit .env and restart with:" "$YELLOW"
-    print_message "   docker compose up -d" "$NC"
+    print_message "   docker compose up -d" "$YELLOW"
+    print_message "\nSlack socket workers are running automatically." "$GREEN"
     exit 0
 else
     print_message "\nFailed to start PySpur services. Please check the error messages above." "$RED"
     exit 1
-fi 
+fi

@@ -1,0 +1,6 @@
+---
+description: API calls in frontend
+globs: 
+alwaysApply: false
+---
+API calls inside the frontend should always be stored inside [api.ts](mdc:frontend/src/utils/api.ts) and use the API_BASE_URL defined there

@@ -2,11 +2,15 @@
 FROM python:3.12 as base
 WORKDIR /pyspur
 
-# Install bash completion
+# Install bash completion and development tools
 RUN apt-get update && apt-get install -y \
     bash-completion \
     nano \
     vim \
+    libpq-dev \
+    gcc \
+    curl \
+    make \
     && rm -rf /var/lib/apt/lists/*
 
 RUN pip install --system uv
@@ -26,3 +30,7 @@ COPY frontend/package*.json ./
 RUN npm install
 
 WORKDIR /pyspur
+
+# Install Docker CLI using shared script
+COPY docker-install.sh /tmp/
+RUN bash /tmp/docker-install.sh && rm /tmp/docker-install.sh

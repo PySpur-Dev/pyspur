@@ -2,3 +2,5 @@
 test.db
 /app/integrations/google/token.json
 data/
+/secure_tokens/
+/.bolt-app-installation/

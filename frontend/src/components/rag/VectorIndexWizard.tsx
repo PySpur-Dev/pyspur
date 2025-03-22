@@ -11,6 +11,9 @@ import {
     SelectSection,
     Textarea,
     Tooltip,
+    Accordion,
+    AccordionItem,
+    Chip,
 } from '@heroui/react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { ArrowLeft, ArrowRight, CheckCircle, Info } from 'lucide-react'
@@ -92,7 +95,6 @@ const generateRandomName = () => {
 
 export const VectorIndexWizard: React.FC = () => {
     const router = useRouter()
-    const [activeStep, setActiveStep] = useState(0)
     const [isSubmitting, setIsSubmitting] = useState(false)
     const [collections, setCollections] = useState<DocumentCollectionResponseSchema[]>([])
     const [embeddingModels, setEmbeddingModels] = useState<Record<string, EmbeddingModelConfig>>({})
@@ -184,28 +186,34 @@ export const VectorIndexWizard: React.FC = () => {
         }
     }, [nameAlert])
 
-    const handleNext = () => {
-        if (activeStep < steps.length - 1) {
-            if (activeStep === 0 && !config.name.trim()) {
+    const handleSubmit = async () => {
+        try {
+            // Basic validation
+            if (!config.collection_id) {
+                setAlert({ type: 'danger', message: 'Please select a document collection' })
+                return
+            }
+
+            if (!config.embedding_model) {
+                setAlert({ type: 'danger', message: 'Please select an embedding model' })
+                return
+            }
+
+            if (!config.vector_db) {
+                setAlert({ type: 'danger', message: 'Please select a vector database' })
+                return
+            }
+
+            // Use a random name if none provided
+            if (!config.name.trim()) {
                 const randomName = generateRandomName()
                 setConfig((prev) => ({ ...prev, name: randomName }))
                 setNameAlert(`Using generated name: ${randomName}`)
             }
-            setActiveStep((prevStep) => prevStep + 1)
-        } else {
-            handleSubmit()
-        }
-    }
 
-    const handleBack = () => {
-        setActiveStep((prevStep) => prevStep - 1)
-    }
-
-    const handleSubmit = async () => {
-        try {
             setIsSubmitting(true)
             const createRequest: VectorIndexCreateRequest = {
-                name: config.name,
+                name: config.name || generateRandomName(),
                 description: config.description,
                 collection_id: config.collection_id,
                 embedding: {
@@ -344,309 +352,249 @@ export const VectorIndexWizard: React.FC = () => {
         </div>
     )
 
-    const renderStepContent = (step: number) => {
-        switch (step) {
-            case 0:
-                return (
-                    <div className="space-y-6">
-                        <div className="space-y-4">
-                            <Select
-                                label="Document Collection"
-                                placeholder="Select a document collection"
-                                selectedKeys={config.collection_id ? [config.collection_id] : []}
-                                onChange={(e) => handleConfigChange('collection_id')(e as any)}
-                                isRequired
-                            >
-                                {collections.map((collection) => (
-                                    <SelectItem key={collection.id} value={collection.id}>
-                                        {collection.name}
-                                    </SelectItem>
-                                ))}
-                            </Select>
-                            <div className="flex gap-2">
-                                <Input
-                                    label="Index Name"
-                                    placeholder="Optional - Enter a name or leave empty for a random name"
-                                    value={config.name}
-                                    onChange={handleConfigChange('name')}
-                                    className="w-full"
-                                    endContent={
-                                        <Tooltip content="Leave empty for a randomly generated name">
-                                            <Info className="w-4 h-4 text-default-400" />
-                                        </Tooltip>
-                                    }
-                                />
-                                <Button
-                                    isIconOnly
-                                    variant="flat"
-                                    className="self-end h-14"
-                                    onPress={() =>
-                                        handleConfigChange('name')({ target: { value: generateRandomName() } } as any)
-                                    }
-                                >
-                                    🎲
-                                </Button>
-                            </div>
-                            <Textarea
-                                label="Description"
-                                value={config.description}
-                                onChange={handleConfigChange('description')}
-                                minRows={3}
-                                endContent={
-                                    <Tooltip content="Optional description of your vector index">
-                                        <Info className="w-4 h-4 text-default-400" />
-                                    </Tooltip>
-                                }
-                            />
-                        </div>
-                    </div>
-                )
-
-            case 1:
-                return (
-                    <div className="space-y-6">
-                        <div className="flex items-center gap-2">
-                            <h3 className="text-lg font-semibold">Configure Index</h3>
-                            <Tooltip content="Configure your vector index settings">
-                                <Info className="w-4 h-4 text-default-400" />
-                            </Tooltip>
-                        </div>
-                        <div className="grid grid-cols-2 gap-4">
-                            <div className="space-y-2">
-                                <div className="flex items-center gap-2 mb-2">
-                                    <span className="text-sm font-medium">Embedding Model</span>
-                                    <Tooltip content="Configure how your text will be converted to vector embeddings">
-                                        <Info className="w-4 h-4 text-default-400" />
-                                    </Tooltip>
-                                </div>
-                                {renderEmbeddingSection()}
-                            </div>
-                            <div className="space-y-2">
-                                <div className="flex items-center gap-2 mb-2">
-                                    <span className="text-sm font-medium">Vector Database</span>
-                                    <Tooltip content="Choose where your vector embeddings will be stored">
-                                        <Info className="w-4 h-4 text-default-400" />
-                                    </Tooltip>
-                                </div>
-                                {renderVectorStoreSection()}
-                            </div>
-                        </div>
-                    </div>
-                )
-
-            case 2:
-                const selectedCollection = collections.find((c) => c.id === config.collection_id)
-                return (
-                    <Card>
-                        <CardBody className="gap-4">
-                            <div className="text-lg font-semibold">Review Configuration</div>
-                            <div className="space-y-4">
-                                <div>
-                                    <div className="font-medium">Collection:</div>
-                                    <div className="text-default-500">
-                                        {selectedCollection?.name || config.collection_id}
-                                    </div>
-                                </div>
-                                <div>
-                                    <div className="font-medium">Index Name:</div>
-                                    <div className="text-default-500">{config.name}</div>
-                                </div>
-                                {config.description && (
-                                    <div>
-                                        <div className="font-medium">Description:</div>
-                                        <div className="text-default-500">{config.description}</div>
-                                    </div>
-                                )}
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div>
-                                        <div className="font-medium">Embedding Model:</div>
-                                        <div className="text-default-500">
-                                            {embeddingModels[config.embedding_model]?.name || config.embedding_model}
-                                        </div>
-                                    </div>
-                                    <div>
-                                        <div className="font-medium">Vector Database:</div>
-                                        <div className="text-default-500">
-                                            {vectorStores[config.vector_db]?.name || config.vector_db}
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </CardBody>
-                    </Card>
-                )
-
-            default:
-                return null
-        }
-    }
-
     return (
-        <div className="max-w-[1200px] mx-auto p-6 min-h-screen bg-gradient-to-b from-background to-default-50/50">
-            <div className="flex flex-col md:flex-row gap-8">
-                {/* Left side - Steps */}
-                <div className="w-full md:w-1/3 lg:w-1/4">
-                    <motion.div
-                        className="sticky top-6"
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ duration: 0.5 }}
-                    >
-                        <div className="flex flex-col max-w-fit mb-2">
-                            <h1 className="text-3xl font-bold text-default-900">Create Vector Index</h1>
-                            <p className="text-small text-default-400">
-                                Follow the steps to configure your vector index settings.
-                            </p>
-                        </div>
-                        <Progress
-                            classNames={{
-                                base: 'mb-4',
-                                track: 'drop-shadow-md',
-                                indicator: 'bg-gradient-to-r from-primary to-primary-500',
-                                label: 'text-sm font-medium',
-                                value: 'text-sm font-medium text-default-500',
-                            }}
-                            label="Progress"
-                            size="md"
-                            value={(activeStep / (steps.length - 1)) * 100}
-                            showValueLabel={true}
-                            valueLabel={`${activeStep + 1} of ${steps.length}`}
-                        />
-
-                        <AnimatePresence>
-                            {nameAlert && (
-                                <motion.div
-                                    initial={{ opacity: 0, y: -10 }}
-                                    animate={{ opacity: 1, y: 0 }}
-                                    exit={{ opacity: 0, y: -10 }}
-                                    transition={{ duration: 0.2 }}
-                                >
-                                    <Alert className="mb-4" color="primary" startContent={<Info className="h-4 w-4" />}>
-                                        {nameAlert}
-                                    </Alert>
-                                </motion.div>
-                            )}
-                        </AnimatePresence>
-
-                        <AnimatePresence>
-                            {alert && (
-                                <motion.div
-                                    initial={{ opacity: 0, y: -10 }}
-                                    animate={{ opacity: 1, y: 0 }}
-                                    exit={{ opacity: 0, y: -10 }}
-                                    transition={{ duration: 0.2 }}
-                                >
-                                    <Alert
-                                        className="mb-4"
-                                        color={alert.type}
-                                        startContent={
-                                            alert.type === 'success' ? (
-                                                <CheckCircle className="h-4 w-4" />
-                                            ) : (
-                                                <Info className="h-4 w-4" />
-                                            )
-                                        }
-                                    >
-                                        {alert.message}
-                                    </Alert>
-                                </motion.div>
-                            )}
-                        </AnimatePresence>
-
-                        <div className="flex flex-col gap-4">
-                            {steps.map((step, index) => (
-                                <motion.button
-                                    key={index}
-                                    onClick={() => setActiveStep(index)}
-                                    className={`flex flex-col gap-1 rounded-xl border-1 p-4 transition-all duration-300 hover:scale-[1.02] hover:shadow-lg
-                    ${
-                        activeStep === index
-                            ? 'border-primary bg-primary/5 shadow-md'
-                            : index < activeStep
-                              ? 'border-success/50 bg-success/5'
-                              : 'border-default-200 dark:border-default-100'
-                    }`}
-                                    disabled={index > activeStep}
-                                    whileHover={{ scale: index <= activeStep ? 1.02 : 1 }}
-                                    whileTap={{ scale: 0.98 }}
-                                >
-                                    <div className="flex items-center gap-3">
-                                        <div
-                                            className={`flex h-8 w-8 items-center justify-center rounded-full text-sm font-medium transition-colors duration-300
-                        ${
-                            activeStep === index
-                                ? 'bg-primary text-white shadow-md'
-                                : index < activeStep
-                                  ? 'bg-success text-white'
-                                  : 'bg-default-100 text-default-600'
-                        }`}
-                                        >
-                                            {index < activeStep ? '✓' : index + 1}
-                                        </div>
-                                        <div className="flex flex-col items-start">
-                                            <span className="font-semibold text-default-900">{step.title}</span>
-                                            <span className="text-xs text-default-400">{step.description}</span>
-                                        </div>
-                                    </div>
-                                </motion.button>
-                            ))}
-                        </div>
-                    </motion.div>
+        <div className="max-w-[900px] mx-auto p-6">
+            <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.3 }}
+            >
+                {/* Header */}
+                <div className="flex justify-between items-center mb-6">
+                    <div>
+                        <h1 className="text-2xl font-bold text-default-900">Create Vector Index</h1>
+                        <p className="text-sm text-default-500">Create a searchable vector index from your document collection</p>
+                    </div>
                 </div>
 
-                {/* Right side - Content */}
-                <motion.div
-                    className="flex-1"
-                    initial={{ opacity: 0, x: 20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ duration: 0.5, delay: 0.2 }}
-                >
-                    <Card className="bg-background/60 dark:bg-background/60 backdrop-blur-lg backdrop-saturate-150 shadow-xl border-1 border-default-200">
-                        <CardBody className="gap-8 p-8">
-                            {renderStepContent(activeStep)}
+                <AnimatePresence>
+                    {alert && (
+                        <motion.div
+                            initial={{ opacity: 0, y: -10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, y: -10 }}
+                            transition={{ duration: 0.2 }}
+                        >
+                            <Alert
+                                className="mb-4"
+                                color={alert.type}
+                                startContent={
+                                    alert.type === 'success' ? (
+                                        <CheckCircle className="h-4 w-4" />
+                                    ) : (
+                                        <Info className="h-4 w-4" />
+                                    )
+                                }
+                            >
+                                {alert.message}
+                            </Alert>
+                        </motion.div>
+                    )}
+                </AnimatePresence>
 
-                            <Divider className="my-4" />
+                <AnimatePresence>
+                    {nameAlert && (
+                        <motion.div
+                            initial={{ opacity: 0, y: -10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, y: -10 }}
+                            transition={{ duration: 0.2 }}
+                        >
+                            <Alert className="mb-4" color="primary" startContent={<Info className="h-4 w-4" />}>
+                                {nameAlert}
+                            </Alert>
+                        </motion.div>
+                    )}
+                </AnimatePresence>
 
-                            <div className="flex justify-between items-center">
-                                <Button
-                                    color="danger"
-                                    variant="light"
-                                    onPress={() => router.back()}
-                                    className="font-medium hover:bg-danger/10"
-                                >
-                                    Cancel
-                                </Button>
-                                <div className="flex gap-3">
-                                    {activeStep > 0 && (
-                                        <Button
-                                            variant="bordered"
-                                            onPress={handleBack}
-                                            className="font-medium"
-                                            startContent={<ArrowLeft size={18} />}
-                                            isDisabled={isSubmitting}
+                <Card className="mb-6 border border-default-200">
+                    <CardBody>
+                        <Accordion defaultExpandedKeys={["1"]}>
+                            {/* Basic Information Section */}
+                            <AccordionItem
+                                key="1"
+                                aria-label="Basic Information"
+                                title={
+                                    <div className="flex items-center gap-2">
+                                        <span className="flex items-center justify-center w-6 h-6 rounded-full bg-primary/10 text-primary text-xs font-medium">1</span>
+                                        <span className="text-md font-semibold">Basic Information</span>
+                                    </div>
+                                }
+                                subtitle="Select collection and set index details"
+                            >
+                                <div className="space-y-4 pt-2">
+                                    <div className="grid grid-cols-1 gap-4">
+                                        <Select
+                                            label="Document Collection"
+                                            placeholder="Select a document collection"
+                                            selectedKeys={config.collection_id ? [config.collection_id] : []}
+                                            onChange={(e) => handleConfigChange('collection_id')(e as any)}
+                                            isRequired
                                         >
-                                            Back
-                                        </Button>
-                                    )}
-                                    <Button
-                                        color="primary"
-                                        onPress={activeStep === steps.length - 1 ? handleSubmit : handleNext}
-                                        className="font-medium"
-                                        endContent={activeStep !== steps.length - 1 && <ArrowRight size={18} />}
-                                        isLoading={isSubmitting}
-                                        isDisabled={
-                                            (activeStep === 0 && !config.collection_id) ||
-                                            (activeStep === 1 && (!config.embedding_model || !config.vector_db))
-                                        }
-                                    >
-                                        {activeStep === steps.length - 1 ? 'Create Index' : 'Next'}
-                                    </Button>
+                                            {collections.map((collection) => (
+                                                <SelectItem key={collection.id} value={collection.id}>
+                                                    {collection.name}
+                                                </SelectItem>
+                                            ))}
+                                        </Select>
+
+                                        <div className="flex gap-2">
+                                            <Input
+                                                label="Index Name"
+                                                placeholder="Optional - Enter a name or leave empty for a random name"
+                                                value={config.name}
+                                                onChange={handleConfigChange('name')}
+                                                className="w-full"
+                                                endContent={
+                                                    <Tooltip content="Leave empty for a randomly generated name">
+                                                        <Info className="w-4 h-4 text-default-400" />
+                                                    </Tooltip>
+                                                }
+                                            />
+                                            <Button
+                                                isIconOnly
+                                                variant="flat"
+                                                className="self-end h-14"
+                                                onPress={() =>
+                                                    handleConfigChange('name')({ target: { value: generateRandomName() } } as any)
+                                                }
+                                            >
+                                                🎲
+                                            </Button>
+                                        </div>
+
+                                        <Textarea
+                                            label="Description"
+                                            value={config.description}
+                                            onChange={handleConfigChange('description')}
+                                            minRows={3}
+                                            placeholder="Optional description of this vector index"
+                                            endContent={
+                                                <Tooltip content="Optional description of your vector index">
+                                                    <Info className="w-4 h-4 text-default-400" />
+                                                </Tooltip>
+                                            }
+                                        />
+                                    </div>
                                 </div>
-                            </div>
-                        </CardBody>
-                    </Card>
-                </motion.div>
-            </div>
+                            </AccordionItem>
+
+                            {/* Embedding Configuration */}
+                            <AccordionItem
+                                key="2"
+                                aria-label="Embedding Configuration"
+                                title={
+                                    <div className="flex items-center gap-2">
+                                        <span className="flex items-center justify-center w-6 h-6 rounded-full bg-primary/10 text-primary text-xs font-medium">2</span>
+                                        <span className="text-md font-semibold">Embedding Configuration</span>
+                                    </div>
+                                }
+                                subtitle="Configure embedding model and vector database"
+                            >
+                                <div className="space-y-4 pt-2">
+                                    <div className="grid grid-cols-1 gap-6">
+                                        <div>
+                                            <div className="flex items-center gap-2 mb-2">
+                                                <span className="text-sm font-medium">Embedding Model</span>
+                                                <Tooltip content="Configure how your text will be converted to vector embeddings">
+                                                    <Info className="w-4 h-4 text-default-400" />
+                                                </Tooltip>
+                                            </div>
+                                            {renderEmbeddingSection()}
+                                        </div>
+
+                                        <div>
+                                            <div className="flex items-center gap-2 mb-2">
+                                                <span className="text-sm font-medium">Vector Database</span>
+                                                <Tooltip content="Choose where your vector embeddings will be stored">
+                                                    <Info className="w-4 h-4 text-default-400" />
+                                                </Tooltip>
+                                            </div>
+                                            {renderVectorStoreSection()}
+                                        </div>
+                                    </div>
+                                </div>
+                            </AccordionItem>
+
+                            {/* Review Configuration */}
+                            <AccordionItem
+                                key="3"
+                                aria-label="Review Configuration"
+                                title={
+                                    <div className="flex items-center gap-2">
+                                        <span className="flex items-center justify-center w-6 h-6 rounded-full bg-primary/10 text-primary text-xs font-medium">3</span>
+                                        <span className="text-md font-semibold">Review Configuration</span>
+                                    </div>
+                                }
+                                subtitle="Review your index configuration before creating"
+                            >
+                                <div className="space-y-4 pt-2">
+                                    <div className="bg-default-50 p-4 rounded-lg">
+                                        <div className="space-y-4">
+                                            <div>
+                                                <div className="font-medium">Collection:</div>
+                                                <div className="text-default-500">
+                                                    {collections.find(c => c.id === config.collection_id)?.name || 'No collection selected'}
+                                                    {config.collection_id && (
+                                                        <Chip size="sm" variant="flat" color="primary" className="ml-2">
+                                                            {config.collection_id}
+                                                        </Chip>
+                                                    )}
+                                                </div>
+                                            </div>
+                                            <div>
+                                                <div className="font-medium">Index Name:</div>
+                                                <div className="text-default-500">{config.name || 'Will be generated automatically'}</div>
+                                            </div>
+                                            {config.description && (
+                                                <div>
+                                                    <div className="font-medium">Description:</div>
+                                                    <div className="text-default-500">{config.description}</div>
+                                                </div>
+                                            )}
+                                            <Divider className="my-2" />
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                <div>
+                                                    <div className="font-medium">Embedding Model:</div>
+                                                    <div className="text-default-500">
+                                                        {embeddingModels[config.embedding_model]?.name || 'Not selected'}
+                                                    </div>
+                                                </div>
+                                                <div>
+                                                    <div className="font-medium">Vector Database:</div>
+                                                    <div className="text-default-500">
+                                                        {vectorStores[config.vector_db]?.name || 'Not selected'}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </AccordionItem>
+                        </Accordion>
+                    </CardBody>
+                </Card>
+
+                <div className="flex justify-between items-center">
+                    <Button
+                        color="danger"
+                        variant="light"
+                        onPress={() => router.back()}
+                        className="font-medium hover:bg-danger/10"
+                    >
+                        Cancel
+                    </Button>
+                    <Button
+                        color="primary"
+                        onPress={handleSubmit}
+                        className="font-medium"
+                        isLoading={isSubmitting}
+                        isDisabled={isSubmitting}
+                    >
+                        Create Index
+                    </Button>
+                </div>
+            </motion.div>
         </div>
     )
 }

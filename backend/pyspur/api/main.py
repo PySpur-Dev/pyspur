@@ -1,3 +1,4 @@
+import os
 import shutil
 import tempfile
 from contextlib import ExitStack, asynccontextmanager
@@ -9,6 +10,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
+from loguru import logger
 
 from .api_app import api_app
 
@@ -34,6 +36,24 @@ async def lifespan(app: FastAPI):
     # Copy static files to temporary directory
     if static_dir.exists():
         shutil.copytree(static_dir, temporary_static_dir, dirs_exist_ok=True)
+
+    # Check if socket mode should be disabled in the main process
+    socket_mode_disabled = os.environ.get("SOCKET_MODE_DISABLED", "").lower() in (
+        "true",
+        "1",
+        "yes",
+    )
+    if socket_mode_disabled:
+        logger.info("Socket Mode is disabled in main process - use dedicated socket workers")
+    else:
+        logger.info("Socket Mode enabled in main process")
+        # Import socket client lazily to avoid circular imports
+        from ..integrations.slack.socket_client import get_socket_mode_client
+
+        # Initialize socket client but don't start any connections here
+        # The socket client will be used on-demand by the API
+        socket_client = get_socket_mode_client()
+        logger.info("Socket Mode client initialized")
 
     yield
 

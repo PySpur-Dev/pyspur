@@ -279,10 +279,12 @@ PROVIDER_CONFIGS = [
         category="messaging",
         icon="logos:slack-icon",
         parameters=[
-            ProviderParameter(name="SLACK_BOT_TOKEN", description="Slack Bot User OAuth Token"),
+            ProviderParameter(
+                name="SLACK_BOT_TOKEN", description="Slack Bot User OAuth Token (starts with xoxb-)"
+            ),
             ProviderParameter(
                 name="SLACK_USER_TOKEN",
-                description="Slack User OAuth Token",
+                description="Slack User OAuth Token (starts with xoxp-)",
                 required=False,
             ),
         ],

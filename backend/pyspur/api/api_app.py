@@ -16,6 +16,7 @@ from .output_file_management import router as output_file_management_router
 from .rag_management import router as rag_management_router
 from .run_management import router as run_management_router
 from .session_management import router as session_management_router
+from .slack_management import router as slack_management_router
 from .template_management import router as template_management_router
 from .user_management import router as user_management_router
 from .workflow_code_convert import router as workflow_code_router
@@ -47,3 +48,4 @@ api_app.include_router(file_management_router, prefix="/files", tags=["files"])
 api_app.include_router(ai_management_router, prefix="/ai", tags=["ai"])
 api_app.include_router(user_management_router, prefix="/user", tags=["users"])
 api_app.include_router(session_management_router, prefix="/session", tags=["sessions"])
+api_app.include_router(slack_management_router, prefix="/slack", tags=["slack integration"])

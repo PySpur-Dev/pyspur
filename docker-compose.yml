@@ -10,11 +10,34 @@ services:
     volumes:
       - ./.env:/pyspur/backend/.env
       - pyspur_data:/pyspur/backend/data
+      - /var/run/docker.sock:/var/run/docker.sock
     extra_hosts:
       - "host.docker.internal:host-gateway"
     depends_on:
       db:
         condition: service_healthy
+    environment:
+      - SOCKET_MODE_DISABLED=true
+
+  slack-socket-worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.socket
+    env_file:
+      - ./.env.example
+      - ./.env
+    volumes:
+      - ./.env:/app/.env
+      - pyspur_data:/app/data
+      - /var/run/docker.sock:/var/run/docker.sock
+    depends_on:
+      db:
+        condition: service_healthy
+      backend:
+        condition: service_started
+    deploy:
+      replicas: ${SOCKET_WORKERS:-2}
+    restart: unless-stopped
 
   db:
     image: postgres:17-alpine

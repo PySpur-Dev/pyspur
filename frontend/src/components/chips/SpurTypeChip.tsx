@@ -10,15 +10,35 @@ interface SpurTypeChipProps {
 }
 
 const SpurTypeChip: React.FC<SpurTypeChipProps> = ({ spurType, showText = true }) => {
-    const text = spurType === SpurType.CHATBOT ? 'Chatbot' : 'Workflow'
+    // Determine the text and icon based on spur type
+    let text = 'Unknown';
+    let icon = 'lucide:help-circle';
+
+    switch(spurType) {
+        case SpurType.CHATBOT:
+            text = 'Chatbot';
+            icon = 'lucide:message-square';
+            break;
+        case SpurType.WORKFLOW:
+            text = 'Workflow';
+            icon = 'lucide:workflow';
+            break;
+        case SpurType.AGENT:
+            text = 'Agent';
+            icon = 'lucide:bot';
+            break;
+        default:
+            // For debugging unknown values
+            console.warn('Unknown SpurType value:', spurType);
+            text = typeof spurType === 'string' ? spurType : 'Unknown';
+    }
+
     return (
         <Chip
             size="sm"
             variant="flat"
             title={!showText ? text : undefined}
-            startContent={
-                <Icon icon={spurType === SpurType.CHATBOT ? 'lucide:message-square' : 'lucide:workflow'} width={16} />
-            }
+            startContent={<Icon icon={icon} width={16} />}
         >
             {showText && text}
         </Chip>

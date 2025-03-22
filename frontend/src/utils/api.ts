@@ -32,6 +32,7 @@ import {
     WorkflowDefinition,
     WorkflowResponse,
     WorkflowVersionResponse,
+    SpurType,
 } from '@/types/api_types/workflowSchemas'
 
 import JSPydanticModel from './JSPydanticModel'
@@ -1238,3 +1239,675 @@ export const createTestSession = async (workflowId: string): Promise<SessionResp
         throw error
     }
 }
+
+// Slack Integration Types
+export interface SlackAgent {
+    id: number
+    name: string
+    slack_team_id: string
+    slack_team_name: string
+    workflow_id?: string
+    spur_type: SpurType
+    is_active: boolean
+    trigger_enabled: boolean
+    trigger_on_mention: boolean
+    trigger_on_direct_message: boolean
+    trigger_on_channel_message: boolean
+    trigger_keywords?: string[]
+    created_at: string
+    has_bot_token: boolean
+    has_user_token: boolean
+    has_app_token?: boolean
+    last_token_update?: string
+    socket_mode_enabled?: boolean
+}
+
+export interface SlackOAuthResponse {
+    success: boolean
+    message: string
+    team_name?: string
+}
+
+export interface SlackMessageResponse {
+    success: boolean
+    message: string
+    ts?: string
+}
+
+// Slack Integration Functions
+export const getSlackAuthUrl = async (): Promise<{ auth_url: string }> => {
+    try {
+        const response = await axios.get(`${API_BASE_URL}/slack/oauth/authorize`)
+        return response.data
+    } catch (error) {
+        console.error('Error getting Slack auth URL:', error)
+        throw error
+    }
+}
+
+export const getSlackRequiredKeys = async (): Promise<{
+    configured: boolean;
+    keys: Array<{
+        name: string;
+        description: string;
+        configured: boolean;
+        masked_value: string;
+        required: boolean;
+        purpose: string;
+        help_url: string;
+    }>;
+}> => {
+    try {
+        const response = await axios.get(`${API_BASE_URL}/slack/required-keys`)
+        return response.data
+    } catch (error) {
+        console.error('Error getting Slack required keys:', error)
+        throw error
+    }
+}
+
+/**
+ * Fetches Slack setup information including required keys and their configuration status
+ * @returns The Slack setup information object or null if there was an error
+ */
+export const fetchSlackSetupInfo = async (): Promise<{
+    configured: boolean;
+    keys: Array<{
+        name: string;
+        description: string;
+        configured: boolean;
+        masked_value: string;
+        required: boolean;
+        purpose: string;
+        help_url: string;
+    }>;
+} | null> => {
+    try {
+        const info = await getSlackRequiredKeys()
+        return info
+    } catch (error) {
+        console.error('Error fetching Slack setup info:', error)
+        return null
+    }
+}
+
+export const getSlackAgents = async (forceRefresh = false): Promise<SlackAgent[]> => {
+    const maxRetries = 2;
+    let lastError = null;
+
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+        try {
+            // Add cache-busting parameter to ensure we get fresh data
+            const cacheBuster = forceRefresh || attempt > 1 ? `?_=${Date.now()}` : '';
+            console.log(`Fetching Slack agents (attempt ${attempt}/${maxRetries})${forceRefresh ? ' with force refresh' : ''}`);
+
+            const response = await axios.get(`${API_BASE_URL}/slack/agents${cacheBuster}`);
+
+            if (!response.data) {
+                throw new Error('No data returned from server');
+            }
+
+            // Process agents to ensure proper spur_type values
+            const processedAgents = response.data.map(agent => {
+                // Log the original spur_type for debugging
+                console.log(`Agent ${agent.id} (${agent.name}) has spur_type:`, agent.spur_type);
+
+                // Ensure spur_type is a valid value
+                if (!agent.spur_type ||
+                    (agent.spur_type !== SpurType.AGENT &&
+                     agent.spur_type !== SpurType.CHATBOT &&
+                     agent.spur_type !== SpurType.WORKFLOW)) {
+                    console.warn(`Agent ${agent.id} has invalid spur_type:`, agent.spur_type);
+                    // Set a default spur_type
+                    return {
+                        ...agent,
+                        spur_type: SpurType.AGENT
+                    };
+                }
+
+                return agent;
+            });
+
+            console.log(`Retrieved ${processedAgents.length} Slack agents`);
+            return processedAgents;
+        } catch (error) {
+            console.error(`Error fetching Slack agents (attempt ${attempt}/${maxRetries}):`, error);
+            lastError = error;
+
+            if (attempt < maxRetries) {
+                // Wait before retrying with increasing delay
+                await new Promise(resolve => setTimeout(resolve, 300 * attempt));
+            }
+        }
+    }
+
+    // Return empty array instead of throwing to prevent UI crashes
+    console.warn('Returning empty array after failed Slack agents fetch attempts');
+    return [];
+}
+
+export const associateWorkflow = async (agentId: number, workflowId: string): Promise<SlackAgent> => {
+    const maxRetries = 3;
+    const waitBetweenRetries = 500; // ms
+    let lastError = null;
+
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+        try {
+            console.log(`Associating workflow (attempt ${attempt}/${maxRetries}):`, { agentId, workflowId, workflowIdType: typeof workflowId });
+
+            // Special handling for empty workflowId (dissociation)
+            if (!workflowId || workflowId === "null" || workflowId === "undefined") {
+                console.log('Workflow ID is empty, this will remove the workflow association');
+                workflowId = null; // Ensure null is sent if workflowId is falsy
+            }
+
+            // Send the API request
+            const response = await axios.put(`${API_BASE_URL}/slack/agents/${agentId}/workflow`, {
+                workflow_id: workflowId
+            });
+
+            console.log('Workflow association response:', response.data);
+
+            // Convert both IDs to strings for consistent comparison
+            const expectedIdStr = workflowId ? String(workflowId) : "";
+            const receivedIdStr = response.data.workflow_id ? String(response.data.workflow_id) : "";
+
+            if (expectedIdStr && receivedIdStr && expectedIdStr !== receivedIdStr) {
+                console.warn('Workflow association response mismatch:', {
+                    expected: expectedIdStr,
+                    received: receivedIdStr
+                });
+
+                // If it's the last attempt and we still have a mismatch, throw an error
+                if (attempt === maxRetries) {
+                    throw new Error('Server returned a different workflow ID than requested');
+                }
+
+                // Wait before retrying
+                await new Promise(resolve => setTimeout(resolve, waitBetweenRetries));
+                continue;
+            }
+
+            console.log('Workflow association successful:', response.data);
+            return response.data;
+        } catch (error) {
+            console.error(`Error associating workflow (attempt ${attempt}/${maxRetries}):`, error);
+            lastError = error;
+
+            if (attempt < maxRetries) {
+                // Wait before retrying
+                await new Promise(resolve => setTimeout(resolve, waitBetweenRetries));
+            }
+        }
+    }
+
+    // If we've exhausted all retries, throw the last error
+    throw lastError || new Error('Failed to associate workflow after multiple attempts');
+}
+
+export const updateTriggerConfig = async (
+    agentId: number,
+    config: {
+        trigger_on_mention: boolean,
+        trigger_on_direct_message: boolean,
+        trigger_on_channel_message: boolean,
+        trigger_keywords: string[],
+        trigger_enabled: boolean
+    }
+): Promise<SlackAgent> => {
+    try {
+        const response = await axios.put(`${API_BASE_URL}/slack/agents/${agentId}/trigger-config`, config)
+        return response.data
+    } catch (error) {
+        console.error('Error updating agent trigger configuration:', error)
+        throw error
+    }
+}
+
+export const sendTestMessage = async (channel: string, text: string, agentId?: number): Promise<SlackMessageResponse> => {
+    try {
+        // Build the URL with the required query parameters
+        let url = `${API_BASE_URL}/slack/test-message?channel=${encodeURIComponent(channel)}`;
+        if (agentId) {
+            url += `&agent_id=${agentId}`;
+        }
+
+        const response = await axios.post(url, {
+            text
+        })
+        return response.data
+    } catch (error: any) {
+        console.error('Error sending test message:', error)
+
+        // Check for specific installation unavailable errors
+        if (error.response?.data?.detail && (
+            error.response.data.detail.includes('installation') ||
+            error.response.data.detail.includes('reinstall') ||
+            error.response.data.detail.includes('AuthorizeResult')
+        )) {
+            return {
+                success: false,
+                message: 'Your Slack installation is no longer available. Please reinstall the app to reconnect.'
+            }
+        }
+
+        throw error
+    }
+}
+
+export const handleSlackCallback = async (code: string): Promise<SlackOAuthResponse> => {
+    try {
+        const response = await axios.get(`${API_BASE_URL}/slack/oauth/callback?code=${code}`)
+        return response.data
+    } catch (error) {
+        console.error('Error handling Slack callback:', error)
+        throw error
+    }
+}
+
+export const checkSlackConfig = async (): Promise<boolean> => {
+    try {
+        const response = await axios.get(`${API_BASE_URL}/slack/config/status`)
+        return response.data.configured
+    } catch (error) {
+        return false
+    }
+}
+
+// Higher-level Slack handler functions
+export interface AlertFunction {
+    (message: string, color: 'success' | 'danger' | 'warning' | 'default'): void;
+}
+
+export const connectToSlack = async (onAlert?: AlertFunction): Promise<void> => {
+    try {
+        // Get the Slack auth URL
+        const response = await getSlackAuthUrl()
+        if (response.auth_url) {
+            // Open the auth URL in a new window/tab
+            window.open(response.auth_url, '_blank')
+        } else {
+            onAlert?.('Failed to get Slack authorization URL', 'danger')
+        }
+    } catch (error: any) {
+        console.error('Error connecting to Slack:', error)
+        // Let the error propagate to the caller for custom handling
+        throw error
+    }
+}
+
+export const toggleSlackTrigger = async (
+    agentId: number,
+    field: string,
+    value: boolean,
+    agents: SlackAgent[],
+    updateAgentsCallback: (updater: (agents: SlackAgent[]) => SlackAgent[]) => void,
+    onAlert?: AlertFunction
+): Promise<void> => {
+    try {
+        // Find the current agent
+        const agent = agents.find(a => a.id === agentId)
+        if (!agent) return
+
+        // Update trigger configuration
+        const config = {
+            trigger_on_mention: field === 'trigger_on_mention' ? value : agent.trigger_on_mention,
+            trigger_on_direct_message: field === 'trigger_on_direct_message' ? value : agent.trigger_on_direct_message,
+            trigger_on_channel_message: field === 'trigger_on_channel_message' ? value : agent.trigger_on_channel_message,
+            trigger_keywords: agent.trigger_keywords || [],
+            trigger_enabled: field === 'trigger_enabled' ? value : agent.trigger_enabled
+        }
+
+        const updatedAgent = await updateTriggerConfig(agentId, config)
+
+        // Update local state
+        updateAgentsCallback(agents =>
+            agents.map(a => a.id === agentId ? updatedAgent : a)
+        )
+
+        onAlert?.('Agent trigger settings updated successfully!', 'success')
+    } catch (error) {
+        console.error('Error updating agent trigger configuration:', error)
+        onAlert?.('Failed to update agent configuration', 'danger')
+    }
+}
+
+/**
+ * Set the Slack bot token
+ */
+export const setSlackToken = async (botToken: string): Promise<SlackOAuthResponse> => {
+    try {
+        console.log('Setting Slack bot token...')
+        const response = await axios.post(`${API_BASE_URL}/slack/set-token`, {
+            token: botToken
+        })
+
+        console.log('Slack token response:', response.data)
+        return response.data
+    } catch (error) {
+        console.error('Error setting Slack token:', error)
+        throw error
+    }
+}
+
+/**
+ * Create a custom Slack agent with the specified name and configuration
+ */
+export const createSlackAgent = async (
+    name: string,
+    config: {
+        trigger_on_mention?: boolean;
+        trigger_on_direct_message?: boolean;
+        trigger_on_channel_message?: boolean;
+        trigger_keywords?: string[];
+        trigger_enabled?: boolean;
+        workflow_id: string; // Required - must be associated with a workflow
+        spur_type?: SpurType;
+        bot_token?: string;  // Slack bot token (xoxb-...)
+        user_token?: string; // Slack user token (xoxp-...)
+        app_token?: string;  // Slack app-level token (xapp-...)
+    }
+): Promise<SlackAgent | null> => {
+    try {
+        console.log('Creating custom Slack agent:', name)
+
+        if (!config.workflow_id) {
+            console.error('Cannot create a Slack agent without a workflow_id');
+            return null;
+        }
+
+        // Extract tokens from config before sending to API
+        const { bot_token, user_token, app_token, ...agentConfig } = config;
+
+        // Create the agent with configuration (excluding tokens)
+        const response = await axios.post(`${API_BASE_URL}/slack/agents`, {
+            name,
+            spur_type: config.spur_type || SpurType.AGENT,
+            ...agentConfig
+        })
+
+        const agent = response.data;
+        console.log('Created custom agent:', agent)
+
+        // Save tokens separately after agent creation
+        if (bot_token || user_token || app_token) {
+            console.log('Setting tokens for agent:', agent.id);
+
+            // Save each token with individual API calls
+            const tokenSavePromises = [];
+
+            if (bot_token?.trim()) {
+                console.log('Setting bot token');
+                tokenSavePromises.push(
+                    axios.post(`${API_BASE_URL}/slack/agents/${agent.id}/tokens/bot_token`, {
+                        token: bot_token.trim()
+                    })
+                );
+            }
+
+            if (user_token?.trim()) {
+                console.log('Setting user token');
+                tokenSavePromises.push(
+                    axios.post(`${API_BASE_URL}/slack/agents/${agent.id}/tokens/user_token`, {
+                        token: user_token.trim()
+                    })
+                );
+            }
+
+            if (app_token?.trim()) {
+                console.log('Setting app token');
+                tokenSavePromises.push(
+                    axios.post(`${API_BASE_URL}/slack/agents/${agent.id}/tokens/app_token`, {
+                        token: app_token.trim()
+                    })
+                );
+            }
+
+            try {
+                await Promise.all(tokenSavePromises);
+                console.log('All tokens set successfully');
+
+                // Refresh the agent data to include updated token flags
+                const updatedAgentResponse = await axios.get(`${API_BASE_URL}/slack/agents/${agent.id}`);
+                return updatedAgentResponse.data;
+            } catch (tokenError) {
+                console.error('Error setting tokens:', tokenError);
+                // Still return the agent even if token setting fails
+            }
+        }
+
+        return agent;
+    } catch (error) {
+        console.error('Error creating custom Slack agent:', error)
+        return null
+    }
+}
+
+/**
+ * Delete a Slack agent by ID
+ */
+export const deleteSlackAgent = async (
+    agentId: number,
+    onAlert?: AlertFunction
+): Promise<boolean> => {
+    try {
+        console.log('Deleting Slack agent:', agentId)
+
+        const response = await axios.delete(`${API_BASE_URL}/slack/agents/${agentId}`)
+
+        if (response.status === 204) {
+            onAlert?.('Slack agent deleted successfully!', 'success')
+            return true
+        } else {
+            throw new Error('Unexpected response status: ' + response.status)
+        }
+    } catch (error) {
+        console.error('Error deleting Slack agent:', error)
+        onAlert?.('Failed to delete Slack agent', 'danger')
+        return false
+    }
+}
+
+export interface SlackSocketModeResponse {
+    agent_id: number;
+    socket_mode_active: boolean;
+    message: string;
+}
+
+// Shared error handling for Socket Mode operations
+const handleSocketModeError = (error: any, operation: string): { error: true; errorType: string; message: string; originalError?: any } => {
+    console.error(`Error ${operation}:`, error);
+
+    // Handle app token errors
+    if (error?.response?.data?.detail?.includes('SLACK_APP_TOKEN') ||
+        error?.response?.data?.detail?.includes('not_allowed_token_type')) {
+        return {
+            error: true,
+            errorType: "SocketModeTokenError",
+            message: "Socket Mode requires an app-level token (SLACK_APP_TOKEN) that starts with 'xapp-'. " +
+                    "Please configure this token in your environment variables. " +
+                    "You can generate one from your Slack App settings under 'Basic Information' → 'App-Level Tokens'.",
+            originalError: error
+        };
+    }
+
+    // Handle 500 errors
+    if (error?.response?.status === 500) {
+        const errorDetail = error?.response?.data?.detail || '';
+        if (errorDetail.includes('token') || errorDetail.includes('xapp-') || errorDetail.includes('not_allowed_token_type')) {
+            return {
+                error: true,
+                errorType: "SocketModeTokenError",
+                message: "Socket Mode requires an app-level token (SLACK_APP_TOKEN) that starts with 'xapp-', " +
+                        "not a bot token. Please configure the correct token type in your environment variables.",
+                originalError: error
+            };
+        }
+        return {
+            error: true,
+            errorType: "SocketModeServerError",
+            message: `Server error occurred when ${operation}: ${errorDetail || 'Unknown server error'}`,
+            originalError: error
+        };
+    }
+
+    // Generic error handler
+    return {
+        error: true,
+        errorType: "UnknownError",
+        message: error?.message || `An unknown error occurred when ${operation}`,
+        originalError: error
+    };
+};
+
+/**
+ * Start Socket Mode for a Slack agent
+ */
+export const startSocketMode = async (
+    agentId: number
+): Promise<SlackSocketModeResponse | { error: true; errorType: string; message: string; originalError?: any }> => {
+    try {
+        const response = await axios.post(
+            `${API_BASE_URL}/slack/agents/${agentId}/socket-mode/start`
+        );
+        return response.data;
+    } catch (error: any) {
+        return handleSocketModeError(error, 'starting Socket Mode');
+    }
+};
+
+/**
+ * Stop Socket Mode for a Slack agent
+ */
+export const stopSocketMode = async (
+    agentId: number
+): Promise<SlackSocketModeResponse | { error: true; errorType: string; message: string; originalError?: any }> => {
+    try {
+        const response = await axios.post(
+            `${API_BASE_URL}/slack/agents/${agentId}/socket-mode/stop`
+        );
+        return response.data;
+    } catch (error: any) {
+        return handleSocketModeError(error, 'stopping Socket Mode');
+    }
+};
+
+/**
+ * Get Socket Mode status for a Slack agent
+ */
+export const getSocketModeStatus = async (
+    agentId: number
+): Promise<SlackSocketModeResponse | { error: true; errorType: string; message: string; originalError?: any }> => {
+    try {
+        const response = await axios.get(
+            `${API_BASE_URL}/slack/agents/${agentId}/socket-mode/status`
+        );
+        return response.data;
+    } catch (error: any) {
+        return handleSocketModeError(error, 'getting Socket Mode status');
+    }
+};
+
+/**
+ * Fetch a masked token for a Slack agent
+ */
+export const fetchMaskedToken = async (agentId: number, tokenType: string): Promise<{
+    masked_token: string;
+    updated_at: string;
+}> => {
+    const url = `${API_BASE_URL}/slack/agents/${agentId}/tokens/${tokenType}`
+    console.log(`Fetching masked token from: ${url}`)
+
+    try {
+        const response = await axios.get(url)
+        console.log(`Received masked token response for ${tokenType}:`, response.data)
+        return response.data
+    } catch (error: any) {
+        console.error(`Error fetching ${tokenType}:`, error.response || error)
+        if (error.response?.status === 404) {
+            console.warn(`Token ${tokenType} for agent ${agentId} not found`)
+        }
+        throw error
+    }
+}
+
+/**
+ * Save Slack tokens for an agent
+ */
+export const saveSlackTokens = async (agentId: number, tokens: {
+    bot_token?: string;
+    user_token?: string;
+    app_token?: string;
+}): Promise<void> => {
+    try {
+        const requests = [];
+        if (tokens.bot_token?.trim()) {
+            requests.push(
+                axios.post(`${API_BASE_URL}/slack/agents/${agentId}/tokens/bot_token`, {
+                    token: tokens.bot_token
+                })
+            );
+        }
+        if (tokens.user_token?.trim()) {
+            requests.push(
+                axios.post(`${API_BASE_URL}/slack/agents/${agentId}/tokens/user_token`, {
+                    token: tokens.user_token
+                })
+            );
+        }
+        if (tokens.app_token?.trim()) {
+            requests.push(
+                axios.post(`${API_BASE_URL}/slack/agents/${agentId}/tokens/app_token`, {
+                    token: tokens.app_token
+                })
+            );
+        }
+
+        await Promise.all(requests);
+    } catch (error) {
+        console.error('Error saving tokens:', error);
+        throw error;
+    }
+}
+
+/**
+ * Delete a Slack token for an agent
+ */
+export const deleteSlackToken = async (agentId: number, tokenType: string): Promise<void> => {
+    try {
+        await axios.delete(`${API_BASE_URL}/slack/agents/${agentId}/tokens/${tokenType}`)
+    } catch (error) {
+        console.error(`Error deleting ${tokenType}:`, error)
+        throw error
+    }
+}
+
+export const testSlackConnection = async (agentId: number): Promise<{
+    success: boolean;
+    message: string;
+    team_id?: string;
+    bot_id?: string;
+    user_id?: string;
+    error?: any;
+}> => {
+    try {
+        const response = await axios.post(`${API_BASE_URL}/slack/agents/${agentId}/test-connection`);
+        return response.data;
+    } catch (error) {
+        console.error('Error testing Slack connection:', error);
+
+        if (axios.isAxiosError(error) && error.response) {
+            return {
+                success: false,
+                message: error.response.data?.detail || 'Failed to test Slack connection',
+                error: error.response.data
+            };
+        }
+
+        return {
+            success: false,
+            message: error instanceof Error ? error.message : 'Unknown error testing Slack connection',
+            error
+        };
+    }
+};

@@ -15,6 +15,7 @@ from pyspur.models.dc_and_vi_model import (
 from pyspur.models.eval_run_model import EvalRunModel  # type: ignore
 from pyspur.models.output_file_model import OutputFileModel  # type: ignore
 from pyspur.models.run_model import RunModel  # type: ignore
+from pyspur.models.slack_agent_model import SlackAgentModel  # type: ignore
 from pyspur.models.task_model import TaskModel  # type: ignore
 from pyspur.models.user_session_model import MessageModel, SessionModel, UserModel  # type: ignore
 from pyspur.models.workflow_model import WorkflowModel  # type: ignore

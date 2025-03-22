@@ -12,6 +12,7 @@ services:
       - ./.env
     environment:
       - ENVIRONMENT=staging
+      - SOCKET_MODE_DISABLED=true
     volumes:
       - .:/pyspur:ro
       - /pyspur/backend/pyspur/static/
@@ -22,6 +23,27 @@ services:
     depends_on:
       db:
         condition: service_healthy
+
+  slack-socket-worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.socket
+    env_file:
+      - ./.env.example
+      - ./.env
+    environment:
+      - ENVIRONMENT=staging
+    volumes:
+      - ./.env:/app/.env
+      - pyspur_data:/app/data
+    depends_on:
+      db:
+        condition: service_healthy
+      backend:
+        condition: service_started
+    deploy:
+      replicas: ${SOCKET_WORKERS:-2}
+    restart: unless-stopped
 
   db:
     image: postgres:17-alpine
@@ -38,4 +60,4 @@ services:
 
 volumes:
   postgres_data:
-  pyspur_data:  # Used to persist data like uploaded files, eval outputs, datasets 
+  pyspur_data:  # Used to persist data like uploaded files, eval outputs, datasets

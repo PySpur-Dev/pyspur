@@ -1,0 +1,28 @@
+FROM python:3.12-slim
+RUN apt-get update && apt-get install -y \
+    libpq-dev \
+    gcc \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Docker CLI using shared script
+COPY docker-install.sh /tmp/
+RUN bash /tmp/docker-install.sh && rm /tmp/docker-install.sh
+
+RUN pip install uv
+WORKDIR /app
+
+# Copy requirements and install dependencies
+COPY backend/pyproject.toml .
+RUN uv pip compile pyproject.toml > requirements.txt && \
+    uv pip install --system --no-cache-dir -r requirements.txt && \
+    rm requirements.txt
+
+# Copy application code
+COPY backend/ .
+
+# Environment settings
+ENV PYTHONPATH=/app
+
+# Run the socket worker
+CMD ["python", "-m", "pyspur.integrations.slack.socket_worker"]

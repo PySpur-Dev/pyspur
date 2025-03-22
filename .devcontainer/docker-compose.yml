@@ -9,6 +9,22 @@ services:
       - ../:/pyspur:cached
       - ../.env:/pyspur/backend/.env:cached
       - /pyspur/frontend/node_modules
+      - /var/run/docker.sock:/var/run/docker.sock
     environment:
       - PYTHONPATH=/pyspur/backend
+      - SOCKET_MODE_DISABLED=true
     command: sleep infinity
+
+  slack-socket-worker:
+    build:
+      context: ..
+      dockerfile: .devcontainer/Dockerfile.socket
+    volumes:
+      - ../:/pyspur:cached
+      - ../.env:/pyspur/backend/.env:cached
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      - PYTHONPATH=/pyspur/backend
+    depends_on:
+      - devdocker
+    restart: unless-stopped
