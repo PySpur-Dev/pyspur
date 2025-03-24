@@ -1,3 +1,4 @@
+import os
 import shutil
 import tempfile
 from contextlib import ExitStack, asynccontextmanager
@@ -9,7 +10,10 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
+from sqlalchemy.exc import SQLAlchemyError
 
+from ..database import get_db
+from ..scheduler import scheduler_manager
 from .api_app import api_app
 
 load_dotenv()
@@ -35,7 +39,32 @@ async def lifespan(app: FastAPI):
     if static_dir.exists():
         shutil.copytree(static_dir, temporary_static_dir, dirs_exist_ok=True)
 
+    # Initialize and start the scheduler
+    try:
+        # Get database URL from environment variable or use a default
+        database_url = os.environ.get("DATABASE_URL", "sqlite:///./sql_app.db")
+
+        # Initialize scheduler with database URL
+        scheduler_manager.initialize(database_url)
+
+        # Sync schedules from database
+        with next(get_db()) as db:
+            scheduler_manager.sync_schedules(db)
+
+        # Start scheduler
+        scheduler_manager.start()
+    except SQLAlchemyError as e:
+        print(f"Failed to initialize scheduler: {e}")
+    except Exception as e:
+        print(f"Error starting scheduler: {e}")
+
     yield
+
+    # Shutdown scheduler
+    try:
+        scheduler_manager.shutdown()
+    except Exception as e:
+        print(f"Error shutting down scheduler: {e}")
 
     # Cleanup: Remove temporary directory and close ExitStack
     exit_stack.close()

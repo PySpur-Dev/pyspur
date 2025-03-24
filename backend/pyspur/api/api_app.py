@@ -21,6 +21,7 @@ from .user_management import router as user_management_router
 from .workflow_code_convert import router as workflow_code_router
 from .workflow_management import router as workflow_management_router
 from .workflow_run import router as workflow_run_router
+from .workflow_schedule import router as workflow_schedule_router
 
 # Create a sub-application for API routes
 api_app = FastAPI(
@@ -47,3 +48,6 @@ api_app.include_router(file_management_router, prefix="/files", tags=["files"])
 api_app.include_router(ai_management_router, prefix="/ai", tags=["ai"])
 api_app.include_router(user_management_router, prefix="/user", tags=["users"])
 api_app.include_router(session_management_router, prefix="/session", tags=["sessions"])
+api_app.include_router(
+    workflow_schedule_router, prefix="/wf/schedules", tags=["workflow schedules"]
+)

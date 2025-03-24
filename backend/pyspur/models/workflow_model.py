@@ -37,3 +37,9 @@ class WorkflowModel(BaseModel):
         back_populates="workflow",
         cascade="all, delete-orphan",
     )
+
+    schedules = relationship(
+        "WorkflowScheduleModel",
+        back_populates="workflow",
+        cascade="all, delete-orphan",
+    )
