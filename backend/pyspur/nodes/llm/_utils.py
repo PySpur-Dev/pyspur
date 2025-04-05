@@ -222,6 +222,9 @@ def sanitize_json_schema(schema: Dict[str, Any]) -> Dict[str, Any]:
             if key not in schema["required"]:
                 schema["required"].append(key)
             sanitize_json_schema(value)
+    if "$defs" in schema:
+        for key in schema["$defs"]:
+            schema["$defs"][key] = sanitize_json_schema(schema["$defs"][key])
     return schema
 
 

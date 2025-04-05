@@ -43,9 +43,12 @@ def json_schema_to_model(
     # Extract the model name from the schema title.
     model_name = model_class_name
 
+    schema_defs = json_schema.get('$defs', {})
+    defs = {name: json_schema_to_model(definition, name) for name, definition in schema_defs.items()}
+
     # Extract the field definitions from the schema properties.
     field_definitions = {
-        name: json_schema_to_pydantic_field(name, prop, json_schema.get("required", []))
+        name: json_schema_to_pydantic_field(name, prop, json_schema.get("required", []), defs)
         for name, prop in json_schema.get("properties", {}).items()
     }
 
@@ -54,7 +57,7 @@ def json_schema_to_model(
 
 
 def json_schema_to_pydantic_field(
-    name: str, json_schema: Dict[str, Any], required: List[str]
+    name: str, json_schema: Dict[str, Any], required: List[str], definitions: Dict[str, Type[BaseModel]]
 ) -> Any:
     """Convert a JSON schema property to a Pydantic field definition.
 
@@ -68,7 +71,7 @@ def json_schema_to_pydantic_field(
 
     """
     # Get the field type.
-    type_ = json_schema_to_pydantic_type(json_schema)
+    type_ = json_schema_to_pydantic_type(json_schema, definitions)
 
     # Get the field description.
     description = json_schema.get("description")
@@ -88,7 +91,7 @@ def json_schema_to_pydantic_field(
     )
 
 
-def json_schema_to_pydantic_type(json_schema: Dict[str, Any]) -> Any:
+def json_schema_to_pydantic_type(json_schema: Dict[str, Any], definitions: Dict[str, Type[BaseModel]]) -> Any:
     """Convert a JSON schema type to a Pydantic type.
 
     Args:
@@ -99,6 +102,9 @@ def json_schema_to_pydantic_type(json_schema: Dict[str, Any]) -> Any:
 
     """
     type_ = json_schema.get("type")
+
+    if ref := json_schema.get('$ref'):
+        return definitions[ref.split("/")[-1]]
 
     if type_ == "string":
         return str
@@ -111,7 +117,7 @@ def json_schema_to_pydantic_type(json_schema: Dict[str, Any]) -> Any:
     elif type_ == "array":
         items_schema = json_schema.get("items")
         if items_schema:
-            item_type = json_schema_to_pydantic_type(items_schema)
+            item_type = json_schema_to_pydantic_type(items_schema, definitions)
             return List[item_type]
         else:
             return List
@@ -125,6 +131,8 @@ def json_schema_to_pydantic_type(json_schema: Dict[str, Any]) -> Any:
             return Dict
     elif type_ == "null":
         return Optional[Any]  # Use Optional[Any] for nullable fields
+    elif type_ == None:
+        return Optional[Any]
     else:
         raise ValueError(f"Unsupported JSON schema type: {type_}")
 
@@ -158,3 +166,18 @@ def json_schema_to_simple_schema(json_schema: Dict[str, Any]) -> Dict[str, str]:
         else:
             simple_schema[prop] = "Any"
     return simple_schema
+
+
+if __name__ == "__main__":
+
+    class TestModel(BaseModel):
+        name: str
+        age: int
+
+    json_schema_to_model(TestModel.model_json_schema())
+
+
+    class TestSubModel(BaseModel):
+        students: List[TestModel]
+
+    json_schema_to_model(TestSubModel.model_json_schema())
