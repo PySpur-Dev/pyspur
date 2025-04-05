@@ -87,6 +87,8 @@ class LLMModels(str, Enum):
     O3_MINI_2025_01_31 = "openai/o3-mini-2025-01-31"
     GPT_4O_MINI = "openai/gpt-4o-mini"
     GPT_4O = "openai/gpt-4o"
+    GPT_4O_MINI_SEARCH_PREVIEW = "openai/gpt-4o-mini-search-preview"
+    GPT_4O_SEARCH_PREVIEW = "openai/gpt-4o-search-preview"
     O1_PREVIEW = "openai/o1-preview"
     O1_MINI = "openai/o1-mini"
     O1 = "openai/o1"
@@ -178,6 +180,24 @@ class LLMModels(str, Enum):
                 constraints=ModelConstraints(
                     max_tokens=16384, max_temperature=2.0
                 ).add_mime_categories({MimeCategory.IMAGES}),
+            ),
+            cls.GPT_4O_MINI_SEARCH_PREVIEW.value: LLMModel(
+                    id=cls.GPT_4O_MINI_SEARCH_PREVIEW.value,
+                    provider=LLMProvider.OPENAI,
+                    name="GPT-4O Mini Search Preview",
+                    constraints=ModelConstraints(
+                            max_tokens=16384,
+                            supports_temperature=False
+                    ).add_mime_categories({MimeCategory.IMAGES}),
+            ),
+            cls.GPT_4O_SEARCH_PREVIEW.value: LLMModel(
+                    id=cls.GPT_4O_SEARCH_PREVIEW.value,
+                    provider=LLMProvider.OPENAI,
+                    name="GPT-4O Search Preview",
+                    constraints=ModelConstraints(
+                            max_tokens=16384,
+                            supports_temperature=False
+                    ).add_mime_categories({MimeCategory.IMAGES}),
             ),
             cls.O1_PREVIEW.value: LLMModel(
                 id=cls.O1_PREVIEW.value,
