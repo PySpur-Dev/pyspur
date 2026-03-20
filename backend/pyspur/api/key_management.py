@@ -93,6 +93,16 @@ PROVIDER_CONFIGS = [
         ],
     ),
     ProviderConfig(
+        id="minimax",
+        name="MiniMax",
+        description="MiniMax AI language models (M2.7, M2.5)",
+        category="llm",
+        icon="minimax",
+        parameters=[
+            ProviderParameter(name="MINIMAX_API_KEY", description="MiniMax API Key"),
+        ],
+    ),
+    ProviderConfig(
         id="cohere",
         name="Cohere",
         description="Cohere's language models",

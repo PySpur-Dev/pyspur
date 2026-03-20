@@ -92,7 +92,7 @@ This is the quickest way to get started. Python 3.11 or higher is required.
     We recommend you configure a postgres instance URL in the `.env` file to get a more stable experience.
 
 4. **[Optional] Configure Your Environment and Add API Keys:**
-    - **App UI**: Navigate to API Keys tab to add provider keys (OpenAI, Anthropic, etc.)
+    - **App UI**: Navigate to API Keys tab to add provider keys (OpenAI, Anthropic, MiniMax, etc.)
     - **Manual**: Edit `.env` file (recommended: configure postgres) and restart with `pyspur serve`
 
 

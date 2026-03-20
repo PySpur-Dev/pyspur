@@ -18,6 +18,7 @@ class LLMProvider(str, Enum):
     AZURE_OPENAI = "azure"
     DEEPSEEK = "deepseek"
     XAI = "xai"
+    MINIMAX = "minimax"
 
 
 class ModelConstraints(BaseModel):
@@ -142,6 +143,11 @@ class LLMModels(str, Enum):
     OLLAMA_MIXTRAL = "ollama/mixtral-8x7b-instruct-v0.1"
 
     XAI_GROK_2 = "xai/grok-2-latest"
+
+    # MiniMax Models
+    MINIMAX_M2_7 = "minimax/MiniMax-M2.7"
+    MINIMAX_M2_5 = "minimax/MiniMax-M2.5"
+    MINIMAX_M2_5_HIGHSPEED = "minimax/MiniMax-M2.5-highspeed"
 
     @classmethod
     def get_model_info(cls, model_id: str) -> LLMModel | None:
@@ -582,6 +588,37 @@ class LLMModels(str, Enum):
                             max_tokens=131072,
                             max_temperature=1.0,
                     ),
+            ),
+            # MiniMax Models
+            cls.MINIMAX_M2_7.value: LLMModel(
+                id=cls.MINIMAX_M2_7.value,
+                provider=LLMProvider.MINIMAX,
+                name="MiniMax M2.7",
+                constraints=ModelConstraints(
+                    max_tokens=8192,
+                    max_temperature=1.0,
+                    supports_JSON_output=True,
+                ),
+            ),
+            cls.MINIMAX_M2_5.value: LLMModel(
+                id=cls.MINIMAX_M2_5.value,
+                provider=LLMProvider.MINIMAX,
+                name="MiniMax M2.5",
+                constraints=ModelConstraints(
+                    max_tokens=8192,
+                    max_temperature=1.0,
+                    supports_JSON_output=True,
+                ),
+            ),
+            cls.MINIMAX_M2_5_HIGHSPEED.value: LLMModel(
+                id=cls.MINIMAX_M2_5_HIGHSPEED.value,
+                provider=LLMProvider.MINIMAX,
+                name="MiniMax M2.5 (High Speed)",
+                constraints=ModelConstraints(
+                    max_tokens=8192,
+                    max_temperature=1.0,
+                    supports_JSON_output=True,
+                ),
             ),
         }
         return model_registry.get(model_id)

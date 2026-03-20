@@ -198,6 +198,7 @@ const APIKeys = (props: CardProps): React.ReactElement => {
             cohere: 'solar:magic-stick-3-bold',
             voyage: 'solar:rocket-bold',
             mistral: 'solar:stars-bold',
+            minimax: 'solar:bolt-circle-bold',
 
             // Vector Store Providers
             pinecone: 'logos:pinecone',

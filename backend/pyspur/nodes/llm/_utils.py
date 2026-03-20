@@ -18,7 +18,7 @@ from tenacity import AsyncRetrying, stop_after_attempt, wait_random_exponential
 from ...utils.file_utils import encode_file_to_base64_data_url
 from ...utils.mime_types_utils import get_mime_type_for_url
 from ...utils.path_utils import is_external_url, resolve_file_path
-from ._model_info import LLMModels
+from ._model_info import LLMModels, LLMProvider
 from ._providers import OllamaOptions, setup_azure_configuration
 
 # uncomment for debugging litellm issues
@@ -171,9 +171,11 @@ async def completion_with_backoff(**kwargs) -> Message:
         logging.info(f"Requested Model: {model}")
 
         # Use Azure if either 'azure/' is prefixed or if an Azure API key
-        # is provided and not using Ollama
+        # is provided and not using Ollama or other providers with their own keys
         if model.startswith("azure/") or (
-            os.getenv("AZURE_OPENAI_API_KEY") and not model.startswith("ollama/")
+            os.getenv("AZURE_OPENAI_API_KEY")
+            and not model.startswith("ollama/")
+            and not model.startswith("minimax/")
         ):
             azure_kwargs = setup_azure_configuration(kwargs)
             logging.info(f"Using Azure config for model: {azure_kwargs['model']}")
@@ -183,6 +185,20 @@ async def completion_with_backoff(**kwargs) -> Message:
             except Exception as e:
                 logging.error(f"Error calling Azure OpenAI: {e}")
                 raise
+
+        elif model.startswith("minimax/"):
+            logging.info("=== MiniMax Configuration ===")
+            minimax_api_key = os.getenv("MINIMAX_API_KEY")
+            minimax_api_base = os.getenv(
+                "MINIMAX_API_BASE", "https://api.minimax.io/v1"
+            )
+            # Route through litellm's OpenAI-compatible handler
+            minimax_model = model.replace("minimax/", "")
+            kwargs["model"] = f"openai/{minimax_model}"
+            kwargs["api_key"] = minimax_api_key
+            kwargs["api_base"] = minimax_api_base
+            response = await acompletion(**kwargs, drop_params=True)
+            return response.choices[0].message
 
         elif model.startswith("ollama/"):
             logging.info("=== Ollama Configuration ===")
@@ -309,11 +325,17 @@ async def generate_text(
         output_json_schema["additionalProperties"] = False
 
         # check if the model supports response format
-        if "response_format" in litellm.get_supported_openai_params(
-            model=model_name, custom_llm_provider=model_info.provider
-        ):
+        # For OpenAI-compatible providers (e.g. MiniMax), use "openai" as
+        # the custom_llm_provider so litellm can resolve supported params.
+        _llm_provider = model_info.provider
+        if _llm_provider == LLMProvider.MINIMAX:
+            _llm_provider = "openai"
+        supported_params = litellm.get_supported_openai_params(
+            model=model_name, custom_llm_provider=_llm_provider
+        )
+        if supported_params and "response_format" in supported_params:
             if litellm.supports_response_schema(
-                model=model_name, custom_llm_provider=model_info.provider
+                model=model_name, custom_llm_provider=_llm_provider
             ) or model_name.startswith("anthropic"):
                 if "name" not in output_json_schema and "schema" not in output_json_schema:
                     output_json_schema = {
