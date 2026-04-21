@@ -44,7 +44,23 @@ def json_schema_to_model(
     model_name = model_class_name
 
     schema_defs = json_schema.get('$defs', {})
-    defs = {name: json_schema_to_model(definition, name) for name, definition in schema_defs.items()}
+    defs: Dict[str, Any] = {}
+    for name, definition in schema_defs.items():
+        if 'enum' in definition:
+            # Enum definitions should map to their base Python type, not a Pydantic model
+            base_type = definition.get('type', 'string')
+            if base_type == 'string':
+                defs[name] = str
+            elif base_type == 'integer':
+                defs[name] = int
+            elif base_type == 'number':
+                defs[name] = float
+            elif base_type == 'boolean':
+                defs[name] = bool
+            else:
+                defs[name] = Any
+        else:
+            defs[name] = json_schema_to_model(definition, name)
 
     # Extract the field definitions from the schema properties.
     field_definitions = {
