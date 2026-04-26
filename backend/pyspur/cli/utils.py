@@ -121,11 +121,12 @@ def run_migrations() -> None:
             if not script_location.is_dir():
                 raise FileNotFoundError("Migration scripts not found in package")
 
-            # extract migration scripts directory to a temporary location
-            with (
-                tempfile.TemporaryDirectory() as script_temp_dir,
-                resources.as_file(script_location) as script_location_path,
-            ):
+            # Extract migration scripts to a temporary location for Alembic.
+            # resources.as_file() only supports files in Python < 3.12, so we
+            # convert the MultiplexedPath to a regular Path via str(), which
+            # returns the underlying filesystem path for installed packages.
+            with tempfile.TemporaryDirectory() as script_temp_dir:
+                script_location_path = Path(str(script_location))
                 shutil.copytree(script_location_path, Path(script_temp_dir), dirs_exist_ok=True)
                 # Create Alembic config programmatically
                 config = Config()
