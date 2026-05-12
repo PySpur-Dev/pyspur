@@ -179,3 +179,152 @@ You can support us in our work by leaving a star! Thank you!
 
 Your feedback will be massively appreciated.
 Please [tell us](mailto:founders@pyspur.dev?subject=Feature%20Request&body=I%20want%20this%20feature%3Ai) which features on that list you like to see next or request entirely new ones.
+## FAQ
+
+### General
+
+**What is PySpur?**
+
+PySpur is an open-source visual playground for AI engineers to iterate over AI agents 10x faster. It provides a UI-based workflow builder with Python extensibility, evaluation tools, and one-click deployment.
+
+**How does PySpur compare to LangGraph or CrewAI?**
+
+- **LangGraph**: Graph-based agent orchestration. PySpur adds visual workflow editing, built-in evaluations, and deployment tools.
+- **CrewAI**: Role-based multi-agent systems. PySpur focuses on rapid iteration with test cases and visual debugging.
+
+**Is PySpur production-ready?**
+
+Yes. PySpur supports one-click deployment as API endpoints, automatic trace capture, and PostgreSQL-backed storage for production stability.
+
+### Getting Started
+
+**What Python version is required?**
+
+Python 3.11 or higher is required.
+
+**How do I install PySpur?**
+
+```sh
+pip install pyspur
+pyspur init my-project
+cd my-project
+pyspur serve --sqlite
+```
+
+This starts PySpur at `http://localhost:6080` with SQLite. For production, configure PostgreSQL in `.env`.
+
+**What are the deployment options?**
+
+- **Dev Container**: Use Cursor/VS Code with Dev Containers extension
+- **Docker Compose**: `docker compose -f docker-compose.dev.yml up --build -d`
+- **Manual Setup**: Clone and configure `.env` manually
+
+### Core Features
+
+**What is Human in the Loop?**
+
+Persistent workflows that wait for human approval at designated points. Useful for sensitive operations requiring review.
+
+**How do Loops work?**
+
+Iterative tool calling with memory. The agent can repeatedly call tools until a condition is met, maintaining context across iterations.
+
+**What structured outputs are supported?**
+
+PySpur provides a UI editor for JSON Schemas. Define output formats and the agent will generate structured responses matching your schema.
+
+**What file upload options are available?**
+
+- Direct file upload through the UI
+- Paste URLs to process documents
+- Support for various document formats
+
+### RAG & Multimodal
+
+**What RAG capabilities are included?**
+
+Built-in pipeline for:
+- Parse: Extract content from documents
+- Chunk: Split into manageable segments
+- Embed: Generate vector embeddings
+- Upsert: Insert into Vector DB
+
+**What vector databases are supported?**
+
+PySpur supports >100 LLM providers, embedders, and vector DBs. Configure your preferred vector database in the workflow.
+
+**What multimodal content is supported?**
+
+Video, Images, Audio, Texts, and Code. Process and analyze multiple content types in your workflows.
+
+### Tools Integration
+
+**What tools are available?**
+
+Built-in integrations include:
+- Slack
+- Firecrawl.dev
+- Google Sheets
+- GitHub
+- And more
+
+**How do I add custom tools?**
+
+Create a single Python file to add new nodes. PySpur's Python-based architecture makes tool extension straightforward.
+
+### LLM Providers
+
+**What LLM providers are supported?**
+
+PySpur supports >100 LLM providers. Configure API keys through the App UI (API Keys tab) or `.env` file.
+
+**How do I configure API keys?**
+
+- **App UI**: Navigate to API Keys tab, add provider keys (OpenAI, Anthropic, etc.)
+- **Manual**: Edit `.env` file and restart with `pyspur serve`
+
+### Evaluations & Deployment
+
+**How do evaluations work?**
+
+1. Define test cases with expected outputs
+2. Run agents on real-world datasets
+3. Compare results against test cases
+4. Iterate until performance meets requirements
+
+**What is one-click deploy?**
+
+Publish your agent as an API endpoint. Integrate wherever you want — web apps, mobile, other services.
+
+**What are Traces?**
+
+Automatic capture of execution traces for deployed agents. Review step-by-step execution to debug issues in production.
+
+### Troubleshooting
+
+**PySpur won't start.**
+
+- Verify Python version is 3.11+
+- Check `.env` configuration
+- Ensure all dependencies installed: `pip install pyspur`
+- Try SQLite mode first: `pyspur serve --sqlite`
+
+**Database connection issues.**
+
+- Verify PostgreSQL URL in `.env`
+- Ensure database is running
+- Check connection credentials
+- Test with SQLite first to isolate issue
+
+**API key not recognized.**
+
+- Add keys through App UI (API Keys tab)
+- Or configure in `.env` file
+- Restart the server after adding keys
+
+### Help & Resources
+
+- **Documentation**: https://docs.pyspur.dev/
+- **Cloud**: https://forms.gle/5wHRctedMpgfNGah7
+- **Email**: founders@pyspur.dev for feature requests
+- **GitHub Issues**: Report bugs and request features
