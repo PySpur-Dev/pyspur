@@ -179,6 +179,8 @@ async def completion_with_backoff(**kwargs) -> Message:
             logging.info(f"Using Azure config for model: {azure_kwargs['model']}")
             try:
                 response = await acompletion(**azure_kwargs, drop_params=True)
+                if not response.choices or response.choices[0].message is None:
+                    raise ValueError("LLM returned empty or filtered response")
                 return response.choices[0].message.content
             except Exception as e:
                 logging.error(f"Error calling Azure OpenAI: {e}")
