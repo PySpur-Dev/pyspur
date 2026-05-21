@@ -179,3 +179,45 @@ You can support us in our work by leaving a star! Thank you!
 
 Your feedback will be massively appreciated.
 Please [tell us](mailto:founders@pyspur.dev?subject=Feature%20Request&body=I%20want%20this%20feature%3Ai) which features on that list you like to see next or request entirely new ones.
+
+
+## ❓ FAQ
+
+### What is PySpur?
+
+PySpur is a visual playground for agentic workflows. Iterate over your AI agents 10x faster with drag-and-drop interface and Python-based extensibility.
+
+### Key Features
+
+- 👤 **Human in the Loop**: Persistent workflows waiting for human approval
+- 🔄 **Loops**: Iterative tool calling with memory
+- 🗃️ **RAG**: Parse, Chunk, Embed, Upsert Data into Vector DB
+- 🖼️ **Multimodal**: Support for Video, Images, Audio, Texts, Code
+- 🧪 **Evals**: Evaluate agents on real-world datasets
+- 🚀 **One-Click Deploy**: Publish as API
+
+### How do I get started?
+
+```bash
+pip install pyspur
+pyspur init my-project
+cd my-project
+pyspur serve --sqlite
+```
+
+### What Python version is required?
+
+Python 3.11 or higher.
+
+### What LLM providers are supported?
+
+PySpur supports >100 LLM providers: OpenAI, Anthropic, Google, Mistral, DeepSeek, local models.
+
+### Where can I find help?
+
+- 📖 [Documentation](https://docs.pyspur.dev)
+
+### License
+
+Apache 2.0 License
+
