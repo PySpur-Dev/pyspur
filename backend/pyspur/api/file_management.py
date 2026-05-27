@@ -15,6 +15,15 @@ router = APIRouter()
 DATA_DIR = Path("data")
 
 
+def _safe_resolve(base: Path, *parts: str) -> Path:
+    """Resolve a path and ensure it is within the expected base directory."""
+    full_path = (base / Path(*parts)).resolve()
+    base_resolved = base.resolve()
+    if not (full_path == base_resolved or str(full_path).startswith(str(base_resolved) + os.sep)):
+        raise HTTPException(status_code=400, detail="Invalid path")
+    return full_path
+
+
 @router.get(
     "/{workflow_id}",
     response_model=List[FileResponseSchema],
@@ -25,7 +34,7 @@ async def list_workflow_files(workflow_id: str) -> List[FileResponseSchema]:
     List all files in the workflow's directory.
     Returns a list of dictionaries containing file information.
     """
-    workflow_dir = DATA_DIR / "run_files" / workflow_id
+    workflow_dir = _safe_resolve(DATA_DIR, "run_files", workflow_id)
 
     if not workflow_dir.exists():
         return []
@@ -87,7 +96,7 @@ async def delete_file(workflow_id: str, filename: str):
     """
     Delete a specific file from a workflow's directory.
     """
-    file_path = DATA_DIR / "run_files" / workflow_id / filename
+    file_path = _safe_resolve(DATA_DIR, "run_files", workflow_id, filename)
 
     if not file_path.exists():
         raise HTTPException(status_code=404, detail="File not found")
@@ -104,7 +113,7 @@ async def delete_workflow_files(workflow_id: str):
     """
     Delete all files in a workflow's directory.
     """
-    workflow_dir = DATA_DIR / "run_files" / workflow_id
+    workflow_dir = _safe_resolve(DATA_DIR, "run_files", workflow_id)
 
     if not workflow_dir.exists():
         raise HTTPException(status_code=404, detail="Workflow directory not found")
