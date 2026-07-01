@@ -25,6 +25,8 @@ https://github.com/user-attachments/assets/54d0619f-22fd-476c-bf19-9be083d7e710
 
 # 🕸️ Why PySpur?
 
+[![Listed on TakoAPI](https://takoapi.com/api/badge/pyspur-dev-pyspur)](https://takoapi.com/agents/pyspur-dev-pyspur)
+
 ## Problem: It takes a 1,000 tiny paper cuts to make AI reliable
 
 AI engineers today face three problems of building agents: 
