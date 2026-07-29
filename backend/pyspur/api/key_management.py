@@ -93,6 +93,45 @@ PROVIDER_CONFIGS = [
         ],
     ),
     ProviderConfig(
+        id="minimax",
+        name="MiniMax",
+        description="MiniMax models through compatible chat APIs",
+        category="llm",
+        parameters=[
+            ProviderParameter(name="MINIMAX_API_KEY", description="MiniMax API Key"),
+            ProviderParameter(
+                name="MINIMAX_REGION",
+                description="MiniMax endpoint region: global_en or cn_zh",
+                type="text",
+            ),
+            ProviderParameter(
+                name="MINIMAX_PROTOCOL",
+                description="MiniMax API protocol: openai or anthropic",
+                type="text",
+            ),
+            ProviderParameter(
+                name="MINIMAX_GLOBAL_EN_OPENAI_API_BASE",
+                description="MiniMax global OpenAI-compatible base URL",
+                type="text",
+            ),
+            ProviderParameter(
+                name="MINIMAX_GLOBAL_EN_ANTHROPIC_API_BASE",
+                description="MiniMax global Anthropic-compatible base URL",
+                type="text",
+            ),
+            ProviderParameter(
+                name="MINIMAX_CN_ZH_OPENAI_API_BASE",
+                description="MiniMax China OpenAI-compatible base URL",
+                type="text",
+            ),
+            ProviderParameter(
+                name="MINIMAX_CN_ZH_ANTHROPIC_API_BASE",
+                description="MiniMax China Anthropic-compatible base URL",
+                type="text",
+            ),
+        ],
+    ),
+    ProviderConfig(
         id="cohere",
         name="Cohere",
         description="Cohere's language models",

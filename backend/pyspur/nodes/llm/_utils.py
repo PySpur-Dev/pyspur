@@ -19,7 +19,7 @@ from ...utils.file_utils import encode_file_to_base64_data_url
 from ...utils.mime_types_utils import get_mime_type_for_url
 from ...utils.path_utils import is_external_url, resolve_file_path
 from ._model_info import LLMModels
-from ._providers import OllamaOptions, setup_azure_configuration
+from ._providers import OllamaOptions, setup_azure_configuration, setup_minimax_configuration
 
 # uncomment for debugging litellm issues
 # litellm.set_verbose=True
@@ -167,6 +167,10 @@ async def completion_with_backoff(**kwargs) -> Message:
     """
     try:
         model = kwargs.get("model", "")
+        minimax_config = setup_minimax_configuration(model)
+        if minimax_config:
+            kwargs = kwargs.copy()
+            kwargs.update(minimax_config)
         logging.info("=== LLM Request Configuration ===")
         logging.info(f"Requested Model: {model}")
 
@@ -278,6 +282,12 @@ async def generate_text(
 
     # Get model info to check capabilities
     model_info = LLMModels.get_model_info(model_name)
+    litellm_model = model_name
+    litellm_provider = model_info.provider if model_info else None
+    if model_name.startswith("minimax/"):
+        minimax_config = setup_minimax_configuration(model_name)
+        litellm_model = minimax_config["model"]
+        litellm_provider = minimax_config["custom_llm_provider"]
 
     # Only add thinking parameters if explicitly requested and supported by the model
     if thinking and model_info and model_info.constraints.supports_thinking:
@@ -310,11 +320,11 @@ async def generate_text(
 
         # check if the model supports response format
         if "response_format" in litellm.get_supported_openai_params(
-            model=model_name, custom_llm_provider=model_info.provider
+            model=litellm_model, custom_llm_provider=litellm_provider
         ):
             if litellm.supports_response_schema(
-                model=model_name, custom_llm_provider=model_info.provider
-            ) or model_name.startswith("anthropic"):
+                model=litellm_model, custom_llm_provider=litellm_provider
+            ) or litellm_provider == "anthropic":
                 if "name" not in output_json_schema and "schema" not in output_json_schema:
                     output_json_schema = {
                         "schema": output_json_schema,

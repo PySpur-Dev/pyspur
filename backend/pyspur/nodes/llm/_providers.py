@@ -4,6 +4,13 @@ from typing import Any, Dict, Optional
 from pydantic import BaseModel, Field
 
 
+MINIMAX_REGIONS = {
+    "global_en": "GLOBAL_EN",
+    "cn_zh": "CN_ZH",
+}
+MINIMAX_PROTOCOLS = {"openai", "anthropic"}
+
+
 class OllamaOptions(BaseModel):
     """Options for Ollama API calls"""
 
@@ -63,3 +70,43 @@ def setup_azure_configuration(kwargs: Dict[str, Any]) -> Dict[str, Any]:
     if missing_config:
         raise ValueError(f"Missing Azure configuration for: {', '.join(missing_config)}")
     return azure_kwargs
+
+
+def setup_minimax_configuration(model: str) -> Dict[str, Any]:
+    """Resolve a MiniMax model to an existing LiteLLM compatible adapter.
+
+    MiniMax exposes both OpenAI-compatible and Anthropic-compatible APIs. The
+    public base URL is selected by region and protocol, while LiteLLM receives
+    the underlying model ID and the matching compatible provider.
+    """
+    if not model.startswith("minimax/"):
+        return {}
+
+    region = os.getenv("MINIMAX_REGION", "global_en")
+    region_key = MINIMAX_REGIONS.get(region)
+    if region_key is None:
+        allowed_regions = ", ".join(sorted(MINIMAX_REGIONS))
+        raise ValueError(f"MINIMAX_REGION must be one of: {allowed_regions}")
+
+    protocol = os.getenv("MINIMAX_PROTOCOL", "openai").lower()
+    if protocol not in MINIMAX_PROTOCOLS:
+        allowed_protocols = ", ".join(sorted(MINIMAX_PROTOCOLS))
+        raise ValueError(f"MINIMAX_PROTOCOL must be one of: {allowed_protocols}")
+
+    env_name = f"MINIMAX_{region_key}_{protocol.upper()}_API_BASE"
+    api_base = os.getenv(env_name, "").rstrip("/")
+    expected_suffix = "/anthropic" if protocol == "anthropic" else "/v1"
+    if not api_base:
+        raise ValueError(f"Missing MiniMax configuration for: {env_name}")
+    if not api_base.endswith(expected_suffix):
+        raise ValueError(f"{env_name} must end with {expected_suffix}")
+
+    request = {
+        "model": model.removeprefix("minimax/"),
+        "custom_llm_provider": protocol,
+        "api_base": api_base,
+    }
+    api_key = os.getenv("MINIMAX_API_KEY")
+    if api_key:
+        request["api_key"] = api_key
+    return request

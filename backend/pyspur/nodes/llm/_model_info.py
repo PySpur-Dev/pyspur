@@ -1,7 +1,7 @@
 from enum import Enum
-from typing import Optional, Set
+from typing import Any, Dict, List, Optional, Set
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from ...utils.mime_types_utils import (
     MIME_TYPES_BY_CATEGORY,
@@ -18,6 +18,7 @@ class LLMProvider(str, Enum):
     AZURE_OPENAI = "azure"
     DEEPSEEK = "deepseek"
     XAI = "xai"
+    MINIMAX = "minimax"
 
 
 class ModelConstraints(BaseModel):
@@ -32,6 +33,11 @@ class ModelConstraints(BaseModel):
     reasoning_separator: str = r"<think>.*?</think>"
     supports_thinking: bool = False
     thinking_budget_tokens: Optional[int] = None
+    context_window: Optional[int] = None
+    input_modalities: Set[str] = Field(default_factory=set)
+    thinking_modes: Set[str] = Field(default_factory=set)
+    pricing_usd_per_million_tokens: Dict[str, Optional[float]] = Field(default_factory=dict)
+    pricing_tiers_usd_per_million_tokens: List[Dict[str, Any]] = Field(default_factory=list)
 
     def add_mime_categories(self, categories: Set[MimeCategory]) -> "ModelConstraints":
         """Add MIME type support for entire categories.
@@ -142,6 +148,10 @@ class LLMModels(str, Enum):
     OLLAMA_MIXTRAL = "ollama/mixtral-8x7b-instruct-v0.1"
 
     XAI_GROK_2 = "xai/grok-2-latest"
+
+    # MiniMax Models
+    MINIMAX_M3 = "minimax/MiniMax-M3"
+    MINIMAX_M2_7 = "minimax/MiniMax-M2.7"
 
     @classmethod
     def get_model_info(cls, model_id: str) -> LLMModel | None:
@@ -582,6 +592,78 @@ class LLMModels(str, Enum):
                             max_tokens=131072,
                             max_temperature=1.0,
                     ),
+            ),
+            cls.MINIMAX_M3.value: LLMModel(
+                id=cls.MINIMAX_M3.value,
+                provider=LLMProvider.MINIMAX,
+                name="MiniMax M3",
+                constraints=ModelConstraints(
+                    max_tokens=65536,
+                    max_temperature=1.0,
+                    supports_thinking=True,
+                    context_window=1000000,
+                    input_modalities={"text", "image", "video"},
+                    thinking_modes={"adaptive", "disabled"},
+                    pricing_usd_per_million_tokens={
+                        "input": 0.6,
+                        "output": 2.4,
+                        "cache_read": 0.12,
+                        "cache_write": None,
+                    },
+                    pricing_tiers_usd_per_million_tokens=[
+                        {
+                            "service_tier": "standard",
+                            "input_tokens_lte": 512000,
+                            "input": 0.3,
+                            "output": 1.2,
+                            "cache_read": 0.06,
+                            "cache_write": None,
+                        },
+                        {
+                            "service_tier": "standard",
+                            "input_tokens_gt": 512000,
+                            "input": 0.6,
+                            "output": 2.4,
+                            "cache_read": 0.12,
+                            "cache_write": None,
+                        },
+                        {
+                            "service_tier": "priority",
+                            "input_tokens_lte": 512000,
+                            "input": 0.45,
+                            "output": 1.8,
+                            "cache_read": 0.09,
+                            "cache_write": None,
+                        },
+                        {
+                            "service_tier": "priority",
+                            "input_tokens_gt": 512000,
+                            "input": 0.9,
+                            "output": 3.6,
+                            "cache_read": 0.18,
+                            "cache_write": None,
+                        },
+                    ],
+                ),
+            ),
+            cls.MINIMAX_M2_7.value: LLMModel(
+                id=cls.MINIMAX_M2_7.value,
+                provider=LLMProvider.MINIMAX,
+                name="MiniMax M2.7",
+                constraints=ModelConstraints(
+                    max_tokens=65536,
+                    max_temperature=1.0,
+                    supports_thinking=True,
+                    context_window=204800,
+                    input_modalities={"text"},
+                    thinking_modes={"always_on"},
+                    pricing_usd_per_million_tokens={
+                        "input": 0.3,
+                        "output": 1.2,
+                        "cache_read": 0.06,
+                        "cache_write": 0.375,
+                    },
+                ),
             ),
         }
         return model_registry.get(model_id)

@@ -20,6 +20,11 @@ export interface ModelConstraints {
     supports_temperature: boolean
     supports_thinking?: boolean
     thinking_budget_tokens?: number
+    context_window?: number
+    input_modalities?: string[]
+    thinking_modes?: string[]
+    pricing_usd_per_million_tokens?: Record<string, number | null>
+    pricing_tiers_usd_per_million_tokens?: Array<Record<string, string | number | null>>
 }
 
 export interface ModelConstraintsMap {
