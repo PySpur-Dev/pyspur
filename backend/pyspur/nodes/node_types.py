@@ -181,6 +181,11 @@ SUPPORTED_NODE_TYPES = {
             "module": ".nodes.search.exa.search",
             "class_name": "ExaSearchNode",
         },
+        {
+            "node_type_name": "ParallelSearchNode",
+            "module": ".nodes.search.parallel.search",
+            "class_name": "ParallelSearchNode",
+        },
     ],
     "Tools": [
         {
