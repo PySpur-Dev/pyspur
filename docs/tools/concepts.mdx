@@ -17,6 +17,27 @@ We recommend PySpur tools be designed with the following characteristics in mind
 2. **Serializable I/O** - Tools should accept and return serializable data structures. This to ensure that LLMs can use the tools.
 
 
+## Parallel Search
+
+Choose **Parallel Search** in the **Search** node picker, connect it to your workflow,
+and set its query template using the incoming variables. You can also add it as an
+agent tool. It searches through `https://search.parallel.ai/mcp` without a Parallel
+account or API key. Free access is rate limited. Remove the node or agent tool to
+stop using it. Existing Exa nodes keep their selected provider and key requirements;
+adding this option does not automatically send searches to Parallel.
+
+Queries and the optional objective are sent to Parallel when the node runs. An
+agent can invoke an enabled tool during its work. Requests identify PySpur through
+its project-wide User-Agent so Parallel can measure aggregate free MCP usage.
+This node uses anonymous access and does not read provider credentials.
+
+Results retain source URLs, titles, publication dates, excerpts, and service
+warnings. Result count and excerpt length limits apply locally; `truncated` signals
+shortened output. The search deadline defaults to 60 seconds and responses are
+limited to 1 MB. This node does not offer domain/date filters or full-page retrieval.
+See the [Search MCP setup guide](https://docs.parallel.ai/integrations/mcp/search-mcp)
+for the hosted service's access details.
+
 ## Custom Tools
 
 PySpur allows you to create custom tools by converting Python functions into PySpur tools. This process involves using the `@tool_function` decorator to register your function as a tool.
