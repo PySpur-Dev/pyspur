@@ -300,6 +300,17 @@ PROVIDER_CONFIGS = [
             ProviderParameter(name="EXA_API_KEY", description="Exa API Key"),
         ],
     ),
+    # Add Linkup Provider
+    ProviderConfig(
+        id="linkup",
+        name="Linkup",
+        description="Linkup web search API",
+        category="search",
+        icon="solar:search-bold",
+        parameters=[
+            ProviderParameter(name="LINKUP_API_KEY", description="Linkup API Key"),
+        ],
+    ),
 ]
 
 # For backward compatibility, create a flat list of all parameter names

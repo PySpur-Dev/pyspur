@@ -181,6 +181,16 @@ SUPPORTED_NODE_TYPES = {
             "module": ".nodes.search.exa.search",
             "class_name": "ExaSearchNode",
         },
+        {
+            "node_type_name": "LinkupSearchNode",
+            "module": ".nodes.search.linkup.search",
+            "class_name": "LinkupSearchNode",
+        },
+        {
+            "node_type_name": "LinkupFetchNode",
+            "module": ".nodes.search.linkup.fetch",
+            "class_name": "LinkupFetchNode",
+        },
     ],
     "Tools": [
         {
